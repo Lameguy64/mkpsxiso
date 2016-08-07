@@ -1,0 +1,8 @@
+.objs
+files
+Debug
+pages
+test.xml
+*.depend
+*.layout
+*.exe
