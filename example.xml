@@ -111,7 +111,10 @@
 		
 	</track>
 
-	<!-- Specifies a CD-DA audio track -->
+	<!-- Specifies CD-DA audio tracks
+	
+		WAV files must be of Microsoft format, uncompressed, 44100KHz 16-bit stereo.
+	-->
 	<track type="audio" source="mytrack2.wav"/>
 	<track type="audio" source="mytrack3.wav"/>
 	

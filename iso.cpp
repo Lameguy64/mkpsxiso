@@ -32,16 +32,24 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 
 	struct stat fileAttrib;
 
-    if (stat(srcfile, &fileAttrib) != 0)
+    if (stat(srcfile, &fileAttrib) != 0) {
+
+		if (!global::QuietMode)
+			printf("      ");
+
+		printf("ERROR: File not found: %s\n", srcfile);
 		return false;
 
+    }
+
 	if (((type == EntryXA) || (type == EntrySTR)) && ((fileAttrib.st_size % 2336) != 0)) {
-		printf("      WARNING: %s is not a multiple of 2336 bytes for XA/STR.\n", srcfile);
+
+        if (!global::QuietMode)
+            printf("      ");
+
+        printf("WARNING: %s is not a multiple of 2336 bytes for XA/STR encoding.\n", srcfile);
+
 	}
-
-
-	if (numentries > 0)
-		entries = (DIRENTRY*)realloc(entries, sizeof(DIRENTRY)*(numentries+1));
 
 
 	char tempName[strlen(id)+2];
@@ -52,6 +60,31 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 		tempName[i] = toupper(tempName[i]);
 
 	strcat(tempName, ";1");
+
+
+	// Check if file entry already exists
+    for(int i=0; i<numentries; i++) {
+
+		if (entries[i].id != NULL) {
+
+            if ((entries[i].type == EntryFile) && (strcasecmp(entries[i].id, tempName) == 0)) {
+
+				if (!global::QuietMode)
+					printf("      ");
+
+				printf("ERROR: Duplicate file entry: %s\n", id);
+
+				return false;
+
+            }
+
+		}
+
+    }
+
+
+	if (numentries > 0)
+		entries = (DIRENTRY*)realloc(entries, sizeof(DIRENTRY)*(numentries+1));
 
 	memset(&entries[numentries], 0x00, sizeof(DIRENTRY));
 
@@ -99,11 +132,25 @@ void iso::DirTreeClass::AddDummyEntry(int sectors) {
 
 iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id) {
 
-	if (numentries > 0) {
+    for(int i=0; i<numentries; i++) {
 
+		if (entries[i].id != NULL) {
+			if ((entries[i].type == iso::EntryDir) && (strcasecmp(entries[i].id, id) == 0)) {
+
+				if (!global::QuietMode)
+					printf("      ");
+
+				printf("ERROR: Duplicate directory entry: %s\n", id);
+
+				return NULL;
+
+			}
+		}
+
+    }
+
+	if (numentries > 0)
 		entries = (DIRENTRY*)realloc(entries, sizeof(DIRENTRY) * (numentries + 1));
-
-	}
 
 	memset(&entries[numentries], 0x00, sizeof(DIRENTRY));
 

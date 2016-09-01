@@ -11,6 +11,7 @@
 				<Option object_output="C:/Users/Lameguy64/Desktop/Projects/mkpsxiso/.objs" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option parameters="test.xml" />
 				<Compiler>
 					<Add option="-O2" />
 				</Compiler>

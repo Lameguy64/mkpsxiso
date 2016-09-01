@@ -4,7 +4,7 @@
 #include "cdwriter.h"	// CD image reader/writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.00"
+#define VERSION "1.04"
 
 namespace global {
 
@@ -59,7 +59,7 @@ int main(int argc, const char* argv[]) {
 
 		printf("mkpsxiso <script.xml> [-q]\n\n");
 		printf("   <script> - File name of an XML script of an ISO image project.\n");
-		printf("   [-q]     - Quiet mode.\n");
+		printf("   [-q]     - Quiet mode (prints nothing but warnings and errors).\n");
 
 		return EXIT_SUCCESS;
 
@@ -172,23 +172,6 @@ int main(int argc, const char* argv[]) {
 			if (!global::QuietMode)
 				printf("  Track #%d %s:\n", trackNum, trackElement->Attribute("type"));
 
-			if (trackNum != 1) {
-
-				if (!global::QuietMode)
-					printf("  ");
-
-				printf("ERROR: Data track can only be on first track.\n");
-
-				writer.Close();
-
-				if (cuefp != NULL)
-					fclose(cuefp);
-
-				free(global::XMLscript);
-				return EXIT_FAILURE;
-
-			}
-
 			if (trackElement->Attribute("type") == NULL) {
 
 				if (!global::QuietMode)
@@ -207,8 +190,25 @@ int main(int argc, const char* argv[]) {
 
 			}
 
-			// Generate ISO file system
+			// Generate ISO file system for data track
 			if (strcasecmp("data", trackElement->Attribute("type")) == 0) {
+
+				if (trackNum != 1) {
+
+					if (!global::QuietMode)
+						printf("  ");
+
+					printf("ERROR: Only the first track can be data.\n");
+
+					writer.Close();
+
+					if (cuefp != NULL)
+						fclose(cuefp);
+
+					free(global::XMLscript);
+					return EXIT_FAILURE;
+
+				}
 
 				if (!ParseISOfileSystem(&writer, trackElement)) {
 
@@ -628,7 +628,6 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 
 			if (!dirTree->AddFileEntry(dirElement->Attribute("name"), entry, dirElement->Attribute("source"))) {
 
-				printf("ERROR: File not found: %s\n", dirElement->Attribute("source"));
 				return false;
 
 			}
@@ -647,6 +646,9 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 			}
 
 			iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(dirElement->Attribute("name"));
+
+			if (subdir == NULL)
+				return false;
 
             if (!ParseDirectory(subdir, dirElement))
 				return false;
