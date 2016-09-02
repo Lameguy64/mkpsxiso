@@ -17,9 +17,11 @@ Another notable difference is that MKPSXISO injects the Sony license data correc
 
 ## Binary Download
 The latest precompiled Win32 binary of this program can be downloaded here:
+
 [mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
 
 Older versions:
+
 [mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
 
 ## Compiling
@@ -30,9 +32,9 @@ To compile for Windows, simply open the CodeBlocks project file within the CodeB
 Compiling this program in a Linux environment is not tested yet.
 
 ## Changelog
-# Version 1.04
+**Version 1.04**
 * Fixed a bug where you'll get a 'Data track must only be on first track' error when creating an ISO image with more than 2 tracks even when the extra tracks are CD audio.
 * Duplicate file and directory entries are no longer possible to add (it'll result to weird problems anyway).
 
-# Version 1.00
+**Version 1.00**
 * Initial release.
