@@ -17,11 +17,9 @@ Another notable difference is that MKPSXISO injects the Sony license data correc
 
 ## Binary Download
 The latest precompiled Win32 binary of this program can be downloaded here:
-
 [mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
 
 Older versions:
-
 [mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
 
 ## Compiling
