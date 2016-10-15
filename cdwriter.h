@@ -9,8 +9,8 @@ namespace cd {
 class IsoWriter {
 
 		FILE*			filePtr;
-		u_char			subHeadBuff[12];
-		u_char			sectorBuff[CD_SECTOR_SIZE];
+		unsigned char			subHeadBuff[12];
+		unsigned char			sectorBuff[CD_SECTOR_SIZE];
 		SECTOR_M2F1*	sectorM2F1;
 		SECTOR_M2F2*	sectorM2F2;
 
@@ -42,7 +42,7 @@ class IsoWriter {
 
 		int		CurrentSector();
 
-		void	SetSubheader(u_char* data);
+		void	SetSubheader(unsigned char* data);
 
 		size_t	WriteBytes(void* data, size_t bytes, int edcEccEncode);
 		size_t	WriteBytesXA(void* data, size_t bytes, int edcEccEncode);
@@ -53,8 +53,8 @@ class IsoWriter {
 	};
 
 	void SwapBytes(void *var, int size);
-	void SetPair16(cd::ISO_USHORT_PAIR* pair, u_short val);
-	void SetPair32(cd::ISO_UINT_PAIR* pair, u_int val);
+	void SetPair16(cd::ISO_USHORT_PAIR* pair, unsigned short val);
+	void SetPair32(cd::ISO_UINT_PAIR* pair, unsigned int val);
 
 };
 

@@ -676,7 +676,7 @@ int iso::DirTreeClass::CalculatePathTableLen() {
 
 }
 
-u_char* iso::DirTreeClass::GenPathTableSub(u_char* buff, DIRENTRY* dirEntry, int parentIndex, int msb) {
+unsigned char* iso::DirTreeClass::GenPathTableSub(unsigned char* buff, DIRENTRY* dirEntry, int parentIndex, int msb) {
 
 	*buff = strlen(dirEntry->id);	// Directory identifier length
 	buff++;
@@ -721,9 +721,9 @@ u_char* iso::DirTreeClass::GenPathTableSub(u_char* buff, DIRENTRY* dirEntry, int
 
 }
 
-int iso::DirTreeClass::GeneratePathTable(u_char* buff, int msb) {
+int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb) {
 
-	u_char* oldBuffPtr = buff;
+	unsigned char* oldBuffPtr = buff;
 
 	*buff = 1;	// Directory identifier length
 	buff++;
@@ -952,7 +952,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id, iso::DirTr
 
 
 	// Write path table
-	u_char sectorBuff[2048];
+	unsigned char sectorBuff[2048];
 	memset(sectorBuff, 0x00, 2048);
 
 	dirTree->GeneratePathTable(sectorBuff, false);

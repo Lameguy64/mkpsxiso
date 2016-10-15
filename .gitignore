@@ -1,4 +1,5 @@
 .objs
+/ExampleFiles/
 files
 Debug
 pages
@@ -7,3 +8,4 @@ test.xml
 *.depend
 *.layout
 *.exe
+mkpsxiso

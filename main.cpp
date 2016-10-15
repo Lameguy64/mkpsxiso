@@ -481,7 +481,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 		printf("    Building filesystem... ");
 
 	{
-		u_char subHead[] = { 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00 };
+		unsigned char subHead[] = { 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00 };
 		writer->SetSubheader(subHead);
 	}
 
@@ -761,7 +761,7 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile) {
 
 	while(waveLen > 0) {
 
-		u_char buff[CD_SECTOR_SIZE];
+		unsigned char buff[CD_SECTOR_SIZE];
 		memset(buff, 0x00, CD_SECTOR_SIZE);
 
         int readLen = waveLen;

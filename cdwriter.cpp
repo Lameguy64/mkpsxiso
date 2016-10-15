@@ -1,20 +1,21 @@
 #include <unistd.h>
+#include <string.h>
 #include "cdwriter.h"
 #include "edcecc.h"
 
 
 void cd::SwapBytes(void *var, int size) {
 
-	u_char temp[size];
+	unsigned char temp[size];
 
 	memcpy(temp, var, size);
 	for(short i=0; i<size; i++) {
-		((u_char*)var)[i] = temp[(size-1)-i];
+		((unsigned char*)var)[i] = temp[(size-1)-i];
 	}
 
 }
 
-void cd::SetPair16(cd::ISO_USHORT_PAIR* pair, u_short val) {
+void cd::SetPair16(cd::ISO_USHORT_PAIR* pair, unsigned short val) {
 
     pair->lsb = val;
     pair->msb = val;
@@ -23,7 +24,7 @@ void cd::SetPair16(cd::ISO_USHORT_PAIR* pair, u_short val) {
 
 }
 
-void cd::SetPair32(cd::ISO_UINT_PAIR* pair, u_int val) {
+void cd::SetPair32(cd::ISO_UINT_PAIR* pair, unsigned int val) {
 
     pair->lsb = val;
     pair->msb = val;
@@ -81,7 +82,7 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 		edcEccGen.ComputeEdcBlock(cd::IsoWriter::sectorM2F1->subHead, 0x808, cd::IsoWriter::sectorM2F1->edc);
 
 		// Encode ECC data
-		u_char tempAddr[4];
+		unsigned char tempAddr[4];
 
 		for(int i=0; i<4; i++) {
 
@@ -330,7 +331,7 @@ int cd::IsoWriter::CurrentSector() {
 
 }
 
-void cd::IsoWriter::SetSubheader(u_char* data) {
+void cd::IsoWriter::SetSubheader(unsigned char* data) {
 
 	memcpy(cd::IsoWriter::subHeadBuff, data, 8);
 

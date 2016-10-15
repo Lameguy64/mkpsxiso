@@ -12,19 +12,18 @@
 // Sector size in bytes (do not change)
 #define CD_SECTOR_SIZE		2352
 
-
 // CD and ISO 9660 reader namespace
 namespace cd {
 
 	/// Structure for a mode 2 form 1 sector (used in regular files)
 	typedef struct {
-		u_char  sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
-		u_char  addr[3];	/// Sector address (see below for encoding details)
-		u_char  mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
-		u_char  subHead[8];	/// Sub-header (00 00 08 00 00 00 08 00 for Form 1 data sectors)
-		u_char	data[2048];	/// Data (form 1)
-		u_char  edc[4];		/// Error-detection code (CRC32 of data area)
-		u_char  ecc[276];	/// Error-correction code (uses Reed-Solomon ECC algorithm)
+		unsigned char  sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
+		unsigned char  addr[3];	/// Sector address (see below for encoding details)
+		unsigned char  mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
+		unsigned char  subHead[8];	/// Sub-header (00 00 08 00 00 00 08 00 for Form 1 data sectors)
+		unsigned char	data[2048];	/// Data (form 1)
+		unsigned char  edc[4];		/// Error-detection code (CRC32 of data area)
+		unsigned char  ecc[276];	/// Error-correction code (uses Reed-Solomon ECC algorithm)
 	} SECTOR_M2F1;
 
 	/**	Regular data files are usually stored in this sector format as it has ECC error correction which
@@ -48,10 +47,10 @@ namespace cd {
 
 	/// Structure for a mode 2 form 2 sector (used in STR/XA files)
 	typedef struct {
-		u_char  sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
-		u_char  addr[3];	/// Sector address (a 24-bit big-endian integer. starts at 200, 201 an onwards)
-		u_char  mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
-		u_char	data[2336];	/// 8 bytes Subheader, 2324 bytes Data (form 2), and 4 bytes ECC
+		unsigned char  sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
+		unsigned char  addr[3];	/// Sector address (a 24-bit big-endian integer. starts at 200, 201 an onwards)
+		unsigned char  mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
+		unsigned char	data[2336];	/// 8 bytes Subheader, 2324 bytes Data (form 2), and 4 bytes ECC
 	} SECTOR_M2F2;
 
 	// Set struct alignment to 1 because the ISO file system is not very memory alignment friendly which will
@@ -60,39 +59,39 @@ namespace cd {
 
 	/// Structure of a double-endian unsigned short word
 	typedef struct {
-		u_short lsb;	/// LSB format 16-bit word
-		u_short msb;	/// MSB format 16-bit word
+		unsigned short lsb;	/// LSB format 16-bit word
+		unsigned short msb;	/// MSB format 16-bit word
 	} ISO_USHORT_PAIR;
 
 	/// Structure of a double-endian unsigned int word
 	typedef struct {
-		u_int lsb;		/// LSB format 32-bit word
-		u_int msb;		/// MSB format 32-bit word
+		unsigned int lsb;		/// LSB format 32-bit word
+		unsigned int msb;		/// MSB format 32-bit word
 	} ISO_UINT_PAIR;
 
 	/// ISO descriptor header structure
 	typedef struct {
-		u_char type;		/// Volume descriptor type (1 is descriptor, 255 is descriptor terminator)
+		unsigned char type;		/// Volume descriptor type (1 is descriptor, 255 is descriptor terminator)
 		char id[5];			/// Volume descriptor ID (always CD001)
-		u_short version;	/// Volume descriptor version (always 0x01)
+		unsigned short version;	/// Volume descriptor version (always 0x01)
 	} ISO_DESCRIPTOR_HEADER;
 
 	/// Structure of a date stamp for ISO_DIR_ENTRY structure
 	typedef struct {
-		u_char year;	/// number of years since 1900
-		u_char month;	/// month, where 1=January, 2=February, etc.
-		u_char day;		/// day of month, in the range from 1 to 31
-		u_char hour;	/// hour, in the range from 0 to 23
-		u_char minute;	/// minute, in the range from 0 to 59
-		u_char second;	/// Second, in the range from 0 to 59
-		u_char GMToffs;	/// Greenwich Mean Time offset
+		unsigned char year;	/// number of years since 1900
+		unsigned char month;	/// month, where 1=January, 2=February, etc.
+		unsigned char day;		/// day of month, in the range from 1 to 31
+		unsigned char hour;	/// hour, in the range from 0 to 23
+		unsigned char minute;	/// minute, in the range from 0 to 59
+		unsigned char second;	/// Second, in the range from 0 to 59
+		unsigned char GMToffs;	/// Greenwich Mean Time offset
 	} ISO_DATESTAMP;
 
 	/// Structure of an ISO path table entry (specifically for the cd::IsoReader class)
 	typedef struct {
-		u_char nameLength;	/// Name length (or 1 for the root directory)
-		u_char extLength;	/// Number of sectors in extended attribute record
-		u_int dirOffs;		/// Number of the first sector in the directory, as a double word
+		unsigned char nameLength;	/// Name length (or 1 for the root directory)
+		unsigned char extLength;	/// Number of sectors in extended attribute record
+		unsigned int dirOffs;		/// Number of the first sector in the directory, as a double word
 		short dirLevel;		/// Index of the directory record's parent directory
 		char* name;			/// Name (0 for the root directory)
 							/// If nameLength is odd numbered, a padding byte will be present after the identifier text.
@@ -100,9 +99,9 @@ namespace cd {
 
 	typedef struct {
 		// Directory entry length (variable, use for parsing through entries)
-		u_char entryLength;
+		unsigned char entryLength;
 		// Extended entry data length (always 0)
-		u_char extLength;
+		unsigned char extLength;
 		// Points to the LBA of the file/directory entry
 		ISO_UINT_PAIR entryOffs;
 		// Size of the file/directory entry
@@ -110,15 +109,15 @@ namespace cd {
 		// Date & time stamp of entry
 		ISO_DATESTAMP entryDate;
 		// File flags (0x02 for directories, 0x00 for files)
-		u_char flags;
+		unsigned char flags;
 		// Unit size (usually 0 even with Form 2 files such as STR/XA)
-		u_char fileUnitSize;
+		unsigned char fileUnitSize;
 		// Interleave gap size (usually 0 even with Form 2 files such as STR/XA)
-		u_char interleaveGapSize;
+		unsigned char interleaveGapSize;
 		// Volume sequence number (always 1)
 		ISO_USHORT_PAIR volSeqNum;
 		// Identifier (file/directory name) length in bytes
-		u_char identifierLen;
+		unsigned char identifierLen;
 		// Pointer to identifier (placed here for convenience)
 		// If identifierLen is even numbered, a padding byte will be present after the identifier text.
 		char* identifier;
@@ -127,24 +126,24 @@ namespace cd {
 
 	// XA attribute struct (located right after the identifier string)
 	typedef struct {
-		u_int pad;		// Nothing but null bytes
-		u_short type;	// XA attribute (0x8800 for directories, 0x800 for regular files, 0x0 for XA Form 2 files)
+		unsigned int pad;		// Nothing but null bytes
+		unsigned short type;	// XA attribute (0x8800 for directories, 0x800 for regular files, 0x0 for XA Form 2 files)
 		char id[2];		// Always XA
-		u_char pad2[6];	// Nothing but null bytes
+		unsigned char pad2[6];	// Nothing but null bytes
 	} ISO_XA_ATTRIB;
 
 	typedef struct {
-		u_char entryLength;		// Always 34 bytes
-		u_char extLength;		// Always 0
+		unsigned char entryLength;		// Always 34 bytes
+		unsigned char extLength;		// Always 0
 		ISO_UINT_PAIR entryOffs;	// Should point to LBA 22
 		ISO_UINT_PAIR entrySize;	// Size of entry extent
 		ISO_DATESTAMP entryDate;	// Record date and time
-		u_char flags;				// File flags
-		u_char fileUnitSize;
-		u_char interleaveGapSize;
+		unsigned char flags;				// File flags
+		unsigned char fileUnitSize;
+		unsigned char interleaveGapSize;
 		ISO_USHORT_PAIR volSeqNum;
-		u_char identifierLen;		// 0x01
-		u_char identifier;			// 0x01
+		unsigned char identifierLen;		// 0x01
+		unsigned char identifier;			// 0x01
 	} ISO_ROOTDIR_HEADER;
 
 	// ISO descriptor structure
@@ -157,11 +156,11 @@ namespace cd {
 		// Volume ID (or label, can be blank or anything)
 		char volumeID[32];
 		// Unused null bytes
-		u_char pad2[8];
+		unsigned char pad2[8];
 		// Size of volume in sector units
 		ISO_UINT_PAIR volumeSize;
 		// Unused null bytes
-		u_char pad3[32];
+		unsigned char pad3[32];
 		// Number of discs in this volume set (always 1 for single volume)
 		ISO_USHORT_PAIR volumeSetSize;
 		// Number of this disc in volume set (always 1 for single volume)
@@ -171,13 +170,13 @@ namespace cd {
 		// Path table size in bytes (applies to all the path tables)
 		ISO_UINT_PAIR pathTableSize;
 		// LBA to Type-L path table
-		u_int	pathTable1Offs;
+		unsigned int	pathTable1Offs;
 		// LBA to optional Type-L path table (usually a copy of the primary path table)
-		u_int	pathTable2Offs;
+		unsigned int	pathTable2Offs;
 		// LBA to Type-L path table but with MSB format values
-		u_int	pathTable1MSBoffs;
+		unsigned int	pathTable1MSBoffs;
 		// LBA to optional Type-L path table but with MSB format values (usually a copy of the main path table)
-		u_int	pathTable2MSBoffs;
+		unsigned int	pathTable2MSBoffs;
 		// Directory entry for the root directory (similar to a directory entry)
 		ISO_ROOTDIR_HEADER	rootDirRecord;
 		// Volume set identifier (can be blank or anything)
@@ -203,13 +202,13 @@ namespace cd {
 		// Volume effective date (in text format YYYYMMDDHHMMSSMMGG)
 		char	volumeEffeciveDate[17];
 		// File structure version (always 1)
-		u_char	fileStructVersion;
+		unsigned char	fileStructVersion;
 		// Padding
-		u_char	dummy0;
+		unsigned char	dummy0;
 		// Application specific data (says CD-XA001 at [141], the rest are null bytes)
-		u_char	appData[512];
+		unsigned char	appData[512];
 		// Padding
-		u_char	pad4[653];
+		unsigned char	pad4[653];
 
 	} ISO_DESCRIPTOR;
 

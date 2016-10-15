@@ -3,6 +3,8 @@
 
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <time.h>
+#include <stdlib.h>
 #include <malloc.h>
 #include <tinyxml2.h>
 
@@ -51,7 +53,7 @@ namespace iso {
 		int CalculatePathTableLenSub(DIRENTRY* dirEntry);
 
 		/// Internal function for recursive path table generation
-		u_char* GenPathTableSub(u_char* buff, DIRENTRY* dirEntry, int parentIndex, int msb);
+		unsigned char* GenPathTableSub(unsigned char* buff, DIRENTRY* dirEntry, int parentIndex, int msb);
 
 		int			recordLBA;
 
@@ -101,7 +103,7 @@ namespace iso {
 		 *
 		 *	Returns: Length of path table in bytes.
 		 */
-		int GeneratePathTable(u_char* buff, int msb);
+		int GeneratePathTable(unsigned char* buff, int msb);
 
 		/** Adds a subdirectory to the directory record.
 		 *

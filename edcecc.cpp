@@ -7,7 +7,7 @@
 
 EDCECC::EDCECC() {
 
-	u_int i,j,edc;
+	unsigned int i,j,edc;
 
 	for(i=0; i<256; i++) {
 
@@ -25,7 +25,7 @@ EDCECC::EDCECC() {
 
 }
 
-u_int EDCECC::ComputeEdcBlockPartial(u_int edc, const u_char *src, int len) {
+unsigned int EDCECC::ComputeEdcBlockPartial(unsigned int edc, const unsigned char *src, int len) {
 
 	while(len--)
 		edc = (edc>>8)^EDCECC::edc_lut[(edc^(*src++))&0xFF];
@@ -34,9 +34,9 @@ u_int EDCECC::ComputeEdcBlockPartial(u_int edc, const u_char *src, int len) {
 
 }
 
-void EDCECC::ComputeEdcBlock(const u_char *src, int len, u_char *dest) {
+void EDCECC::ComputeEdcBlock(const unsigned char *src, int len, unsigned char *dest) {
 
-	u_int edc = EDCECC::ComputeEdcBlockPartial(0, src, len);
+	unsigned int edc = EDCECC::ComputeEdcBlockPartial(0, src, len);
 
 	dest[0] = (edc>>0)&0xFF;
 	dest[1] = (edc>>8)&0xFF;
@@ -45,20 +45,20 @@ void EDCECC::ComputeEdcBlock(const u_char *src, int len, u_char *dest) {
 
 }
 
-void EDCECC::ComputeEccBlock(u_char *src, u_int major_count, u_int minor_count, u_int major_mult, u_int minor_inc, u_char *dest) {
+void EDCECC::ComputeEccBlock(unsigned char *src, unsigned int major_count, unsigned int minor_count, unsigned int major_mult, unsigned int minor_inc, unsigned char *dest) {
 
-	u_int len = major_count*minor_count;
-	u_int major,minor;
+	unsigned int len = major_count*minor_count;
+	unsigned int major,minor;
 
 	for(major = 0; major < major_count; major++) {
 
-		u_int	index = (major >> 1) * major_mult + (major & 1);
-		u_char	ecc_a = 0;
-		u_char	ecc_b = 0;
+		unsigned int	index = (major >> 1) * major_mult + (major & 1);
+		unsigned char	ecc_a = 0;
+		unsigned char	ecc_b = 0;
 
 		for(minor = 0; minor < minor_count; minor++) {
 
-			u_char temp = src[index];
+			unsigned char temp = src[index];
 
 			index += minor_inc;
 
