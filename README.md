@@ -42,10 +42,11 @@ This tool requires tinyxml2 to compile.
   * Build Essentials
   * cmake
   * tinyxml2
-2. Navigate to the download of this repo.
-3. Run "cmake ." to generate the make file.
-4. Run "make" to compile the program.
-5. The result will be in bin_nix, named "mkpsxiso"
+2. Open a terminal.
+3. Navigate to the download of this repo.
+4. Run "cmake ." to generate the make file.
+5. Run "make" to compile the program.
+6. The result will be in bin_nix, named "mkpsxiso"
 
 ## Changelog
 **Version 1.05**
