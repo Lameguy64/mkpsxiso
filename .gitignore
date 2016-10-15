@@ -1,11 +1,7 @@
-.objs
-/ExampleFiles/
-files
-Debug
-pages
-scrap.txt
-test.xml
-*.depend
+/bin*/
+/CMakeFiles/
+Makefile
+*.cmake
+*.txt
+*.cdp
 *.layout
-*.exe
-mkpsxiso
