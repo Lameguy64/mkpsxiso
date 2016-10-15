@@ -52,7 +52,7 @@ This tool requires tinyxml2 to compile.
 **Version 1.05**
 * Fixed types for linux build, changed u_char and such to unsigned char.
 * In cygwin64 version of tinyxml2, "XML_NO_ERROR" is not defined, changed with "XML_SUCCESS" and this works on both Windows and Linux.
-* Converted to cmake, if you want a codeblocks project just run "cmake . -G "CodeBlocks - Unix Makefiles" to generate the project file.
+* Converted to cmake, if you want a codeblocks project file, just run "cmake . -G "CodeBlocks - Unix Makefiles"" to create it.
 
 **Version 1.04**
 * Fixed a bug where you'll get a 'Data track must only be on first track' error when creating an ISO image with more than 2 tracks even when the extra tracks are CD audio.
