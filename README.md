@@ -25,11 +25,34 @@ Older versions:
 ## Compiling
 This tool requires tinyxml2 to compile.
 
-To compile for Windows, simply open the CodeBlocks project file within the CodeBlocks IDE then compile. You must use the MinGW GCC compiler (usually included with CodeBlocks) as the source code uses linux specific functions that are not present in Visual C.
+### Windows
+1. Install cygwin64 with the following:
+  * make
+  * cmake
+  * gcc
+  * tinyxml2
+2. Open the cygwin64 terminal.
+3. Navigate to the download of this repo.
+4. Run "cmake ." to generate the make file.
+5. Run "make" to compile the program.
+6. The result will be in bin_win, named "mkpsxiso.exe"
 
-Compiling this program in a Linux environment is not tested yet.
+### Linux (Ubuntu)
+1. Install the following:
+  * Build Essentials
+  * cmake
+  * tinyxml2
+2. Navigate to the download of this repo.
+3. Run "cmake ." to generate the make file.
+4. Run "make" to compile the program.
+5. The result will be in bin_nix, named "mkpsxiso"
 
 ## Changelog
+**Version 1.05**
+* Fixed types for linux build, changed u_char and such to unsigned char.
+* In cygwin64 version of tinyxml2, "XML_NO_ERROR" is not defined, changed with "XML_SUCCESS" and this works on both Windows and Linux.
+* Converted to cmake, if you want a codeblocks project just run "cmake . -G "CodeBlocks - Unix Makefiles" to generate the project file.
+
 **Version 1.04**
 * Fixed a bug where you'll get a 'Data track must only be on first track' error when creating an ISO image with more than 2 tracks even when the extra tracks are CD audio.
 * Duplicate file and directory entries are no longer possible to add (it'll result to weird problems anyway).

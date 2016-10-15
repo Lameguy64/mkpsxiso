@@ -6,7 +6,7 @@ set(MAIN "mkpsxiso")
 
 project(${MAIN})
 #include directory, same for all build types
-include_directories(include)
+include_directories(src)
 
 file(GLOB SOURCES "src/*.cpp")
 
