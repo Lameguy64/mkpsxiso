@@ -33,7 +33,6 @@ else()
   
 endif()
 
-  
-  add_executable(${MAIN} ${SOURCES})
+add_executable(${MAIN} ${SOURCES})
 
 target_link_libraries(${MAIN} ${TINYXML_LIBRARIES})
