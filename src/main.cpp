@@ -79,7 +79,7 @@ int main(int argc, const char* argv[]) {
 	// Load XML file
 	tinyxml2::XMLDocument xmlFile;
 
-    if (xmlFile.LoadFile(global::XMLscript) != tinyxml2::XML_NO_ERROR) {
+    if (xmlFile.LoadFile(global::XMLscript) != tinyxml2::XML_SUCCESS) {
 		printf("ERROR: Cannot load XML file.\n\n");
 		printf("Make sure the format of the XML script is correct and that the file exists.\n");
 		free(global::XMLscript);
