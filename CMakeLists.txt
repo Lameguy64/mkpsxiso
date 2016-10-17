@@ -15,16 +15,19 @@ find_package(PkgConfig REQUIRED)
 pkg_search_module(TINYXML REQUIRED tinyxml2)
 
 #include sources that are platform specific
-if(MINGW OR MSYS OR CYGWIN OR MSVC)
+if(MINGW OR CYGWIN)
   message(STATUS "WINDOWS BUILD")
   
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin_win)
+  
+elseif(MSYS OR MSVC)
+  message(FATAL_ERROR "CAN NOT BUILD ON MICROSOFT COMPILER")
   
 elseif(APPLE OR WATCOM OR BORLAND)
   message(FATAL_ERROR "CAN NOT BUILD FOR APPLE, WATCOM, BORLAND")
   
 elseif(UNIX)
-  message(STATUS "LINUX BUILD")
+  message(STATUS "UNIX BUILD")
 
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin_nix)
 
