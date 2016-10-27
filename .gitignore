@@ -1,9 +1,7 @@
-.objs
-files
-Debug
-pages
-scrap.txt
-test.xml
-*.depend
+/bin*/
+/CMakeFiles/
+Makefile
+CMakeCache.txt
+*.cmake
+*.cdp
 *.layout
-*.exe
