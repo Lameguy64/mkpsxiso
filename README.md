@@ -26,7 +26,7 @@ Older versions:
 ## Compiling
 This tool requires tinyxml2 to compile.
 
-### Windows (CodeBlocks IDE without CMake)
+### Windows (CodeBlocks without CMake)
 1. Install CodeBlocks (Preferably with MinGW32 GCC compiler bundled).
 2. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
 3. Open the project file mkpsxiso.cbp inside the src directory.
