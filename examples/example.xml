@@ -3,24 +3,24 @@
 <!-- MKPSXISO example XML script -->
 
 <!-- <iso_project>
-		Starts an ISO image project to build. Multiple <iso_project> elements may be
-		specified within the same xml script which useful for multi-disc projects.
-	
-		<iso_project> elements must contain at least one <track> element.
+	Starts an ISO image project to build. Multiple <iso_project> elements may be
+	specified within the same xml script which is useful for multi-disc projects.
+
+	<iso_project> elements must contain at least one <track> element.
 	
 	Attributes:
 		image_name	- File name of the ISO image file to generate.
 		cue_sheet	- Optional, file name of the cue sheet for the image file
-					  (required if more than one track is specified).
+					  (required if more than one track is specified, not needed if you don't use CD-DA).
 -->
 <iso_project image_name="myimage.bin" cue_sheet="myimage.cue">
 
 	<!-- <track>
-			Specifies a track to the ISO project. This example element creates a data
-			track for storing data files and CD-XA/STR streams.
-		
-			Only one data track is allowed and data tracks must only be specified as the
-			first track in the ISO image and cannot	be specified after an audio track.
+		Specifies a track to the ISO project. This example element creates a data
+		track for storing data files and CD-XA/STR streams.
+	
+		Only one data track is allowed and data tracks must only be specified as the
+		first track in the ISO image and cannot	be specified after an audio track.
 		
 		Attributes:
 			type		- Track type (either data or audio).
@@ -31,7 +31,7 @@
 	<track type="data">
 	
 		<!-- <identifiers>
-				Optional, Specifies the identifier strings to use for the data track.
+			Optional, Specifies the identifier strings to use for the data track.
 				
 			Attributes:
 				system			- Optional, specifies the system identifier (PLAYSTATION if unspecified).
@@ -53,19 +53,20 @@
 		/>
 		
 		<!-- <license>
-				Optional, specifies the license file to use, the format of the license file must be in
-				raw 2336 byte sector format, like the ones included with the PsyQ SDK in psyq\cdgen\LCNSFILE.
-				
-				License data is not included within the MKPSXISO program to avoid possible legal problems
-				in the open source environment... Better be safe than sorry.
-				
+			Optional, specifies the license file to use, the format of the license file must be in
+			raw 2336 byte sector format, like the ones included with the PlayStation Programmer's Tool
+			SDK in PS\CDGEN\LCNSFILE.
+			
+			License data is not included within the MKPSXISO program to avoid possible legal problems
+			in the open source environment... Better be safe than sorry.
+			
 			Attributes:
 				file	- Specifies the license file to inject into the ISO image.
 		-->
 		<license file="licensea.dat"/>
 		
 		<!-- <directory_tree>
-				Specifies and contains the directory structure for the data track.
+			Specifies and contains the directory structure for the data track.
 			
 			Attributes:
 				None.
@@ -73,7 +74,7 @@
 		<directory_tree>
 		
 			<!-- <file>
-					Specifies a file in the directory tree.
+				Specifies a file in the directory tree.
 					
 				Attributes:
 					name	- File name to use in the directory tree (can be used for renaming).
@@ -83,11 +84,12 @@
 			-->
 			<!-- Stores system.txt as system.cnf -->
 			<file name="system.cnf"	type="data"	source="system.txt"/>
+			
 			<file name="myexec.exe"	type="data"	source="myexec.exe"/>
 			
 			<!-- <dir>
-					Specifies a directory in the directory tree. <file> and <dir> elements inside the element
-					will be inside the specified directory.
+				Specifies a directory in the directory tree. <file> and <dir> elements inside the element
+				will be inside the directory.
 			-->
 			<dir name="mydir">
 			
@@ -106,14 +108,31 @@
 				</dir>
 			
 			</dir>
+			
+			<!-- <dummy>
+				Specifies an invisible dummy file to be generated into the file system. Use this to
+				add dummy sectors, usually at the end of the file system portion of the image to prevent
+				'drive runaway' problems.
+				
+				The dummy file is completely invisible as it is not added into the directory records
+				of the ISO image entirely, ensuring a clean directory structure when the file system is
+				viewed.
+				
+				Attributes:
+					sectors	- Size of dummy file in sector units (1024 = 2MB).
+			-->
+			<dummy sectors="1024"/>
 		
 		</directory_tree>
 		
 	</track>
 
-	<!-- Specifies CD-DA audio tracks
+	<!-- Specifies CD-DA audio tracks to the CD image
 	
-		WAV files must be of Microsoft format, uncompressed, 44100KHz 16-bit stereo.
+		WAV files must be in Microsoft format, 44100KHz 16-bit stereo, uncompressed.
+		
+		Plans for supporting FLAC as source audio were considered but was dropped because the author found
+		it impossible to compile libflac on Windows using MinGW GCC and MSys.
 	-->
 	<track type="audio" source="mytrack2.wav"/>
 	<track type="audio" source="mytrack3.wav"/>

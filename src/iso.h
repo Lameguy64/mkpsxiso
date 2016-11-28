@@ -135,7 +135,7 @@ namespace iso {
 		int GetFileCountTotal();
 		int GetDirCountTotal();
 
-		void PrintEntries();
+		void OutputLBAlisting(FILE* fp, int level);
 
 	};
 

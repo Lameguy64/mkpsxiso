@@ -4,13 +4,18 @@
 #include "cdwriter.h"	// CD image reader/writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.05"
+#define VERSION "1.06"
 
 namespace global {
 
-	time_t	BuildTime;
-	int		QuietMode = false;
-	char*	XMLscript = NULL;
+	time_t		BuildTime;
+	int			QuietMode	= false;
+	int			Overwrite	= false;
+
+	const char*	XMLscript	= NULL;
+	const char*	LBAfile		= NULL;
+	const char*	ImageName	= NULL;
+	int			OutputOverride = false;
 
 };
 
@@ -33,6 +38,21 @@ int main(int argc, const char* argv[]) {
 
 				global::QuietMode = true;
 
+			} else if (strcasecmp("-lba", argv[i]) == 0) {
+
+				i++;
+				global::LBAfile = argv[i];
+
+			} else if (strcasecmp("-o", argv[i]) == 0) {
+
+				i++;
+				global::ImageName = argv[i];
+				global::OutputOverride = true;
+
+			} else if (strcasecmp("-y", argv[i]) == 0) {
+
+				global::Overwrite = true;
+
 			} else {
 
 				printf("Unknown parameter: %s\n", argv[i]);
@@ -44,22 +64,27 @@ int main(int argc, const char* argv[]) {
 		} else {
 
 			if (global::XMLscript == NULL)
-				global::XMLscript = strdup(argv[i]);
+				global::XMLscript = argv[i];
 
 		}
 
 	}
 
 	if ((!global::QuietMode) || (argc == 1)) {
+
 		printf("MKPSXISO " VERSION " - PlayStation ISO Image Maker\n");
 		printf("2016 Meido-Tek Productions (Lameguy64)\n\n");
+
 	}
 
 	if (argc == 1) {
 
-		printf("mkpsxiso <script.xml> [-q]\n\n");
-		printf("   <script> - File name of an XML script of an ISO image project.\n");
-		printf("   [-q]     - Quiet mode (prints nothing but warnings and errors).\n");
+		printf("mkpsxiso [-y] [-q] [-lba <file>] <script.xml>\n\n");
+		printf("   <script>    - File name of an ISO image project in XML format to generate.\n");
+		printf("   -lba <file> - Outputs an LBA listing of all files in ISO file system.\n");
+		printf("   -o <file>   - Specifies output file name (overrides XML but not cue_sheet).\n");
+		printf("   -q          - Quiet mode (prints nothing but warnings and errors).\n");
+		printf("   -y          - Always overwrite.\n");
 
 		return EXIT_SUCCESS;
 
@@ -80,19 +105,21 @@ int main(int argc, const char* argv[]) {
 	tinyxml2::XMLDocument xmlFile;
 
     if (xmlFile.LoadFile(global::XMLscript) != tinyxml2::XML_SUCCESS) {
+
 		printf("ERROR: Cannot load XML file.\n\n");
-		printf("Make sure the format of the XML script is correct and that the file exists.\n");
-		free(global::XMLscript);
+		printf("Make sure the format of the XML document is correct and that the file exists.\n");
 		return EXIT_FAILURE;
+
     }
 
 	// Check if there is an <iso_project> element
     tinyxml2::XMLElement* projectElement = xmlFile.FirstChildElement("iso_project");
 
     if (projectElement == NULL) {
-		printf("ERROR: Cannot find <iso_project> element.\n");
-		free(global::XMLscript);
+
+		printf("ERROR: Cannot find <iso_project> element in XML document.\n");
 		return EXIT_FAILURE;
+
     }
 
 
@@ -100,22 +127,61 @@ int main(int argc, const char* argv[]) {
 	while(projectElement != NULL) {
 
 		// Check if image_name attribute is specified
-		if (projectElement->Attribute("image_name") == NULL) {
-			printf("ERROR: image_name attribute not specfied in <iso_project> element.\n");
-			free(global::XMLscript);
-			return EXIT_FAILURE;
+		if (global::ImageName == NULL) {
+
+			if (projectElement->Attribute("image_name") == NULL) {
+
+				printf("ERROR: image_name attribute not specfied in <iso_project> element.\n");
+				return EXIT_FAILURE;
+
+			}
+
+			global::ImageName = projectElement->Attribute("image_name");
+
 		}
 
 		if (!global::QuietMode)
-			printf("Building ISO Image: %s\n\n", projectElement->Attribute("image_name"));
+			printf("Building ISO Image: %s\n", global::ImageName);
+
+		if (!global::Overwrite) {
+
+			if (GetSize(global::ImageName) >= 0) {
+
+				printf("WARNING: ISO image already exists, overwrite? <y/n> ");
+
+				char key;
+
+				do {
+
+					key = getchar();
+
+					if (tolower(key) == 'n') {
+
+						return EXIT_FAILURE;
+
+					}
+
+				} while(tolower(key) != 'y');
+
+				printf("\n");
+
+			} else {
+
+				printf("\n");
+
+			}
+
+		}
+
 
 		// Check if there is a track element specified
 		tinyxml2::XMLElement* trackElement = projectElement->FirstChildElement("track");
 
 		if (trackElement == NULL) {
+
 			printf("ERROR: At least one <track> element must be specified.\n");
-			free(global::XMLscript);
 			return EXIT_FAILURE;
+
 		}
 
 
@@ -131,7 +197,6 @@ int main(int argc, const char* argv[]) {
 
 				printf("ERROR: cue_sheet attribute is blank.\n");
 
-				free(global::XMLscript);
 				return EXIT_FAILURE;
 
 			}
@@ -143,14 +208,13 @@ int main(int argc, const char* argv[]) {
 				if (!global::QuietMode)
 					printf("  ");
 
-				printf("  ERROR: Unable to create cue sheet.\n");
+				printf("ERROR: Unable to create cue sheet.\n");
 
-				free(global::XMLscript);
 				return EXIT_FAILURE;
 
 			}
 
-			fprintf(cuefp, "FILE \"%s\" BINARY\n", projectElement->Attribute("image_name"));
+			fprintf(cuefp, "FILE \"%s\" BINARY\n", global::ImageName);
 
 			if (!global::QuietMode)
 				printf("  CUE Sheet: %s\n\n", projectElement->Attribute("cue_sheet"));
@@ -160,7 +224,7 @@ int main(int argc, const char* argv[]) {
 
 		// Create ISO image for writing
 		cd::IsoWriter writer;
-		writer.Create(projectElement->Attribute("image_name"));
+		writer.Create(global::ImageName);
 
 
 		int trackNum = 1;
@@ -185,7 +249,6 @@ int main(int argc, const char* argv[]) {
 				if (cuefp != NULL)
 					fclose(cuefp);
 
-				free(global::XMLscript);
 				return EXIT_FAILURE;
 
 			}
@@ -205,7 +268,6 @@ int main(int argc, const char* argv[]) {
 					if (cuefp != NULL)
 						fclose(cuefp);
 
-					free(global::XMLscript);
 					return EXIT_FAILURE;
 
 				}
@@ -220,7 +282,6 @@ int main(int argc, const char* argv[]) {
 						unlink(projectElement->Attribute("cue_sheet"));
 					}
 
-					free(global::XMLscript);
 					return EXIT_FAILURE;
 
 
@@ -247,7 +308,6 @@ int main(int argc, const char* argv[]) {
 
 					writer.Close();
 
-					free(global::XMLscript);
 					return EXIT_FAILURE;
 
 				}
@@ -302,7 +362,6 @@ int main(int argc, const char* argv[]) {
 						writer.Close();
 						fclose(cuefp);
 
-						free(global::XMLscript);
 						return EXIT_FAILURE;
 
 					}
@@ -323,7 +382,6 @@ int main(int argc, const char* argv[]) {
 				if (cuefp != NULL)
 					fclose(cuefp);
 
-				free(global::XMLscript);
 				return EXIT_FAILURE;
 
 			}
@@ -355,9 +413,15 @@ int main(int argc, const char* argv[]) {
 		// Check for next <iso_project> element
 		projectElement = projectElement->NextSiblingElement("iso_project");
 
+		if (global::OutputOverride) {
+
+			printf("ERROR: -o switch cannot be used in multi-disc ISO projects.\n");
+			return EXIT_FAILURE;
+
+		}
+
 	}
 
-	free(global::XMLscript);
     return(0);
 
 }
@@ -520,6 +584,16 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 	if (!global::QuietMode)
 		printf("      Writing filesystem... ");
 
+	if (global::LBAfile != NULL) {
+
+		FILE* fp = fopen(global::LBAfile, "w");
+
+		dirTree.OutputLBAlisting(fp, 0);
+
+		fclose(fp);
+
+	}
+
 	dirTree.SortDirEntries();
 
 	if (!dirTree.WriteDirectoryRecords(writer, 0)) {
@@ -586,7 +660,7 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 
 	while(dirElement != NULL) {
 
-        if (strcmp("file", dirElement->Name()) == 0) {
+        if (strcasecmp("file", dirElement->Name()) == 0) {
 
 			if (strlen(dirElement->Attribute("name")) > 12) {
 
@@ -632,15 +706,15 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 
 			}
 
-		} else if (strcmp("dummy", dirElement->Name()) == 0) {
+		} else if (strcasecmp("dummy", dirElement->Name()) == 0) {
 
 			dirTree->AddDummyEntry(atoi(dirElement->Attribute("sectors")));
 
-        } else if (strcmp("dir", dirElement->Name()) == 0) {
+        } else if (strcasecmp("dir", dirElement->Name()) == 0) {
 
 			if (strlen(dirElement->Attribute("name")) > 12) {
 
-				printf("ERROR: Directory %s is more than 12 characters long.\n", dirElement->Attribute("source"));
+				printf("ERROR: Directory name %s is more than 12 characters long.\n", dirElement->Attribute("source"));
 				return false;
 
 			}

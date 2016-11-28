@@ -17,13 +17,13 @@ namespace cd {
 
 	/// Structure for a mode 2 form 1 sector (used in regular files)
 	typedef struct {
-		unsigned char  sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
-		unsigned char  addr[3];	/// Sector address (see below for encoding details)
-		unsigned char  mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
-		unsigned char  subHead[8];	/// Sub-header (00 00 08 00 00 00 08 00 for Form 1 data sectors)
+		unsigned char	sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
+		unsigned char	addr[3];	/// Sector address (see below for encoding details)
+		unsigned char	mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
+		unsigned char	subHead[8];	/// Sub-header (00 00 08 00 00 00 08 00 for Form 1 data sectors)
 		unsigned char	data[2048];	/// Data (form 1)
-		unsigned char  edc[4];		/// Error-detection code (CRC32 of data area)
-		unsigned char  ecc[276];	/// Error-correction code (uses Reed-Solomon ECC algorithm)
+		unsigned char	edc[4];		/// Error-detection code (CRC32 of data area)
+		unsigned char	ecc[276];	/// Error-correction code (uses Reed-Solomon ECC algorithm)
 	} SECTOR_M2F1;
 
 	/**	Regular data files are usually stored in this sector format as it has ECC error correction which
@@ -47,9 +47,9 @@ namespace cd {
 
 	/// Structure for a mode 2 form 2 sector (used in STR/XA files)
 	typedef struct {
-		unsigned char  sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
-		unsigned char  addr[3];	/// Sector address (a 24-bit big-endian integer. starts at 200, 201 an onwards)
-		unsigned char  mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
+		unsigned char	sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
+		unsigned char	addr[3];	/// Sector address (a 24-bit big-endian integer. starts at 200, 201 an onwards)
+		unsigned char	mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
 		unsigned char	data[2336];	/// 8 bytes Subheader, 2324 bytes Data (form 2), and 4 bytes ECC
 	} SECTOR_M2F2;
 
@@ -59,32 +59,32 @@ namespace cd {
 
 	/// Structure of a double-endian unsigned short word
 	typedef struct {
-		unsigned short lsb;	/// LSB format 16-bit word
-		unsigned short msb;	/// MSB format 16-bit word
+		unsigned short	lsb;	/// LSB format 16-bit word
+		unsigned short	msb;	/// MSB format 16-bit word
 	} ISO_USHORT_PAIR;
 
 	/// Structure of a double-endian unsigned int word
 	typedef struct {
-		unsigned int lsb;		/// LSB format 32-bit word
-		unsigned int msb;		/// MSB format 32-bit word
+		unsigned int	lsb;		/// LSB format 32-bit word
+		unsigned int	msb;		/// MSB format 32-bit word
 	} ISO_UINT_PAIR;
 
 	/// ISO descriptor header structure
 	typedef struct {
-		unsigned char type;		/// Volume descriptor type (1 is descriptor, 255 is descriptor terminator)
-		char id[5];			/// Volume descriptor ID (always CD001)
-		unsigned short version;	/// Volume descriptor version (always 0x01)
+		unsigned char	type;		/// Volume descriptor type (1 is descriptor, 255 is descriptor terminator)
+		char			id[5];		/// Volume descriptor ID (always CD001)
+		unsigned short	version;	/// Volume descriptor version (always 0x01)
 	} ISO_DESCRIPTOR_HEADER;
 
 	/// Structure of a date stamp for ISO_DIR_ENTRY structure
 	typedef struct {
-		unsigned char year;	/// number of years since 1900
-		unsigned char month;	/// month, where 1=January, 2=February, etc.
-		unsigned char day;		/// day of month, in the range from 1 to 31
-		unsigned char hour;	/// hour, in the range from 0 to 23
-		unsigned char minute;	/// minute, in the range from 0 to 59
-		unsigned char second;	/// Second, in the range from 0 to 59
-		unsigned char GMToffs;	/// Greenwich Mean Time offset
+		unsigned char	year;		/// number of years since 1900
+		unsigned char	month;		/// month, where 1=January, 2=February, etc.
+		unsigned char	day;		/// day of month, in the range from 1 to 31
+		unsigned char	hour;		/// hour, in the range from 0 to 23
+		unsigned char	minute;		/// minute, in the range from 0 to 59
+		unsigned char	second;		/// Second, in the range from 0 to 59
+		unsigned char	GMToffs;	/// Greenwich Mean Time offset
 	} ISO_DATESTAMP;
 
 	/// Structure of an ISO path table entry (specifically for the cd::IsoReader class)
@@ -92,9 +92,9 @@ namespace cd {
 		unsigned char nameLength;	/// Name length (or 1 for the root directory)
 		unsigned char extLength;	/// Number of sectors in extended attribute record
 		unsigned int dirOffs;		/// Number of the first sector in the directory, as a double word
-		short dirLevel;		/// Index of the directory record's parent directory
-		char* name;			/// Name (0 for the root directory)
-							/// If nameLength is odd numbered, a padding byte will be present after the identifier text.
+		short dirLevel;				/// Index of the directory record's parent directory
+		char* name;					/// Name (0 for the root directory)
+									/// If nameLength is odd numbered, a padding byte will be present after the identifier text.
 	} ISO_PATHTABLE_ENTRY;
 
 	typedef struct {

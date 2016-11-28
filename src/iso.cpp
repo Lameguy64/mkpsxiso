@@ -286,7 +286,7 @@ void iso::DirTreeClass::SortDirEntries() {
 	for(int i=1; i<numentries-numdummies; i++) {
 		for(int j=1; j<numentries-numdummies; j++) {
 
-			if (strcmp(entries[j-1].id, entries[j].id) > 0) {
+			if (strcasecmp(entries[j-1].id, entries[j].id) > 0) {
 
 				temp = entries[j-1];
 				entries[j-1] = entries[j];
@@ -296,73 +296,6 @@ void iso::DirTreeClass::SortDirEntries() {
 
 		}
 	}
-
-
-	/*
-	int numdirs=0,numfiles=0;
-	// Sort directories to be first in list
-	for(int i=1; i<numentries; i++) {
-		for(int j=1; j<numentries; j++) {
-
-			if ((entries[j-1].type != EntryDir) && (entries[j].type == EntryDir)) {
-
-				temp = entries[j-1];
-				entries[j-1] = entries[j];
-				entries[j] = temp;
-
-			}
-
-		}
-	}
-
-	if (numdirs > 1) {
-
-		// Sort the directory entries
-		for(int i=1; i<numdirs; i++) {
-			for(int j=1; j<numdirs; j++) {
-
-				if (strcmp(entries[j-1].id, entries[j].id) > 0) {
-
-					temp = entries[j-1];
-					entries[j-1] = entries[j];
-					entries[j] = temp;
-
-				}
-
-			}
-		}
-
-	}
-
-
-	// Count number of files
-	for(int i=0; i<numentries; i++) {
-
-		if ((entries[i].type != EntryDir) && (entries[i].id != NULL))
-			numfiles++;
-
-	}
-
-
-	// Now sort the files
-	if (numfiles > 1) {
-
-		for(int i=numdirs+1; i<(numdirs+numfiles); i++) {
-			for(int j=numdirs+1; j<(numdirs+numfiles); j++) {
-
-				if (strcmp(entries[j-1].id, entries[j].id) > 0) {
-
-					temp = entries[j-1];
-					entries[j-1] = entries[j];
-					entries[j] = temp;
-
-				}
-
-			}
-		}
-
-	}
-	*/
 
 }
 
@@ -614,23 +547,41 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) {
 
 }
 
-void iso::DirTreeClass::PrintEntries() {
+void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) {
 
-	printf("RECORD LBA : %d\n", recordLBA);
 	for(int i=0; i<numentries; i++) {
 
-		if (entries[i].id != NULL)
-			printf("N:%s ", entries[i].id);
-		else
-			printf("N:<DUMMY> ");
+		for(int s=0; s<level; s++) {
 
-		printf("L:%d LBA:%d T:%d S:%s\n", entries[i].length, entries[i].lba, entries[i].type, entries[i].srcfile);
+            if (s < (level-1)) {
 
-		if (entries[i].subdir != NULL) {
+				fprintf(fp, " | ");
 
-			((DirTreeClass*)entries[i].subdir)->PrintEntries();
+            } else {
+
+            	fprintf(fp, " +-");
+
+            }
 
 		}
+
+		if (entries[i].id != NULL) {
+
+			fprintf(fp, "%s", entries[i].id);
+
+			for(int s=0; s<17-(int)strlen(entries[i].id); s++)
+				fprintf(fp, " ");
+
+		} else {
+
+			fprintf(fp, "<DUMMY>          ");
+
+		}
+
+		fprintf(fp, "LBA:%d\n", entries[i].lba);
+
+		if (entries[i].type == EntryDir)
+			((DirTreeClass*)entries[i].subdir)->OutputLBAlisting(fp, level+1);
 
 	}
 

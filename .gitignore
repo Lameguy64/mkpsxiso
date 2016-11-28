@@ -1,7 +1,10 @@
 /bin*/
 /CMakeFiles/
+/pages/
+/test/
 Makefile
 CMakeCache.txt
 *.cmake
-*.cdp
 *.layout
+*.depend
+*.exe
