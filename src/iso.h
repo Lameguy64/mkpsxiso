@@ -44,7 +44,11 @@ namespace iso {
 
 	class DirTreeClass {
 
-		int dirIndex;
+		const char	*name;
+		int			dirIndex;
+		int			recordLBA;
+
+		void		*parent;
 
 		/// Internal function for generating and writing directory records
 		int	WriteDirEntries(cd::IsoWriter* writer, int lastLBA);
@@ -55,29 +59,34 @@ namespace iso {
 		/// Internal function for recursive path table generation
 		unsigned char* GenPathTableSub(unsigned char* buff, DIRENTRY* dirEntry, int parentIndex, int msb);
 
-		int			recordLBA;
-
 	public:
 
 		int			numentries;
-		DIRENTRY*	entries;
+		DIRENTRY	*entries;
 
+		/** Flag to indicate if the directory record has exceeded a sector
+		 */
+		int			passedSector;
 
 		DirTreeClass();
 		virtual ~DirTreeClass();
+
+		void PrintRecordPath();
+
+		void OutputHeaderListing(FILE* fp, int level);
 
 		/** Calculates the length of the directory record to be produced by this class in bytes.
 		 *
 		 *  Returns: Length of directory record in bytes.
 		 */
-		int	CalculateDirEntryLen();
+		int	CalculateDirEntryLen(int forLBA);
 
 		/** Calculates the LBA of all file and directory entries in the directory record and returns the next LBA
 		 *	address.
 		 *
-		 *	lba			- LBA address where the first directory record begins (always 22).
+		 *	lba			- LBA address where the first directory record begins.
 		 */
-		int CalculateTreeLBA(int lba = 22);
+		int CalculateTreeLBA(int lba);
 
 		/** Adds a file entry to the directory record.
 		 *

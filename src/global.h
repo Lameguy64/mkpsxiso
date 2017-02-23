@@ -8,6 +8,8 @@ namespace global {
 	extern time_t	BuildTime;
 	extern int		QuietMode;
 
+	extern int		NoLimit;
+
 };
 
 #endif // _GLOBAL_H

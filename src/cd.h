@@ -165,7 +165,7 @@ namespace cd {
 		ISO_USHORT_PAIR volumeSetSize;
 		// Number of this disc in volume set (always 1 for single volume)
 		ISO_USHORT_PAIR volumeSeqNumber;
-		// Size of sector in bytes (always 2352 bytes)
+		// Size of sector in bytes (always 2048 bytes)
 		ISO_USHORT_PAIR sectorSize;
 		// Path table size in bytes (applies to all the path tables)
 		ISO_UINT_PAIR pathTableSize;

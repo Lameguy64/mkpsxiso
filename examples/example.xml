@@ -10,8 +10,9 @@
 	
 	Attributes:
 		image_name	- File name of the ISO image file to generate.
-		cue_sheet	- Optional, file name of the cue sheet for the image file
-					  (required if more than one track is specified, not needed if you don't use CD-DA).
+		cue_sheet	- File name of the cue sheet for the image file
+					  (Optional, required if more than one track is specified, not needed
+					  if you don't use CD audio in your project).
 -->
 <iso_project image_name="myimage.bin" cue_sheet="myimage.cue">
 
@@ -19,43 +20,42 @@
 		Specifies a track to the ISO project. This example element creates a data
 		track for storing data files and CD-XA/STR streams.
 	
-		Only one data track is allowed and data tracks must only be specified as the
-		first track in the ISO image and cannot	be specified after an audio track.
+		Only one data track is permitted and data tracks must only be specified as the
+		first track in the ISO image and cannot	be specified past an audio track.
 		
 		Attributes:
 			type		- Track type (either data or audio).
 			source		- For audio tracks only, specifies the file name of a wav audio
-						  file to use for the audio track.
+						  file as source data for the audio track.
 			
 	-->
 	<track type="data">
 	
 		<!-- <identifiers>
-			Optional, Specifies the identifier strings to use for the data track.
+			Optional, Specifies the identifier strings for the data track.
 				
 			Attributes:
-				system			- Optional, specifies the system identifier (PLAYSTATION if unspecified).
-				application		- Optional, specifies the application identifier (PLAYSTATION if unspecified).
+				system			- Optional, specifies the system identifier (default to PLAYSTATION).
+				application		- Optional, specifies the application identifier (defaults to PLAYSTATION).
 				volume			- Optional, specifies the volume identifier.
 				volume_set		- Optional, specifies the volume set identifier.
 				publisher		- Optional, specifies the publisher identifier.
-				data_preparer	- Optional, specifies the data preparer identifier. If unspecified, MKPSXISO
-								  will fill it with lengthy text telling that the image file was generated
-								  using MKPSXISO.
+				data_preparer	- Optional, specifies the data preparer identifier (defaults to a lengthy
+								  description specifying that the image file was generated using MKPSXISO).
 		-->
 		<identifiers
 			system			="PLAYSTATION"
 			application		="PLAYSTATION"
 			volume			="MYDISC"
 			volume_set		="MYDISC"
-			publisher		="MYPUBLISHER"
+			publisher		="ME"
 			data_preparer	="MKPSXISO"
 		/>
 		
 		<!-- <license>
-			Optional, specifies the license file to use, the format of the license file must be in
+			Optional, specifies the license file to use. The file format of the license file must be in
 			raw 2336 byte sector format, like the ones included with the PlayStation Programmer's Tool
-			SDK in PS\CDGEN\LCNSFILE.
+			SDK (also known as PsyQ SDK) in PS\CDGEN\LCNSFILE.
 			
 			License data is not included within the MKPSXISO program to avoid possible legal problems
 			in the open source environment... Better be safe than sorry.
@@ -69,7 +69,9 @@
 			Specifies and contains the directory structure for the data track.
 			
 			Attributes:
-				None.
+				srcdir	- Specifies the directory path to the source files if no source attribute is
+						  specified to the <file> elements (optional, take note that it does not behave
+						  like cd or chdir and must be a complete path, can be a relative or absolute path).
 		-->
 		<directory_tree>
 		
@@ -78,9 +80,9 @@
 					
 				Attributes:
 					name	- File name to use in the directory tree (can be used for renaming).
-					type	- Optional, type of file (data for regular files and is the default, xa for
-							  XA audio and str for MDEC video).
-					source	- File name of the source file.
+					type	- The file's type, options are 'data' for standard files, 'xa' for XA
+							  audio and 'str' for MDEC video streams (optional, defaults to data).
+					source	- File name of the source file (optional).
 			-->
 			<!-- Stores system.txt as system.cnf -->
 			<file name="system.cnf"	type="data"	source="system.txt"/>
@@ -88,8 +90,15 @@
 			<file name="myexec.exe"	type="data"	source="myexec.exe"/>
 			
 			<!-- <dir>
-				Specifies a directory in the directory tree. <file> and <dir> elements inside the element
-				will be inside the directory.
+				Specifies a subdirectory to the directory structure. <file> and <dir> elements inside
+				the element will be stored inside it.
+				
+				Attributes:
+					name	- Specifies the name of the subdirectory.
+					srcdir	- Specifies the directory path to the source files if no source attribute is
+							  specified to the <file> elements (optional, take note that it does not behave
+							  like cd or chdir and must be a complete path, can be a relative or absolute path).
+						  
 			-->
 			<dir name="mydir">
 			
@@ -97,7 +106,7 @@
 				
 				<file name="myfile.dat" type="data" source="myfile.dat"/>
 				
-				<!-- Specifies a directory inside mydir -->
+				<!-- Specifies a directory named mystreams inside mydir -->
 				<dir name="mystreams">
 				
 					<!-- Specifies a file as XA audio -->
@@ -111,12 +120,12 @@
 			
 			<!-- <dummy>
 				Specifies an invisible dummy file to be generated into the file system. Use this to
-				add dummy sectors, usually at the end of the file system portion of the image to prevent
-				'drive runaway' problems.
+				add dummy sectors, usually at the end of the file system portion of the image to avoid
+				the possibility of 'drive runaway' which can damage a drive mechanism.
 				
 				The dummy file is completely invisible as it is not added into the directory records
-				of the ISO image entirely, ensuring a clean directory structure when the file system is
-				viewed.
+				of the ISO image entirely which ensures a clean directory structure when the file system is
+				viewed on a file browser.
 				
 				Attributes:
 					sectors	- Size of dummy file in sector units (1024 = 2MB).
@@ -129,10 +138,11 @@
 
 	<!-- Specifies CD-DA audio tracks to the CD image
 	
-		WAV files must be in Microsoft format, 44100KHz 16-bit stereo, uncompressed.
+		WAV files must be in Microsoft format, 44100KHz 16-bit stereo, uncompressed. Mkpsxiso will not perform
+		transcoding if the input file format is not correct.
 		
-		Plans for supporting FLAC as source audio were considered but was dropped because the author found
-		it impossible to compile libflac on Windows using MinGW GCC and MSys.
+		Plans for supporting FLAC as source audio were considered but dropped because Lameguy64 found it to
+		be impossible to compile libflac under Windows.
 	-->
 	<track type="audio" source="mytrack2.wav"/>
 	<track type="audio" source="mytrack3.wav"/>

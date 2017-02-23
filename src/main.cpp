@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <tinyxml2.h>
-
+#include <unistd.h>
 #include "cdwriter.h"	// CD image reader/writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.06"
+#define VERSION "1.10"
+
 
 namespace global {
 
@@ -12,10 +13,15 @@ namespace global {
 	int			QuietMode	= false;
 	int			Overwrite	= false;
 
-	const char*	XMLscript	= NULL;
-	const char*	LBAfile		= NULL;
-	const char*	ImageName	= NULL;
+	int			NoLimit		= false;
+
+	const char*	XMLscript		= NULL;
+	const char*	LBAfile			= NULL;
+	const char*	LBAheaderFile	= NULL;
+	const char*	ImageName		= NULL;
+
 	int			OutputOverride = false;
+	int			NoIsoGen = false;
 
 };
 
@@ -34,7 +40,20 @@ int main(int argc, const char* argv[]) {
 
 		if (argv[i][0] == '-') {
 
-			if (strcasecmp("-q", argv[i]) == 0) {
+			if (strcasecmp("-lbahead", argv[i]) == 0) {
+
+				i++;
+				global::LBAheaderFile = argv[i];
+
+			} else if (strcasecmp("-nolimit", argv[i]) == 0) {
+
+				global::NoLimit = true;
+
+			} else if (strcasecmp("-noisogen", argv[i]) == 0) {
+
+				global::NoIsoGen = true;
+
+			} else if (strcasecmp("-q", argv[i]) == 0) {
 
 				global::QuietMode = true;
 
@@ -73,23 +92,28 @@ int main(int argc, const char* argv[]) {
 	if ((!global::QuietMode) || (argc == 1)) {
 
 		printf("MKPSXISO " VERSION " - PlayStation ISO Image Maker\n");
-		printf("2016 Meido-Tek Productions (Lameguy64)\n\n");
+		printf("2017 Meido-Tek Productions (Lameguy64)\n\n");
 
 	}
 
 	if (argc == 1) {
 
-		printf("mkpsxiso [-y] [-q] [-lba <file>] <script.xml>\n\n");
-		printf("   <script>    - File name of an ISO image project in XML format to generate.\n");
-		printf("   -lba <file> - Outputs an LBA listing of all files in ISO file system.\n");
-		printf("   -o <file>   - Specifies output file name (overrides XML but not cue_sheet).\n");
-		printf("   -q          - Quiet mode (prints nothing but warnings and errors).\n");
-		printf("   -y          - Always overwrite.\n");
+		printf("mkpsxiso [-y] [-q] [-o <file>] [-lba <file>] [-lbaheader <file>] [-nolimit]\n");
+		printf(" [-noisogen] <xml>\n\n");
+		printf("  -y        - Always overwrite.\n");
+		printf("  -q        - Quiet mode (prints nothing but warnings and errors).\n");
+		printf("  -o        - Specifies output file name (overrides XML but not cue_sheet).\n");
+		printf("  <xml>     - File name of an ISO image project in XML format to generate.\n\n");
+		printf("Special Options:\n\n");
+		printf("  -lbalist  - Outputs an LBA listing of all files within the ISO file system.\n");
+		printf("  -lbahead  - Outputs an LBA listing of all files in C header format.\n");
+		printf("  -nolimit  - Don't warn when a directory record or path table exceeds a sector.\n");
+		printf("  -noisogen - Do not generate ISO image but calculate file LBA addresses.\n");
+		printf("              (ideal for -lba and -lbaheader without generating an image)\n");
 
 		return EXIT_SUCCESS;
 
 	}
-
 
 	if (global::XMLscript == NULL) {
 
@@ -140,8 +164,16 @@ int main(int argc, const char* argv[]) {
 
 		}
 
-		if (!global::QuietMode)
-			printf("Building ISO Image: %s\n", global::ImageName);
+		if (!global::QuietMode) {
+
+			printf("Building ISO Image: %s", global::ImageName);
+
+			if (projectElement->Attribute("cue_sheet") != NULL)
+				printf(" + %s", projectElement->Attribute("cue_sheet"));
+
+			printf("\n");
+
+		}
 
 		if (!global::Overwrite) {
 
@@ -188,43 +220,46 @@ int main(int argc, const char* argv[]) {
 		// Check if cue_sheet attribute is specified
 		FILE*	cuefp = NULL;
 
-		if (projectElement->Attribute("cue_sheet") != NULL) {
+		if (!global::NoIsoGen) {
 
-			if (strlen(projectElement->Attribute("cue_sheet")) == 0) {
+			if (projectElement->Attribute("cue_sheet") != NULL) {
 
-				if (!global::QuietMode)
-					printf("  ");
+				if (strlen(projectElement->Attribute("cue_sheet")) == 0) {
 
-				printf("ERROR: cue_sheet attribute is blank.\n");
+					if (!global::QuietMode)
+						printf("  ");
 
-				return EXIT_FAILURE;
+					printf("ERROR: cue_sheet attribute is blank.\n");
+
+					return EXIT_FAILURE;
+
+				}
+
+				cuefp = fopen(projectElement->Attribute("cue_sheet"), "w");
+
+				if (cuefp == NULL) {
+
+					if (!global::QuietMode)
+						printf("  ");
+
+					printf("ERROR: Unable to create cue sheet.\n");
+
+					return EXIT_FAILURE;
+
+				}
+
+				fprintf(cuefp, "FILE \"%s\" BINARY\n", global::ImageName);
 
 			}
-
-			cuefp = fopen(projectElement->Attribute("cue_sheet"), "w");
-
-			if (cuefp == NULL) {
-
-				if (!global::QuietMode)
-					printf("  ");
-
-				printf("ERROR: Unable to create cue sheet.\n");
-
-				return EXIT_FAILURE;
-
-			}
-
-			fprintf(cuefp, "FILE \"%s\" BINARY\n", global::ImageName);
-
-			if (!global::QuietMode)
-				printf("  CUE Sheet: %s\n\n", projectElement->Attribute("cue_sheet"));
 
 		}
 
 
 		// Create ISO image for writing
 		cd::IsoWriter writer;
-		writer.Create(global::ImageName);
+
+		if (!global::NoIsoGen)
+			writer.Create(global::ImageName);
 
 
 		int trackNum = 1;
@@ -243,8 +278,10 @@ int main(int argc, const char* argv[]) {
 
 				printf("ERROR: type attribute not specified in <track> element.\n");
 
-				writer.Close();
-				unlink(projectElement->Attribute("image_name"));
+				if (!global::NoIsoGen)
+					writer.Close();
+
+				unlink(global::ImageName);
 
 				if (cuefp != NULL)
 					fclose(cuefp);
@@ -263,7 +300,8 @@ int main(int argc, const char* argv[]) {
 
 					printf("ERROR: Only the first track can be data.\n");
 
-					writer.Close();
+					if (!global::NoIsoGen)
+						writer.Close();
 
 					if (cuefp != NULL)
 						fclose(cuefp);
@@ -274,12 +312,16 @@ int main(int argc, const char* argv[]) {
 
 				if (!ParseISOfileSystem(&writer, trackElement)) {
 
-					writer.Close();
-					unlink(projectElement->Attribute("image_name"));
+					if (!global::NoIsoGen)
+						writer.Close();
+
+					unlink(global::ImageName);
 
 					if (cuefp != NULL) {
+
 						fclose(cuefp);
 						unlink(projectElement->Attribute("cue_sheet"));
+
 					}
 
 					return EXIT_FAILURE;
@@ -306,7 +348,8 @@ int main(int argc, const char* argv[]) {
 
 					printf("ERROR: cue_sheet attribute must be specified when using audio tracks.\n");
 
-					writer.Close();
+					if (!global::NoIsoGen)
+						writer.Close();
 
 					return EXIT_FAILURE;
 
@@ -321,7 +364,8 @@ int main(int argc, const char* argv[]) {
 
 					printf("ERROR: source attribute not specified for track.\n");
 
-					writer.Close();
+					if (!global::NoIsoGen)
+						writer.Close();
 
 					if (cuefp != NULL)
 						fclose(cuefp);
@@ -332,37 +376,57 @@ int main(int argc, const char* argv[]) {
 
 					fprintf(cuefp, "  TRACK %02d AUDIO\n", trackNum);
 
-					int trackLBA = writer.SeekToEnd();
+					if (!global::NoIsoGen) {
 
-					// Add PREGAP of 2 seconds on first audio track only
-					if (!firstCDDAdone) {
+						int trackLBA = writer.SeekToEnd();
 
-						fprintf(cuefp, "    PREGAP 00:02:00\n");
-						firstCDDAdone = true;
+						// Add PREGAP of 2 seconds on first audio track only
+						if (!firstCDDAdone) {
 
-					}
+							fprintf(cuefp, "    PREGAP 00:02:00\n");
+							firstCDDAdone = true;
 
-					fprintf(cuefp, "    INDEX 01 %02d:%02d:%02d\n",
-						(trackLBA/75)/60,
-						(trackLBA/75)%60,
-						trackLBA%75
-					);
+						} else {
 
-					// Pack the audio file
-					if (!global::QuietMode)
-						printf("    Packing audio %s... ", trackElement->Attribute("source"));
+							fprintf(cuefp, "    INDEX 00 %02d:%02d:%02d\n",
+								(trackLBA/75)/60,
+								(trackLBA/75)%60,
+								trackLBA%75
+							);
 
-					if (PackWaveFile(&writer, trackElement->Attribute("source"))) {
+							char blank[CD_SECTOR_SIZE];
+							memset(blank, 0x00, CD_SECTOR_SIZE);
 
+							for(int sp=0; sp<150; sp++)
+								writer.WriteBytesRaw(blank, CD_SECTOR_SIZE);
+
+							trackLBA += 150;
+
+						}
+
+						fprintf(cuefp, "    INDEX 01 %02d:%02d:%02d\n",
+							(trackLBA/75)/60,
+							(trackLBA/75)%60,
+							trackLBA%75
+						);
+
+						// Pack the audio file
 						if (!global::QuietMode)
-							printf("Done.\n");
+							printf("    Packing audio %s... ", trackElement->Attribute("source"));
 
-					} else {
+						if (PackWaveFile(&writer, trackElement->Attribute("source"))) {
 
-						writer.Close();
-						fclose(cuefp);
+							if (!global::QuietMode)
+								printf("Done.\n");
 
-						return EXIT_FAILURE;
+						} else {
+
+							writer.Close();
+							fclose(cuefp);
+
+							return EXIT_FAILURE;
+
+						}
 
 					}
 
@@ -377,7 +441,8 @@ int main(int argc, const char* argv[]) {
 
 				printf("ERROR: Unknown track type.\n");
 
-				writer.Close();
+				if (!global::NoIsoGen)
+					writer.Close();
 
 				if (cuefp != NULL)
 					fclose(cuefp);
@@ -395,18 +460,22 @@ int main(int argc, const char* argv[]) {
 		}
 
 		// Get the last LBA of the image to calculate total size
-		int totalImageSize = writer.SeekToEnd();
+		if (!global::NoIsoGen) {
 
-		// Close both ISO writer and CUE sheet
-		writer.Close();
+			int totalImageSize = writer.SeekToEnd();
 
-		if (cuefp != NULL)
-			fclose(cuefp);
+			// Close both ISO writer and CUE sheet
+			writer.Close();
 
-		if (!global::QuietMode) {
+			if (cuefp != NULL)
+				fclose(cuefp);
 
-			printf("ISO image generated successfully.\n");
-			printf("Total image size: %d bytes (%d sectors)\n\n", (CD_SECTOR_SIZE*totalImageSize), totalImageSize);
+			if (!global::QuietMode) {
+
+				printf("ISO image generated successfully.\n");
+				printf("Total image size: %d bytes (%d sectors)\n\n", (CD_SECTOR_SIZE*totalImageSize), totalImageSize);
+
+			}
 
 		}
 
@@ -525,12 +594,13 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 
 	}
 
+
 	if (!ParseDirectory(&dirTree, trackElement->FirstChildElement("directory_tree")))
 		return false;
 
 
 	// Calculate directory tree LBAs and retrieve size of image
-	int imageLen = dirTree.CalculateTreeLBA();
+	int imageLen = dirTree.CalculateTreeLBA(18+(((dirTree.CalculatePathTableLen()+2047)/2048)*4));
 
 	if (!global::QuietMode) {
 
@@ -539,6 +609,38 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 		printf("      Estimated filesystem size: %d bytes (%d sectors)\n\n", 2352*imageLen, imageLen);
 
 	}
+
+
+	if (global::LBAfile != NULL) {
+
+		FILE* fp = fopen(global::LBAfile, "w");
+
+		dirTree.OutputLBAlisting(fp, 0);
+
+		fclose(fp);
+
+		if (!global::QuietMode)
+			printf("    Wrote LBA file listing %s.\n\n", global::LBAfile);
+
+	}
+
+	if (global::LBAheaderFile != NULL) {
+
+		FILE* fp = fopen(global::LBAheaderFile, "w");
+
+		dirTree.OutputHeaderListing(fp, 0);
+
+		fclose(fp);
+
+		if (!global::QuietMode)
+			printf("    Wrote LBA file listing header %s.\n\n", global::LBAheaderFile);
+
+	}
+
+
+	if (global::NoIsoGen)
+		return true;
+
 
 	// Write the file system
 	if (!global::QuietMode)
@@ -549,16 +651,12 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 		writer->SetSubheader(subHead);
 	}
 
-	if (dirTree.CalculatePathTableLen() > 2048) {
-
-		printf("ERROR: Path table exceeds 2048 bytes.\n\n");
+	if ((global::NoLimit == false) && (dirTree.CalculatePathTableLen() > 2048)) {
 
 		if (!global::QuietMode)
-			printf("    ");
+			printf("      ");
 
-		printf("Try reducing the number of directories in your directory tree.\n");
-
-		return false;
+		printf("WARNING: Path table exceeds 2048 bytes.\n");
 
 	}
 
@@ -567,7 +665,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 
 
 	// Write padding which will be written with proper data later on
-	for(int i=0; i<22; i++) {
+	for(int i=0; i<18+(((dirTree.CalculatePathTableLen()+2047)/2048)*4); i++) {
 
 		char buff[2048];
 		memset(buff, 0x00, 2048);
@@ -584,46 +682,25 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 	if (!global::QuietMode)
 		printf("      Writing filesystem... ");
 
-	if (global::LBAfile != NULL) {
-
-		FILE* fp = fopen(global::LBAfile, "w");
-
-		dirTree.OutputLBAlisting(fp, 0);
-
-		fclose(fp);
-
-	}
-
 	dirTree.SortDirEntries();
 
-	if (!dirTree.WriteDirectoryRecords(writer, 0)) {
-
-		printf("ERROR: A directory record is exceeding 2048 bytes.\n\n");
-
-		if (!global::QuietMode)
-			printf("      ");
-
-		printf("Try shortening filenames or reduce the number of files in directories\n");
-
-		if (!global::QuietMode)
-			printf("      ");
-
-		printf("with a large number of files.\n");
-
-		return false;
-
-	}
+	dirTree.WriteDirectoryRecords(writer, 0);
 
 
 	// Set file system identifiers
 	iso::IDENTIFIERS isoIdentifiers;
+	memset(&isoIdentifiers, 0x00, sizeof(iso::IDENTIFIERS));
 
-	isoIdentifiers.SystemID		= identifierElement->Attribute("system");
-	isoIdentifiers.VolumeID		= identifierElement->Attribute("volume");
-	isoIdentifiers.VolumeSet	= identifierElement->Attribute("volumeset");
-	isoIdentifiers.Publisher	= identifierElement->Attribute("publisher");
-	isoIdentifiers.Application	= identifierElement->Attribute("application");
-	isoIdentifiers.DataPreparer	= identifierElement->Attribute("datapreparer");
+	if (identifierElement != NULL) {
+
+		isoIdentifiers.SystemID		= identifierElement->Attribute("system", "");
+		isoIdentifiers.VolumeID		= identifierElement->Attribute("volume", "");
+		isoIdentifiers.VolumeSet	= identifierElement->Attribute("volumeset", "");
+		isoIdentifiers.Publisher	= identifierElement->Attribute("publisher", "");
+		isoIdentifiers.Application	= identifierElement->Attribute("application", "");
+		isoIdentifiers.DataPreparer	= identifierElement->Attribute("datapreparer");
+
+	}
 
 	// Write file system descriptor to finish the image
 	iso::WriteDescriptor(writer, isoIdentifiers, &dirTree, imageLen);
@@ -656,18 +733,38 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 
 int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement) {
 
+	const char *srcDir = dirElement->Attribute("srcdir");
+
+	if (srcDir != NULL) {
+
+		while(strchr(srcDir, '\\') != NULL)
+			*strchr(srcDir, '\\') = '/';
+
+	}
+
 	dirElement = dirElement->FirstChildElement();
 
 	while(dirElement != NULL) {
 
         if (strcasecmp("file", dirElement->Name()) == 0) {
 
+
+			if ((strchr(dirElement->Attribute("name"), '\\') != NULL) || (strchr(dirElement->Attribute("name"), '/') != NULL)) {
+
+                if (!global::QuietMode)
+					printf("      ");
+
+				printf("ERROR: Filename '%s' cannot be a path.\n", dirElement->Attribute("name"));
+				return false;
+
+			}
+
 			if (strlen(dirElement->Attribute("name")) > 12) {
 
 				if (!global::QuietMode)
 					printf("      ");
 
-				printf("ERROR: Filename %s is more than 12 characters long.\n", dirElement->Attribute("source"));
+				printf("ERROR: Filename '%s' is more than 12 characters long.\n", dirElement->Attribute("name"));
 				return false;
 
 			}
@@ -700,11 +797,35 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 
 			}
 
-			if (!dirTree->AddFileEntry(dirElement->Attribute("name"), entry, dirElement->Attribute("source"))) {
+			char *srcFilePath = NULL;
+			const char *srcFile = dirElement->Attribute("source");
+
+			if (srcFile == NULL)
+				srcFile = dirElement->Attribute("name");
+
+			if (srcDir != NULL) {
+
+				srcFilePath = (char*)malloc(strlen(srcDir)+strlen(srcFile)+4);
+
+				strcpy(srcFilePath, srcDir);
+				strcat(srcFilePath, "/");
+				strcat(srcFilePath, srcFile);
+
+				srcFile = srcFilePath;
+
+			}
+
+			if (!dirTree->AddFileEntry(dirElement->Attribute("name"), entry, srcFile)) {
+
+				if (srcFilePath != NULL)
+					free(srcFilePath);
 
 				return false;
 
 			}
+
+			if (srcFilePath != NULL)
+				free(srcFilePath);
 
 		} else if (strcasecmp("dummy", dirElement->Name()) == 0) {
 
@@ -715,6 +836,7 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 			if (strlen(dirElement->Attribute("name")) > 12) {
 
 				printf("ERROR: Directory name %s is more than 12 characters long.\n", dirElement->Attribute("source"));
+
 				return false;
 
 			}
