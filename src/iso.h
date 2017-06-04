@@ -79,7 +79,7 @@ namespace iso {
 		 *
 		 *  Returns: Length of directory record in bytes.
 		 */
-		int	CalculateDirEntryLen(int forLBA);
+		int	CalculateDirEntryLen();
 
 		/** Calculates the LBA of all file and directory entries in the directory record and returns the next LBA
 		 *	address.

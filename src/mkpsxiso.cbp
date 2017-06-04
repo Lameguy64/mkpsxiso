@@ -12,9 +12,9 @@
 				<Option object_output="../bin/obj" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="-y -lbahead listing.h test\test.xml" />
+				<Option parameters="-nolimit -lbahead listing.h -lba listing.txt test\test.xml" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-O1" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />

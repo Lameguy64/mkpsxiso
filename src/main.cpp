@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <tinyxml2.h>
 #include <unistd.h>
+#include <string>
 #include "cdwriter.h"	// CD image reader/writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.10"
+#define VERSION "1.14"
 
 
 namespace global {
@@ -15,11 +16,12 @@ namespace global {
 
 	int			NoLimit		= false;
 
-	const char*	XMLscript		= NULL;
-	const char*	LBAfile			= NULL;
-	const char*	LBAheaderFile	= NULL;
-	const char*	ImageName		= NULL;
+	std::string	XMLscript;
+	std::string LBAfile;
+	std::string LBAheaderFile;
+	std::string ImageName;
 
+	const char*	cuefile = NULL;
 	int			OutputOverride = false;
 	int			NoIsoGen = false;
 
@@ -60,7 +62,7 @@ int main(int argc, const char* argv[]) {
 			} else if (strcasecmp("-lba", argv[i]) == 0) {
 
 				i++;
-				global::LBAfile = argv[i];
+				global::LBAfile	= argv[i];
 
 			} else if (strcasecmp("-o", argv[i]) == 0) {
 
@@ -75,14 +77,13 @@ int main(int argc, const char* argv[]) {
 			} else {
 
 				printf("Unknown parameter: %s\n", argv[i]);
-
 				return EXIT_FAILURE;
 
 			}
 
 		} else {
 
-			if (global::XMLscript == NULL)
+			if (global::XMLscript.empty())
 				global::XMLscript = argv[i];
 
 		}
@@ -100,22 +101,22 @@ int main(int argc, const char* argv[]) {
 
 		printf("mkpsxiso [-y] [-q] [-o <file>] [-lba <file>] [-lbaheader <file>] [-nolimit]\n");
 		printf(" [-noisogen] <xml>\n\n");
-		printf("  -y        - Always overwrite.\n");
+		printf("  -y        - Always overwrite ISO image files.\n");
 		printf("  -q        - Quiet mode (prints nothing but warnings and errors).\n");
 		printf("  -o        - Specifies output file name (overrides XML but not cue_sheet).\n");
-		printf("  <xml>     - File name of an ISO image project in XML format to generate.\n\n");
+		printf("  <xml>     - File name of an ISO image project in XML document format.\n\n");
 		printf("Special Options:\n\n");
-		printf("  -lbalist  - Outputs an LBA listing of all files within the ISO file system.\n");
-		printf("  -lbahead  - Outputs an LBA listing of all files in C header format.\n");
-		printf("  -nolimit  - Don't warn when a directory record or path table exceeds a sector.\n");
-		printf("  -noisogen - Do not generate ISO image but calculate file LBA addresses.\n");
-		printf("              (ideal for -lba and -lbaheader without generating an image)\n");
+		printf("  -lba      - Outputs an LBA log of all files included into the ISO file system.\n");
+		printf("  -lbahead  - Similar to -lba but outputs in C header file format.\n");
+		printf("  -nolimit  - Don't warn when directory records or path tables exceed a sector.\n");
+		printf("  -noisogen - Do not generate ISO but calculate file LBAs\n");
+		printf("              (to be used with -lba or -lbahead without generating ISO).\n");
 
 		return EXIT_SUCCESS;
 
 	}
 
-	if (global::XMLscript == NULL) {
+	if (global::XMLscript.empty()) {
 
 		printf("No XML script specified.\n");
 		return EXIT_FAILURE;
@@ -128,9 +129,9 @@ int main(int argc, const char* argv[]) {
 	// Load XML file
 	tinyxml2::XMLDocument xmlFile;
 
-    if (xmlFile.LoadFile(global::XMLscript) != tinyxml2::XML_SUCCESS) {
+    if (xmlFile.LoadFile(global::XMLscript.c_str()) != tinyxml2::XML_SUCCESS) {
 
-		printf("ERROR: Cannot load XML file.\n\n");
+		printf("ERROR: Cannot load specified XML file.\n\n");
 		printf("Make sure the format of the XML document is correct and that the file exists.\n");
 		return EXIT_FAILURE;
 
@@ -146,12 +147,26 @@ int main(int argc, const char* argv[]) {
 
     }
 
+    int imagesCount = 0;
 
 	// Build loop for XML scripts with multiple <iso_project> elements
 	while(projectElement != NULL) {
 
+		if (imagesCount == 1) {
+
+			if (global::OutputOverride) {
+
+				printf("ERROR: -o switch cannot be used in multi-disc ISO projects.\n");
+				return EXIT_FAILURE;
+
+			}
+
+		}
+
+		imagesCount++;
+
 		// Check if image_name attribute is specified
-		if (global::ImageName == NULL) {
+		if (global::ImageName.empty()) {
 
 			if (projectElement->Attribute("image_name") == NULL) {
 
@@ -166,32 +181,30 @@ int main(int argc, const char* argv[]) {
 
 		if (!global::QuietMode) {
 
-			printf("Building ISO Image: %s", global::ImageName);
+			printf("Building ISO Image: %s", global::ImageName.c_str());
 
-			if (projectElement->Attribute("cue_sheet") != NULL)
+			if (projectElement->Attribute("cue_sheet") != NULL) {
 				printf(" + %s", projectElement->Attribute("cue_sheet"));
+				global::cuefile = projectElement->Attribute("cue_sheet");
+			}
 
 			printf("\n");
 
 		}
 
-		if (!global::Overwrite) {
+		if ((!global::Overwrite) && (!global::NoIsoGen)) {
 
-			if (GetSize(global::ImageName) >= 0) {
+			if (GetSize(global::ImageName.c_str()) >= 0) {
 
 				printf("WARNING: ISO image already exists, overwrite? <y/n> ");
-
 				char key;
 
 				do {
 
 					key = getchar();
 
-					if (tolower(key) == 'n') {
-
+					if (tolower(key) == 'n')
 						return EXIT_FAILURE;
-
-					}
 
 				} while(tolower(key) != 'y');
 
@@ -210,10 +223,8 @@ int main(int argc, const char* argv[]) {
 		tinyxml2::XMLElement* trackElement = projectElement->FirstChildElement("track");
 
 		if (trackElement == NULL) {
-
 			printf("ERROR: At least one <track> element must be specified.\n");
 			return EXIT_FAILURE;
-
 		}
 
 
@@ -222,9 +233,9 @@ int main(int argc, const char* argv[]) {
 
 		if (!global::NoIsoGen) {
 
-			if (projectElement->Attribute("cue_sheet") != NULL) {
+			if (global::cuefile != NULL) {
 
-				if (strlen(projectElement->Attribute("cue_sheet")) == 0) {
+				if (strlen(global::cuefile) == 0) {
 
 					if (!global::QuietMode)
 						printf("  ");
@@ -235,7 +246,7 @@ int main(int argc, const char* argv[]) {
 
 				}
 
-				cuefp = fopen(projectElement->Attribute("cue_sheet"), "w");
+				cuefp = fopen(global::cuefile, "w");
 
 				if (cuefp == NULL) {
 
@@ -248,7 +259,7 @@ int main(int argc, const char* argv[]) {
 
 				}
 
-				fprintf(cuefp, "FILE \"%s\" BINARY\n", global::ImageName);
+				fprintf(cuefp, "FILE \"%s\" BINARY\n", global::ImageName.c_str());
 
 			}
 
@@ -259,7 +270,7 @@ int main(int argc, const char* argv[]) {
 		cd::IsoWriter writer;
 
 		if (!global::NoIsoGen)
-			writer.Create(global::ImageName);
+			writer.Create(global::ImageName.c_str());
 
 
 		int trackNum = 1;
@@ -281,7 +292,7 @@ int main(int argc, const char* argv[]) {
 				if (!global::NoIsoGen)
 					writer.Close();
 
-				unlink(global::ImageName);
+				unlink(global::ImageName.c_str());
 
 				if (cuefp != NULL)
 					fclose(cuefp);
@@ -298,7 +309,7 @@ int main(int argc, const char* argv[]) {
 					if (!global::QuietMode)
 						printf("  ");
 
-					printf("ERROR: Only the first track can be data.\n");
+					printf("ERROR: Only the first track can be set as a data track.\n");
 
 					if (!global::NoIsoGen)
 						writer.Close();
@@ -315,17 +326,14 @@ int main(int argc, const char* argv[]) {
 					if (!global::NoIsoGen)
 						writer.Close();
 
-					unlink(global::ImageName);
+					unlink(global::ImageName.c_str());
 
 					if (cuefp != NULL) {
-
 						fclose(cuefp);
 						unlink(projectElement->Attribute("cue_sheet"));
-
 					}
 
 					return EXIT_FAILURE;
-
 
 				}
 
@@ -336,6 +344,16 @@ int main(int argc, const char* argv[]) {
 					fprintf(cuefp, "    INDEX 01 00:00:00\n");
 
 				}
+
+				if (global::NoIsoGen) {
+
+					printf("Skipped generating ISO image.\n");
+					break;
+
+				}
+
+				if (!global::QuietMode)
+					printf("\n");
 
 			// Add audio track
 			} else if (strcasecmp("audio", trackElement->Attribute("type")) == 0) {
@@ -356,7 +374,6 @@ int main(int argc, const char* argv[]) {
 				}
 
 				// Write track information to the CUE sheet
-
 				if (trackElement->Attribute("source") == NULL) {
 
 					if (!global::QuietMode)
@@ -432,6 +449,8 @@ int main(int argc, const char* argv[]) {
 
 				}
 
+				if (!global::QuietMode)
+					printf("\n");
 
 			// If an unknown track type is specified
 			} else {
@@ -450,9 +469,6 @@ int main(int argc, const char* argv[]) {
 				return EXIT_FAILURE;
 
 			}
-
-			if (!global::QuietMode)
-				printf("\n");
 
 			trackElement = trackElement->NextSiblingElement("track");
 			trackNum++;
@@ -473,7 +489,7 @@ int main(int argc, const char* argv[]) {
 			if (!global::QuietMode) {
 
 				printf("ISO image generated successfully.\n");
-				printf("Total image size: %d bytes (%d sectors)\n\n", (CD_SECTOR_SIZE*totalImageSize), totalImageSize);
+				printf("Total image size: %d bytes (%d sectors)\n", (CD_SECTOR_SIZE*totalImageSize), totalImageSize);
 
 			}
 
@@ -481,13 +497,6 @@ int main(int argc, const char* argv[]) {
 
 		// Check for next <iso_project> element
 		projectElement = projectElement->NextSiblingElement("iso_project");
-
-		if (global::OutputOverride) {
-
-			printf("ERROR: -o switch cannot be used in multi-disc ISO projects.\n");
-			return EXIT_FAILURE;
-
-		}
 
 	}
 
@@ -509,8 +518,14 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 			printf("    Identifiers:\n");
 			if (identifierElement->Attribute("system") != NULL)
 				printf("      System       : %s\n", identifierElement->Attribute("system"));
+			else
+				printf("      System       : PLAYSTATION (default)\n");
+
 			if (identifierElement->Attribute("application") != NULL)
 				printf("      Application  : %s\n", identifierElement->Attribute("application"));
+			else
+				printf("      Application  : PLAYSTATION (default)\n");
+
 			if (identifierElement->Attribute("volume") != NULL)
 				printf("      Volume       : %s\n", identifierElement->Attribute("volume"));
 			if (identifierElement->Attribute("volumeset") != NULL)
@@ -534,7 +549,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 				if (!global::QuietMode)
 					printf("    ");
 
-				printf("ERROR: file attribute of <license> element is blank.");
+				printf("ERROR: file attribute of <license> element is missing or blank.");
 
 				return false;
 
@@ -606,34 +621,43 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 
 		printf("      Files Total: %d\n", dirTree.GetFileCountTotal());
 		printf("      Directories: %d\n", dirTree.GetDirCountTotal());
-		printf("      Estimated filesystem size: %d bytes (%d sectors)\n\n", 2352*imageLen, imageLen);
+		printf("      Total file system size: %d bytes (%d sectors)\n\n", 2352*imageLen, imageLen);
 
 	}
 
 
-	if (global::LBAfile != NULL) {
+	if (!global::LBAfile.empty()) {
 
-		FILE* fp = fopen(global::LBAfile, "w");
+		FILE* fp = fopen(global::LBAfile.c_str(), "w");
+
+		fprintf(fp, "File LBA log generated by MKPSXISO v" VERSION "\n\n");
+		fprintf(fp, "Image bin file: %s\n", global::ImageName.c_str());
+
+		if (global::cuefile != NULL)
+			fprintf(fp, "Image cue file: %s\n", global::cuefile);
+
+		fprintf(fp, "\nFile System:\n\n");
+		fprintf(fp, "    Type  Name             Length    LBA       Timecode    Bytes     Source File\n\n");
 
 		dirTree.OutputLBAlisting(fp, 0);
 
 		fclose(fp);
 
 		if (!global::QuietMode)
-			printf("    Wrote LBA file listing %s.\n\n", global::LBAfile);
+			printf("    Wrote file LBA log %s.\n\n", global::LBAfile.c_str());
 
 	}
 
-	if (global::LBAheaderFile != NULL) {
+	if (!global::LBAheaderFile.empty()) {
 
-		FILE* fp = fopen(global::LBAheaderFile, "w");
+		FILE* fp = fopen(global::LBAheaderFile.c_str(), "w");
 
 		dirTree.OutputHeaderListing(fp, 0);
 
 		fclose(fp);
 
 		if (!global::QuietMode)
-			printf("    Wrote LBA file listing header %s.\n\n", global::LBAheaderFile);
+			printf("    Wrote file LBA listing header %s.\n\n", global::LBAheaderFile.c_str());
 
 	}
 
@@ -693,12 +717,17 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 
 	if (identifierElement != NULL) {
 
-		isoIdentifiers.SystemID		= identifierElement->Attribute("system", "");
-		isoIdentifiers.VolumeID		= identifierElement->Attribute("volume", "");
-		isoIdentifiers.VolumeSet	= identifierElement->Attribute("volumeset", "");
-		isoIdentifiers.Publisher	= identifierElement->Attribute("publisher", "");
-		isoIdentifiers.Application	= identifierElement->Attribute("application", "");
+		isoIdentifiers.SystemID		= identifierElement->Attribute("system");
+		isoIdentifiers.VolumeID		= identifierElement->Attribute("volume");
+		isoIdentifiers.VolumeSet	= identifierElement->Attribute("volumeset");
+		isoIdentifiers.Publisher	= identifierElement->Attribute("publisher");
+		isoIdentifiers.Application	= identifierElement->Attribute("application");
 		isoIdentifiers.DataPreparer	= identifierElement->Attribute("datapreparer");
+
+		if (isoIdentifiers.SystemID == NULL)
+			isoIdentifiers.SystemID = "PLAYSTATION";
+		if (isoIdentifiers.Application == NULL)
+			isoIdentifiers.Application = "PLAYSTATION";
 
 	}
 
@@ -733,12 +762,15 @@ int ParseISOfileSystem(cd::IsoWriter* writer, tinyxml2::XMLElement* trackElement
 
 int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement) {
 
-	const char *srcDir = dirElement->Attribute("srcdir");
+	std::string srcDir;
 
-	if (srcDir != NULL) {
+	if (dirElement->Attribute("srcdir") != NULL)
+		srcDir = dirElement->Attribute("srcdir");
 
-		while(strchr(srcDir, '\\') != NULL)
-			*strchr(srcDir, '\\') = '/';
+	if (!srcDir.empty()) {
+
+		while(srcDir.rfind("\\") != std::string::npos)
+			srcDir.replace(srcDir.rfind("\\"), 1, "/");
 
 	}
 
@@ -748,24 +780,27 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 
         if (strcasecmp("file", dirElement->Name()) == 0) {
 
+			if (dirElement->Attribute("name") != NULL) {
 
-			if ((strchr(dirElement->Attribute("name"), '\\') != NULL) || (strchr(dirElement->Attribute("name"), '/') != NULL)) {
+				if ((strchr(dirElement->Attribute("name"), '\\') != NULL) || (strchr(dirElement->Attribute("name"), '/') != NULL)) {
 
-                if (!global::QuietMode)
-					printf("      ");
+					if (!global::QuietMode)
+						printf("      ");
 
-				printf("ERROR: Filename '%s' cannot be a path.\n", dirElement->Attribute("name"));
-				return false;
+					printf("ERROR: Name attribute for file entry '%s' cannot be a path.\n", dirElement->Attribute("name"));
+					return false;
 
-			}
+				}
 
-			if (strlen(dirElement->Attribute("name")) > 12) {
+				if (strlen(dirElement->Attribute("name")) > 12) {
 
-				if (!global::QuietMode)
-					printf("      ");
+					if (!global::QuietMode)
+						printf("      ");
 
-				printf("ERROR: Filename '%s' is more than 12 characters long.\n", dirElement->Attribute("name"));
-				return false;
+					printf("ERROR: Name entry for file '%s' is more than 12 characters long.\n", dirElement->Attribute("name"));
+					return false;
+
+				}
 
 			}
 
@@ -797,35 +832,58 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 
 			}
 
-			char *srcFilePath = NULL;
-			const char *srcFile = dirElement->Attribute("source");
+			std::string srcFile;
 
-			if (srcFile == NULL)
-				srcFile = dirElement->Attribute("name");
+			if (dirElement->Attribute("source") != NULL)
+				srcFile = dirElement->Attribute("source");
 
-			if (srcDir != NULL) {
+			if (srcFile.empty()) {
 
-				srcFilePath = (char*)malloc(strlen(srcDir)+strlen(srcFile)+4);
-
-				strcpy(srcFilePath, srcDir);
-				strcat(srcFilePath, "/");
-				strcat(srcFilePath, srcFile);
-
-				srcFile = srcFilePath;
+				if (dirElement->Attribute("name") != NULL)
+					srcFile = dirElement->Attribute("name");
 
 			}
 
-			if (!dirTree->AddFileEntry(dirElement->Attribute("name"), entry, srcFile)) {
+			if (!srcDir.empty())
+				srcFile = srcDir + "/" + srcFile;
 
-				if (srcFilePath != NULL)
-					free(srcFilePath);
+			const char *name = dirElement->Attribute("name");
 
+			if (name == NULL) {
+
+				if (srcFile.empty()) {
+
+					if (!global::QuietMode)
+						printf("      ");
+
+					printf("WARNING: File entry without name or source attributes found, will be ignored.\n");
+
+					dirElement = dirElement->NextSiblingElement();
+
+					continue;
+
+				}
+
+				name = strrchr(srcFile.c_str(), '/');
+
+				if (name == NULL) {
+
+					name = srcFile.c_str();
+
+				} else {
+
+					if (strrchr(srcFile.c_str(), '\\') > name)
+						name = strrchr(srcFile.c_str(), '\\');
+
+					name++;
+
+				}
+
+			}
+
+
+			if (!dirTree->AddFileEntry(name, entry, srcFile.c_str()))
 				return false;
-
-			}
-
-			if (srcFilePath != NULL)
-				free(srcFilePath);
 
 		} else if (strcasecmp("dummy", dirElement->Name()) == 0) {
 

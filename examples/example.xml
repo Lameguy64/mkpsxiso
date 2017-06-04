@@ -4,7 +4,7 @@
 
 <!-- <iso_project>
 	Starts an ISO image project to build. Multiple <iso_project> elements may be
-	specified within the same xml script which is useful for multi-disc projects.
+	specified within the same xml script useful for multi-disc game projects.
 
 	<iso_project> elements must contain at least one <track> element.
 	
@@ -20,8 +20,8 @@
 		Specifies a track to the ISO project. This example element creates a data
 		track for storing data files and CD-XA/STR streams.
 	
-		Only one data track is permitted and data tracks must only be specified as the
-		first track in the ISO image and cannot	be specified past an audio track.
+		Only one data track is permitted and data tracks can only be specified as the
+		first track in a ISO image and cannot be specified past an audio track.
 		
 		Attributes:
 			type		- Track type (either data or audio).
@@ -33,15 +33,19 @@
 	
 		<!-- <identifiers>
 			Optional, Specifies the identifier strings for the data track.
-				
+			
+			In order for the resulting ISO to be bootable to a PSX, the system and application identifiers must
+			read PLAYSTATION. If for some reason you wanted to keep them blank, specify a blank system and
+			application identifier.
+			
 			Attributes:
-				system			- Optional, specifies the system identifier (default to PLAYSTATION).
-				application		- Optional, specifies the application identifier (defaults to PLAYSTATION).
+				system			- Optional, specifies the system identifier (if blank, defaults to PLAYSTATION).
+				application		- Optional, specifies the application identifier (if blank, defaults to PLAYSTATION).
 				volume			- Optional, specifies the volume identifier.
 				volume_set		- Optional, specifies the volume set identifier.
 				publisher		- Optional, specifies the publisher identifier.
 				data_preparer	- Optional, specifies the data preparer identifier (defaults to a lengthy
-								  description specifying that the image file was generated using MKPSXISO).
+								  message stating that the image file was generated using MKPSXISO).
 		-->
 		<identifiers
 			system			="PLAYSTATION"
@@ -69,7 +73,7 @@
 			Specifies and contains the directory structure for the data track.
 			
 			Attributes:
-				srcdir	- Specifies the directory path to the source files if no source attribute is
+				srcdir	- Optional, specifies the directory path to the source files if no source attribute is
 						  specified to the <file> elements (optional, take note that it does not behave
 						  like cd or chdir and must be a complete path, can be a relative or absolute path).
 		-->
@@ -79,10 +83,10 @@
 				Specifies a file in the directory tree.
 					
 				Attributes:
-					name	- File name to use in the directory tree (can be used for renaming).
+					name	- File name to use in the directory tree (optional, a source attribute must be present, can be used for renaming).
 					type	- The file's type, options are 'data' for standard files, 'xa' for XA
 							  audio and 'str' for MDEC video streams (optional, defaults to data).
-					source	- File name of the source file (optional).
+					source	- File name of the source file (optional, a name attribute must be present).
 			-->
 			<!-- Stores system.txt as system.cnf -->
 			<file name="system.cnf"	type="data"	source="system.txt"/>
@@ -142,7 +146,7 @@
 		transcoding if the input file format is not correct.
 		
 		Plans for supporting FLAC as source audio were considered but dropped because Lameguy64 found it to
-		be impossible to compile libflac under Windows.
+		be impossible to compile libflac under Windows and that most people usually use XA audio over CDDA anyway.
 	-->
 	<track type="audio" source="mytrack2.wav"/>
 	<track type="audio" source="mytrack3.wav"/>

@@ -162,8 +162,8 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id) {
 
 	entries[numentries].id		= strdup(id);
 	entries[numentries].type	= EntryDir;
-	entries[numentries].length	= 2048;
 	entries[numentries].subdir	= (void*) new DirTreeClass;
+	entries[numentries].length	= ((iso::DirTreeClass*)entries[numentries].subdir)->CalculateDirEntryLen();
 
 	((DirTreeClass*)entries[numentries].subdir)->parent = this;
 
@@ -203,7 +203,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba) {
 	// Set LBA of directory record of this class
 	recordLBA = lba;
 
-	lba += (CalculateDirEntryLen(true)+2047)/2048;
+	lba += (CalculateDirEntryLen()+2047)/2048;
 
 	if ((global::NoLimit == false) && (passedSector)) {
 
@@ -229,6 +229,8 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba) {
 			// Recursively calculate the LBA of subdirectories
 			lba = ((DirTreeClass*)entries[i].subdir)->CalculateTreeLBA(lba);
 
+			entries[i].length = ((DirTreeClass*)entries[i].subdir)->CalculateDirEntryLen();
+
 		} else {
 
 			// Increment LBA by the size of file
@@ -246,7 +248,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba) {
 
 }
 
-int iso::DirTreeClass::CalculateDirEntryLen(int forLBA) {
+int iso::DirTreeClass::CalculateDirEntryLen() {
 
 	int dirEntryLen = 96;
 
@@ -264,8 +266,9 @@ int iso::DirTreeClass::CalculateDirEntryLen(int forLBA) {
 
 		dataLen += sizeof(cd::ISO_XA_ATTRIB);
 
-		if ((forLBA) && (dirEntryLen+dataLen) > 2048)
-            dirEntryLen = 2048*((dirEntryLen+dataLen)/2048);
+		if (((dirEntryLen%2048)+dataLen) > 2048) {
+			dirEntryLen = (2048*(dirEntryLen/2048))+(dirEntryLen%2048);
+		}
 
 		dirEntryLen += dataLen;
 
@@ -407,7 +410,6 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA) {
 
 		if (entries[i].type == EntryDir) {
 
-			entries[i].length = ((iso::DirTreeClass*)entries[i].subdir)->CalculateDirEntryLen(false);
 			entry->flags = 0x02;
 
 		} else {
@@ -632,7 +634,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) {
 			for(int s=0; s<17-(int)strlen(entries[i].id); s++)
 				fprintf(fp, " ");
 
-			fprintf(fp, "%d\n", entries[i].lba);
+			fprintf(fp, "%d\n", 150+entries[i].lba);
 
 		}
 
@@ -653,38 +655,68 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) {
 
 }
 
+void LBAtoTimecode(int lba, char* timecode) {
+
+	sprintf(timecode, "%02d:%02d:%02d", (lba/75)/60, (lba/75)%60, (lba%75));
+
+}
+
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) {
+
+	char textbuff[10];
 
 	for(int i=0; i<numentries; i++) {
 
-		for(int s=0; s<level; s++) {
-
-            if (s < (level-1)) {
-
-				fprintf(fp, " | ");
-
-            } else {
-
-            	fprintf(fp, " +-");
-
-            }
-
-		}
+		fprintf(fp, "    ");
 
 		if (entries[i].id != NULL) {
 
-			fprintf(fp, "%s", entries[i].id);
+			if (entries[i].type == EntryFile)
+				fprintf(fp, "File  ");
+			else if (entries[i].type == EntryDir)
+				fprintf(fp, "Dir   ");
+			else if (entries[i].type == EntrySTR)
+				fprintf(fp, "STR   ");
+			else if (entries[i].type == EntryXA)
+				fprintf(fp, "XA    ");
 
+			fprintf(fp, "%s", entries[i].id);
 			for(int s=0; s<17-(int)strlen(entries[i].id); s++)
 				fprintf(fp, " ");
 
 		} else {
 
-			fprintf(fp, "<DUMMY>          ");
+			fprintf(fp, "Dummy <DUMMY>          ");
 
 		}
 
-		fprintf(fp, "LBA:%d\n", entries[i].lba);
+		// Write size in sector units
+		sprintf(textbuff, "%d", ((entries[i].length+2047)/2048));
+		fprintf(fp, "%s", textbuff);
+		for(int s=0; s<10-(int)strlen(textbuff); s++)
+			fprintf(fp, " ");
+
+		// Write LBA offset
+		sprintf(textbuff, "%d", entries[i].lba);
+		fprintf(fp, "%s", textbuff);
+		for(int s=0; s<10-(int)strlen(textbuff); s++)
+			fprintf(fp, " ");
+
+		// Write Timecode
+		LBAtoTimecode(150+entries[i].lba, textbuff);
+		fprintf(fp, "%s    ", textbuff);
+
+		// Write size in byte units
+		sprintf(textbuff, "%d", entries[i].length);
+		fprintf(fp, "%s", textbuff);
+		for(int s=0; s<10-(int)strlen(textbuff); s++)
+			fprintf(fp, " ");
+
+		// Write source file path
+		if ((entries[i].id != NULL) && (entries[i].type != EntryDir))
+			fprintf(fp, "%s\n", entries[i].srcfile);
+		else
+			fprintf(fp, " \n");
 
 		if (entries[i].type == EntryDir)
 			((DirTreeClass*)entries[i].subdir)->OutputLBAlisting(fp, level+1);
@@ -979,7 +1011,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id, iso::DirTr
 	isoDescriptor.rootDirRecord.entryLength = 34;
 	isoDescriptor.rootDirRecord.extLength	= 0;
 	cd::SetPair32(&isoDescriptor.rootDirRecord.entryOffs, 18+(pathTableSectors*4));
-	cd::SetPair32(&isoDescriptor.rootDirRecord.entrySize, dirTree->CalculateDirEntryLen(false));
+	cd::SetPair32(&isoDescriptor.rootDirRecord.entrySize, dirTree->CalculateDirEntryLen());
 	isoDescriptor.rootDirRecord.flags = 0x02;
 	cd::SetPair16(&isoDescriptor.rootDirRecord.volSeqNum, 1);
 	isoDescriptor.rootDirRecord.identifierLen = 1;
