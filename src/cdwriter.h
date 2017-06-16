@@ -9,8 +9,8 @@ namespace cd {
 class IsoWriter {
 
 		FILE*			filePtr;
-		unsigned char			subHeadBuff[12];
-		unsigned char			sectorBuff[CD_SECTOR_SIZE];
+		unsigned char	subHeadBuff[12];
+		unsigned char	sectorBuff[CD_SECTOR_SIZE];
 		SECTOR_M2F1*	sectorM2F1;
 		SECTOR_M2F2*	sectorM2F2;
 

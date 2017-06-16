@@ -2,10 +2,10 @@
 #include <tinyxml2.h>
 #include <unistd.h>
 #include <string>
-#include "cdwriter.h"	// CD image reader/writer module
+#include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.14"
+#define VERSION "1.15"
 
 
 namespace global {
@@ -106,11 +106,11 @@ int main(int argc, const char* argv[]) {
 		printf("  -o        - Specifies output file name (overrides XML but not cue_sheet).\n");
 		printf("  <xml>     - File name of an ISO image project in XML document format.\n\n");
 		printf("Special Options:\n\n");
-		printf("  -lba      - Outputs an LBA log of all files included into the ISO file system.\n");
-		printf("  -lbahead  - Similar to -lba but outputs in C header file format.\n");
-		printf("  -nolimit  - Don't warn when directory records or path tables exceed a sector.\n");
-		printf("  -noisogen - Do not generate ISO but calculate file LBAs\n");
-		printf("              (to be used with -lba or -lbahead without generating ISO).\n");
+		printf("  -lba      - Outputs a log of all files packed with LBA information.\n");
+		printf("  -lbahead  - Outputs a C header of all the file's LBA addresses.\n");
+		printf("  -nolimit  - No warning when a directory record exceeds a sector.\n");
+		printf("  -noisogen - Do not generate ISO but calculates file LBAs\n");
+		printf("              (To be used with -lba or -lbahead without generating ISO).\n");
 
 		return EXIT_SUCCESS;
 
@@ -133,6 +133,7 @@ int main(int argc, const char* argv[]) {
 
 		printf("ERROR: Cannot load specified XML file.\n\n");
 		printf("Make sure the format of the XML document is correct and that the file exists.\n");
+
 		return EXIT_FAILURE;
 
     }

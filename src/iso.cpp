@@ -203,7 +203,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba) {
 	// Set LBA of directory record of this class
 	recordLBA = lba;
 
-	lba += (CalculateDirEntryLen()+2047)/2048;
+	lba += CalculateDirEntryLen()/2048;
 
 	if ((global::NoLimit == false) && (passedSector)) {
 
@@ -277,7 +277,7 @@ int iso::DirTreeClass::CalculateDirEntryLen() {
 	if (dirEntryLen > 2048)
 		passedSector = true;
 
-	return dirEntryLen;
+	return(2048*((dirEntryLen+2047)/2048));
 
 }
 
@@ -377,10 +377,11 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA) {
 		dataLen += 2;
 
 		xa = (cd::ISO_XA_ATTRIB*)(dataBuffPtr+dataLen);
+		memset(xa, 0x00, sizeof(cd::ISO_XA_ATTRIB));
 
 		xa->id[0] = 'X';
 		xa->id[1] = 'A';
-		xa->type  = 0x8800;
+		xa->attributes  = 0x558d;
 
 		dataLen += sizeof(cd::ISO_XA_ATTRIB);
 
@@ -434,14 +435,17 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA) {
 			dataLen++;
 
 		xa = (cd::ISO_XA_ATTRIB*)(entryBuff+dataLen);
+		memset(xa, 0x00, sizeof(cd::ISO_XA_ATTRIB));
 
 		xa->id[0] = 'X';
 		xa->id[1] = 'A';
 
 		if (entries[i].type == EntryFile)
-			xa->type  = 0x0800;
+			xa->attributes	= 0x550d;
+		else if ((entries[i].type == EntrySTR) || (entries[i].type == EntryXA))
+			xa->attributes	= 0x553d;
 		else if (entries[i].type == EntryDir)
-			xa->type  = 0x8800;
+			xa->attributes	= 0x558d;
 
 		dataLen += sizeof(cd::ISO_XA_ATTRIB);
 		entry->entryLength = dataLen;
@@ -576,7 +580,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) {
 				if (buff[2] == 0x48)
 					writer->WriteBytesXA(buff, 2336, cd::IsoWriter::EdcEccForm1);	// If so, write it as Mode 2 Form 1
 				else
-					writer->WriteBytesXA(buff, 2336, cd::IsoWriter::EdcEccNone);	// Otherwise, write it as an XA track
+					writer->WriteBytesXA(buff, 2336, cd::IsoWriter::EdcEccNone);	// Otherwise, write it as an XA sector
 
 			}
 

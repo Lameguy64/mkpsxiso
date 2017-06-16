@@ -1,25 +1,29 @@
 # MKPSXISO
-Basically a modern clone of BUILDCD that came included with the PlayStation Programmer's Tool SDK for generating ISO disc images used for developing PlayStation software (usually homebrew nowadays). The problem with BUILDCD however is that it's an old real-mode DOS program and will not work on 64-bit versions of Windows without a DOS emulator. Also, BUILDCD only produces CD images in an unusual image format used by early CD writers which must be converted to a usable ISO format using a separate tool, making the already slow ISO generation process even slower.
+Basically a modern clone of BUILDCD that came included with the leaked PlayStation PsyQ SDK used for creating ISO disc images for developing PlayStation software. The problem with BUILDCD however is that it is an old real-mode DOS program and will not work natively on 64-bit versions of Windows without a DOS emulator which not only makes automated build scripts that produce ISO images messy and inconvenient to manage but it also slows down ISO creation speed considerably.
 
-While other ISO generator tools such as the popular MKISOFS may work, most do not let you control the order of the files by LBA (which is very important when optimizing file orders to speed up file access times) and all do not support mixed-mode XA file integration for streaming files such as XA audio and MDEC STR video... Thus, MKPSXISO was made to replace BUILDCD to aid PlayStation homebrew development on modern systems.
+Also, BUILDCD only produces CD images in a non standard CD image format used by early CD burners which must be converted to a usable ISO format with a separate tool. This makes the already slow ISO generation process even slower.
 
-MKPSXISO more or less replicates BUILDCD's functionality but better! The most notable difference is that MKPSXISO produces ISO images in either iso or cue+bin format so that generated images can immediately be loaded to an emulator or burned to a CD. The cue+bin format allows images to contain more than a single track usually for iso image projects that include CD-DA audio tracks.
+While other ISO creation tools such as MKISOFS may work as an alternative, most do not let you control the order of the files stored in the ISO image (and is essential for optimizing file order to speed up access times) and all do not support mixed-mode XA files for streamed data such as XA audio and MDEC video streams. MKPSXISO was made specifically to replace BUILDCD to aid in PlayStation homebrew development on modern systems as well as modification/hacking of existing PlayStation titles.
 
-Another notable difference is that MKPSXISO injects the Sony license data correctly into the disc image. However, the license data is not provided with the program so one must have a copy of the official PlayStation Programmer's Tool SDK (which can be found in www.psxdev.net) for the license data. This is to avoid possible legal problems when including Sony's license data into open source programs and it's better to be safe than sorry... Besides, there already exists disc patcher tools to inject license data if you don't use the PlayStation Programmer's Tool SDK anyway.
+MKPSXISO more or less replicates most of the functionality of BUILDCD but better! The most notable difference is that MKPSXISO creates ISO images in either standalone iso or cue+bin format so that generated images can immediately be run on an emulator or burned to a CD.
+
+Another notable difference of MKPSXISO is that it injects the Sony license data correctly into the disc image which eliminates the need of having to use a separate program for licensing the ISO image. However, the license data is not included so one must have a copy of the official PlayStation Programmer's Tool SDK or the PsyQ SDK (both of which can be found in www.psxdev.net) for the license files to be able to take advantage of this feature. This is to avoid possible legal problems when including Sony's license data into open source programs... Better to be safe than sorry!
 
 ## Features
-* Outputs CD image in iso or bin+cue image format.
-* Injects license data properly.
-* Manual file ordering to allow for file seek optimization.
-* Supports mixed-mode XA file integration for CD-XA streams such as XA audio and STR video.
-* Supports injecting CD-DA audio tracks into generated ISO image.
-* Uses XML for iso project scripting.
+* Uses XML for scripting ISO projects.
+* Outputs ISO images directly to iso or bin+cue image format.
+* Injects license data into ISO image correctly.
+* File LBA controlled by order of files allowing for file seek optimization (just like BUILDCD).
+* Supports mixed-mode CD-XA stream files such as XA audio and STR video.
+* Supports CD-DA audio tracks from uncompressed WAV files.
+* Can output log of all files packed with details such as LBA, size and timecode offset.
 
 ## Binary Download
 The latest precompiled Win32 binary of this program can be downloaded here:
-[mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
+[mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
 
 Older versions:
+[mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
 [mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
 [mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
 [mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
@@ -60,6 +64,11 @@ This tool requires tinyxml2 to compile.
 6. The result will be in bin_nix, named "mkpsxiso"
 
 ## Changelog
+**Version 1.15**
+* Directory record lengths have been tweaked to now calculate in sector multiples instead of actual bytes. This now makes ISOs generated with MKPSXISO fully ISO9660 compliant and ISO tools that threw a fit when opening ISO images generated with older versions of MKPSXISO should no longer complain.
+* Improved XA attribute header encoding (not really necessary but still nice to have).
+* Re-done README text.
+
 **Version 1.14 (BIG update because I forgot to release 1.12)**
 * Name attribute of file entries can now be omitted provided that the source attribute is at least present.
 * Changed some char* strings to std::string strings.

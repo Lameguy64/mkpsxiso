@@ -126,10 +126,12 @@ namespace cd {
 
 	// XA attribute struct (located right after the identifier string)
 	typedef struct {
-		unsigned int pad;		// Nothing but null bytes
-		unsigned short type;	// XA attribute (0x8800 for directories, 0x800 for regular files, 0x0 for XA Form 2 files)
-		char id[2];		// Always XA
-		unsigned char pad2[6];	// Nothing but null bytes
+		unsigned short	ownergroupid;	// Usually 0x0000
+		unsigned short	owneruserid;	// Usually 0x0000
+		unsigned short	attributes;
+		char id[2];
+		unsigned char	filenum;		// Usually 0x00
+		unsigned char	reserved[5];
 	} ISO_XA_ATTRIB;
 
 	typedef struct {
