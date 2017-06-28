@@ -1,0 +1,9 @@
+*.o
+*.exe
+*.old
+*.depend
+*.layout
+Debug
+obj
+output
+testiso
