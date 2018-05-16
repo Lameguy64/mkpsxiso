@@ -36,9 +36,9 @@ void cd::SetPair32(cd::ISO_UINT_PAIR* pair, unsigned int val) {
 
 cd::IsoWriter::IsoWriter() {
 
-	cd::IsoWriter::filePtr			= NULL;
-	cd::IsoWriter::sectorM2F1		= NULL;
-	cd::IsoWriter::sectorM2F2		= NULL;
+	cd::IsoWriter::filePtr			= nullptr;
+	cd::IsoWriter::sectorM2F1		= nullptr;
+	cd::IsoWriter::sectorM2F2		= nullptr;
 	cd::IsoWriter::currentByte		= 0;
 	cd::IsoWriter::currentSector	= 0;
 	cd::IsoWriter::bytesWritten		= 0;
@@ -50,10 +50,10 @@ cd::IsoWriter::IsoWriter() {
 
 cd::IsoWriter::~IsoWriter() {
 
-	if (cd::IsoWriter::filePtr != NULL)
+	if (cd::IsoWriter::filePtr != nullptr)
 		fclose(cd::IsoWriter::filePtr);
 
-	cd::IsoWriter::filePtr = NULL;
+	cd::IsoWriter::filePtr = nullptr;
 
 }
 
@@ -114,7 +114,7 @@ bool cd::IsoWriter::Create(const char* fileName) {
 
 	cd::IsoWriter::filePtr	= fopen(fileName, "wb");
 
-	if (cd::IsoWriter::filePtr == NULL)
+	if (cd::IsoWriter::filePtr == nullptr)
 		return(false);
 
 	cd::IsoWriter::currentByte		= 0;
@@ -339,7 +339,7 @@ void cd::IsoWriter::SetSubheader(unsigned char* data) {
 
 void cd::IsoWriter::Close() {
 
-	if (cd::IsoWriter::filePtr != NULL) {
+	if (cd::IsoWriter::filePtr != nullptr) {
 
 		if (cd::IsoWriter::currentByte > 0) {
 			cd::IsoWriter::PrepSector(cd::IsoWriter::lastSectorType);
@@ -350,6 +350,6 @@ void cd::IsoWriter::Close() {
 
 	}
 
-	cd::IsoWriter::filePtr = NULL;
+	cd::IsoWriter::filePtr = nullptr;
 
 }

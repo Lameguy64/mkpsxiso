@@ -84,8 +84,9 @@
 					
 				Attributes:
 					name	- File name to use in the directory tree (optional, a source attribute must be present, can be used for renaming).
-					type	- The file's type, options are 'data' for standard files, 'xa' for XA
-							  audio and 'str' for MDEC video streams (optional, defaults to data).
+					type	- The file's type. Options are 'data' for standard files, 'xa' for XA
+							  audio, 'str' for MDEC video streams and 'da' is for CD-DA audio files
+							  (optional, defaults to data).
 					source	- File name of the source file (optional, a name attribute must be present).
 			-->
 			<!-- Stores system.txt as system.cnf -->
@@ -135,6 +136,16 @@
 					sectors	- Size of dummy file in sector units (1024 = 2MB).
 			-->
 			<dummy sectors="1024"/>
+			
+			<!-- Sample DA audio file entry.
+			
+				Unlike XA and STR file types, DA files can only be put last in the ISO file system as
+				the file will be packed as raw CD audio data and you cannot put file data past a CD
+				audio track. It will also be mapped as a conventional CD audio track in the CUE sheet.
+				
+				You can still use the <track> element after this.
+			-->
+			<file name="audio1.da" type="da" source="myaudio.wav"/>
 		
 		</directory_tree>
 		

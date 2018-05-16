@@ -20,9 +20,10 @@ Another notable difference of MKPSXISO is that it injects the Sony license data 
 
 ## Binary Download
 The latest precompiled Win32 binary of this program can be downloaded here:
-[mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
+[mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
 
 Older versions:
+[mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
 [mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
 [mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
 [mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
@@ -64,12 +65,27 @@ This tool requires tinyxml2 to compile.
 6. The result will be in bin_nix, named "mkpsxiso"
 
 ## Changelog
-**Version 1.15**
+
+**Version 1.18 (5/16/2018)**
+* Added support for DA audio files (files that map directly to a CD Audio track which games that use CD Audio have).
+* XML load error message now reports useful error details.
+* Parameter errors in XML script now reports with line numbers.
+* Fixed corrupt file names displayed when packing files.
+* Fixed corrupt directory names and corrected minor formatting issues of generated LBA header files.
+* Improved formatting of generated LBA listings.
+* Can now accept raw audio files for CD audio tracks. However, it assumes any file that isn't a WAV file as raw audio.
+* Directory record entries now handled using std::vector arrays (possibly better stability).
+* Replaced char strings to std::string strings inside DirTreeClass and associated typedefs.
+* Replaced all strcasecmp() with custom compare() function to make code fully C++14 compatible.
+* Included Netbeans 8.1 project.
+* Removed mkisoxml from download temporarily (currently too buggy, source still available).
+
+**Version 1.15 (6/16/2017)**
 * Directory record lengths have been tweaked to now calculate in sector multiples instead of actual bytes. This now makes ISOs generated with MKPSXISO fully ISO9660 compliant and ISO tools that threw a fit when opening ISO images generated with older versions of MKPSXISO should no longer complain.
 * Improved XA attribute header encoding (not really necessary but still nice to have).
 * Re-done README text.
 
-**Version 1.14 (BIG update because I forgot to release 1.12)**
+**Version 1.14 (6/4/2017, BIG update because I forgot to release 1.12)**
 * Name attribute of file entries can now be omitted provided that the source attribute is at least present.
 * Changed some char* strings to std::string strings.
 * Fixed typo in help text where -lba was referenced as -lbalist.
@@ -81,7 +97,7 @@ This tool requires tinyxml2 to compile.
 * Changed the format of the file LBA log completely which no longer uses a tree style format but it outputs more information of the file entries.
 * LBA values in generated header files are now offset by 150 sectors to take into account that sectors actually begin past 150 sectors. This may have caused direct LBA seeks to point 150 sectors behind the actual LBA on the CD.
 
-**Version 1.10**
+**Version 1.10 (2/23/2017)**
 * Can now handle as many files/directories the ISO9660 filesystem can handle without crashing or reporting an error as both a new feature and a fix for MeganGrass.
 * 2 second pregaps are now generated for CD audio tracks 3 and onwards in ISO projects that contain CD Audio.
 * Added -noisogen to disable iso generation useful for generating only an LBA listing of files in the ISO project in plain text or C header format.
@@ -90,7 +106,7 @@ This tool requires tinyxml2 to compile.
 * Added optional srcdir attribute for -directory_tree- and -dir- elements (mostly intended for the new mkisoxml tool).
 * Added crude mkisoxml utility for quickly generating basic ISO XML projects out of a directory (can be compiled with CMake).
 
-**Version 1.06**
+**Version 1.06 (11/28/2016)**
 * Added file overwrite confirmation.
 * Element and attribute strings are no longer case sensitive.
 * File name strings from arguments are no longer passed as duplicated strings (eliminates the risk of forgetting to dealloc said strings on exit).
@@ -102,9 +118,9 @@ This tool requires tinyxml2 to compile.
 * In cygwin64 version of tinyxml2, "XML_NO_ERROR" is not defined, changed with "XML_SUCCESS" and this works on both Windows and Linux.
 * Converted to cmake, if you want a codeblocks project file, just run "cmake . -G "CodeBlocks - Unix Makefiles"" to create it.
 
-**Version 1.04**
+**Version 1.04 (9/1/2016)**
 * Fixed a bug where you'll get a 'Data track must only be on first track' error when creating an ISO image with more than 2 tracks even when the extra tracks are CD audio.
 * Duplicate file and directory entries are no longer possible to add (it'll result to weird problems anyway).
 
-**Version 1.00**
+**Version 1.00 (8/6/2016)**
 * Initial release.

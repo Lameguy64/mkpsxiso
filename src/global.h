@@ -9,7 +9,7 @@ namespace global {
 	extern int		QuietMode;
 
 	extern int		NoLimit;
-
+	extern int		trackNum;
 };
 
 #endif // _GLOBAL_H

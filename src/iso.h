@@ -5,21 +5,25 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <tinyxml2.h>
-
+#include <string>
+#include <vector>
 #include "cdwriter.h"
 
-namespace iso {
+namespace iso
+{
 
-	enum EntryType {
+	enum EntryType
+	{
 		EntryFile = 0,
+		EntryDir,
 		EntryXA,
 		EntrySTR,
-		EntryDir,
+		EntryDA
 	};
 
-	typedef struct {
+	typedef struct
+	{
 		const char*	SystemID;
 		const char*	VolumeID;
 		const char*	VolumeSet;
@@ -28,28 +32,30 @@ namespace iso {
 		const char*	Application;
 	} IDENTIFIERS;
 
-	typedef struct {
+	typedef struct
+	{
+		std::string	id;			/// Entry identifier (empty if invisible dummy)
+		int			length;		/// Length of file in bytes
+		int			lba;		/// File LBA (in sectors)
 
-		char*	id;			/// Entry identifier (NULL if invisible dummy)
-		int		length;		/// Length of file in bytes
-		int		lba;		/// File LBA (in sectors)
-
-		char*	srcfile;	/// Filename with path to source file (NULL if directory or dummy)
-		int		type;		/// File type (0 - file, 1 - directory)
-		void*	subdir;
+		std::string	srcfile;	/// Filename with path to source file (empty if directory or dummy)
+		int			type;		/// File type (0 - file, 1 - directory)
+		void*		subdir;
 
 		cd::ISO_DATESTAMP date;
 
 	} DIRENTRY;
 
-	class DirTreeClass {
-
-		const char	*name;
+	class DirTreeClass
+	{
+		std::string name;
 		int			dirIndex;
 		int			recordLBA;
 
 		void		*parent;
 
+		int			first_track;
+		
 		/// Internal function for generating and writing directory records
 		int	WriteDirEntries(cd::IsoWriter* writer, int lastLBA);
 
@@ -59,10 +65,12 @@ namespace iso {
 		/// Internal function for recursive path table generation
 		unsigned char* GenPathTableSub(unsigned char* buff, DIRENTRY* dirEntry, int parentIndex, int msb);
 
+		int GetWavSize(const char* wavFile);
+		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap);
+		
 	public:
 
-		int			numentries;
-		DIRENTRY	*entries;
+		std::vector<DIRENTRY> entries;
 
 		/** Flag to indicate if the directory record has exceeded a sector
 		 */
@@ -145,7 +153,7 @@ namespace iso {
 		int GetDirCountTotal();
 
 		void OutputLBAlisting(FILE* fp, int level);
-
+		int WriteCueEntries(FILE* fp, int* trackNum);
 	};
 
 	void WriteLicenseData(cd::IsoWriter* writer, void* data);

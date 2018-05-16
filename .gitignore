@@ -8,3 +8,8 @@ CMakeCache.txt
 *.layout
 *.depend
 *.exe
+*.bin
+*.cue 
+.dep.inc
+build
+dist
