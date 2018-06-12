@@ -45,6 +45,30 @@ namespace iso
 		cd::ISO_DATESTAMP date;
 
 	} DIRENTRY;
+	
+	class PathEntryClass {
+	public:
+		PathEntryClass();
+		virtual ~PathEntryClass();
+		
+		std::string* dir_id;
+		int dir_level;
+		int dir_lba;
+		int next_parent;
+		
+		void* dir;
+		void* sub;
+	};
+	
+	class PathTableClass {
+	public:
+		
+		PathTableClass();
+		virtual ~PathTableClass();
+		unsigned char* GenTableData(unsigned char* buff, int msb);
+		
+		std::vector<PathEntryClass*> entries;
+	};
 
 	class DirTreeClass
 	{
@@ -63,7 +87,7 @@ namespace iso
 		int CalculatePathTableLenSub(DIRENTRY* dirEntry);
 
 		/// Internal function for recursive path table generation
-		unsigned char* GenPathTableSub(unsigned char* buff, DIRENTRY* dirEntry, int parentIndex, int msb);
+		void GenPathTableSub(PathTableClass* table, DirTreeClass* dir, int parentIndex, int msb);
 
 		int GetWavSize(const char* wavFile);
 		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap);
@@ -72,8 +96,7 @@ namespace iso
 
 		std::vector<DIRENTRY> entries;
 
-		/** Flag to indicate if the directory record has exceeded a sector
-		 */
+		// Flag to indicate if the directory record has exceeded a sector
 		int			passedSector;
 
 		DirTreeClass();

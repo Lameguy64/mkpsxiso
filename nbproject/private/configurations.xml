@@ -26,7 +26,6 @@
       </nativedebugger>
       <runprofile version="9">
         <runcommandpicklist>
-          <runcommandpicklistitem>"${OUTPUT_PATH}"</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" mk</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" mkisoxml/</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" mkisoxml/output.xml</runcommandpicklistitem>
@@ -36,8 +35,9 @@
           <runcommandpicklistitem>"${OUTPUT_PATH}" -lbahead lba.txt test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" -lbahead lba.h -noisogen test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" -lbahead lba.h test/test.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" treetest.xml</runcommandpicklistitem>
         </runcommandpicklist>
-        <runcommand>"${OUTPUT_PATH}" -lbahead lba.h test/test.xml</runcommand>
+        <runcommand>"${OUTPUT_PATH}" treetest.xml</runcommand>
         <rundir></rundir>
         <buildfirst>true</buildfirst>
         <console-type>1</console-type>
@@ -71,8 +71,9 @@
         <runcommandpicklist>
           <runcommandpicklistitem>"${OUTPUT_PATH}"</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" test/test.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" treetest.xml</runcommandpicklistitem>
         </runcommandpicklist>
-        <runcommand>"${OUTPUT_PATH}" test/test.xml</runcommand>
+        <runcommand>"${OUTPUT_PATH}" treetest.xml</runcommand>
         <rundir></rundir>
         <buildfirst>true</buildfirst>
         <console-type>1</console-type>

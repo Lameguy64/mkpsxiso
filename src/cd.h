@@ -98,26 +98,16 @@ namespace cd {
 	} ISO_PATHTABLE_ENTRY;
 
 	typedef struct {
-		// Directory entry length (variable, use for parsing through entries)
-		unsigned char entryLength;
-		// Extended entry data length (always 0)
-		unsigned char extLength;
-		// Points to the LBA of the file/directory entry
-		ISO_UINT_PAIR entryOffs;
-		// Size of the file/directory entry
-		ISO_UINT_PAIR entrySize;
-		// Date & time stamp of entry
-		ISO_DATESTAMP entryDate;
-		// File flags (0x02 for directories, 0x00 for files)
-		unsigned char flags;
-		// Unit size (usually 0 even with Form 2 files such as STR/XA)
-		unsigned char fileUnitSize;
-		// Interleave gap size (usually 0 even with Form 2 files such as STR/XA)
-		unsigned char interleaveGapSize;
-		// Volume sequence number (always 1)
-		ISO_USHORT_PAIR volSeqNum;
-		// Identifier (file/directory name) length in bytes
-		unsigned char identifierLen;
+		unsigned char entryLength;			// Directory entry length (variable, use for parsing through entries)
+		unsigned char extLength;			// Extended entry data length (always 0)
+		ISO_UINT_PAIR entryOffs;			// Points to the LBA of the file/directory entry
+		ISO_UINT_PAIR entrySize;			// Size of the file/directory entry
+		ISO_DATESTAMP entryDate;			// Date & time stamp of entry
+		unsigned char flags;				// File flags (0x02 for directories, 0x00 for files)
+		unsigned char fileUnitSize;			// Unit size (usually 0 even with Form 2 files such as STR/XA)
+		unsigned char interleaveGapSize;	// Interleave gap size (usually 0 even with Form 2 files such as STR/XA)
+		ISO_USHORT_PAIR volSeqNum;			// Volume sequence number (always 1)
+		unsigned char identifierLen;		// Identifier (file/directory name) length in bytes
 		// Pointer to identifier (placed here for convenience)
 		// If identifierLen is even numbered, a padding byte will be present after the identifier text.
 		char* identifier;
@@ -145,7 +135,7 @@ namespace cd {
 		unsigned char interleaveGapSize;
 		ISO_USHORT_PAIR volSeqNum;
 		unsigned char identifierLen;		// 0x01
-		unsigned char identifier;			// 0x01
+		unsigned char identifier;			// 0x00
 	} ISO_ROOTDIR_HEADER;
 
 	// ISO descriptor structure

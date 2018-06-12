@@ -20,9 +20,10 @@ Another notable difference of MKPSXISO is that it injects the Sony license data 
 
 ## Binary Download
 The latest precompiled Win32 binary of this program can be downloaded here:
-[mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
+[mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
 
 Older versions:
+[mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
 [mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
 [mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
 [mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
@@ -64,7 +65,48 @@ This tool requires tinyxml2 to compile.
 5. Run "make" to compile the program.
 6. The result will be in bin_nix, named "mkpsxiso"
 
+## Issues
+
+The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
+```
+<dir name="dira">
+	<dir name="subdir1a">
+		<dir name="subdiraa"/>
+		<dir name="subdirab"/>
+		<dir name="subdirac"/>
+	</dir>
+	<dir name="subdir1b"/>
+	<dir name="subdir1c"/>
+</dir>
+
+<dir name="dirb">
+	<dir name="subdir2a"/>
+	<dir name="subdir2b"/>
+	<dir name="subdir2c">
+		<dir name="subdirba"/>
+		<dir name="subdirbb"/>
+		<dir name="subdirbc"/>
+	</dir>
+</dir>
+
+<dir name="dirc">
+	<dir name="subdir3a"/>
+	<dir name="subdir3b"/>
+	<dir name="subdir3c"/>
+</dir>
+```
+
+On Windows, browsing the subdirectories in dirb and dirc will not list the contents for some reason and trying to access it in a command prompt leads to a permission denied or similar error message. Disc image tools such as CDmage will display the contents of the aforementioned subdirectories without issue and the issue persists on disc images created with BuildCD suggesting it is likely an operating system related issue.
+
+This can be avoided by minimizing identically named directories but its best to test your generated disc image before considering it ready for release.
+
 ## Changelog
+
+**Version 1.19 (6/12/2018)**
+* Path table generation logic significantly reworked. Previous implementation was flawed and caused issues on games and operating systems that utilize the path table. MKPSXISO should be truly ISO9660 compliant now (apologies for the misleading remark in the 1.15 changelog).
+* Date stamp is now set in the root directory record in the image descriptor.
+* Fixed specifying only a source attribute for a file element not behaving as intended.
+* Fixed no error on missing CUE file when DA audio type files are found but no cue sheet was specified.
 
 **Version 1.18 (5/16/2018)**
 * Added support for DA audio files (files that map directly to a CD Audio track which games that use CD Audio have).

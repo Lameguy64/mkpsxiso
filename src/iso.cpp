@@ -637,6 +637,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 
 		dataLen += 2;
 
+		
 		xa = (cd::ISO_XA_ATTRIB*)(dataBuffPtr+dataLen);
 		memset( xa, 0x00, sizeof(cd::ISO_XA_ATTRIB) );
 
@@ -645,7 +646,8 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 		xa->attributes  = 0x558d;
 
 		dataLen += sizeof(cd::ISO_XA_ATTRIB);
-
+		
+		
 		entry->flags = 0x02;
 		entry->entryLength = dataLen;
 
@@ -697,6 +699,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 			dataLen++;
 		}
 		
+		
 		xa = (cd::ISO_XA_ATTRIB*)(entryBuff+dataLen);
 		memset(xa, 0x00, sizeof(cd::ISO_XA_ATTRIB));
 
@@ -719,6 +722,8 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 		}
 
 		dataLen += sizeof(cd::ISO_XA_ATTRIB);
+		
+		
 		entry->entryLength = dataLen;
 
 		if ( (dataBuffPtr+dataLen) > (dataBuff+2047) )
@@ -1145,56 +1150,71 @@ int iso::DirTreeClass::CalculatePathTableLen()
 	return len;
 }
 
-unsigned char* iso::DirTreeClass::GenPathTableSub(unsigned char* buff, 
-	DIRENTRY* dirEntry, int parentIndex, int msb) 
+void iso::DirTreeClass::GenPathTableSub(PathTableClass* table, 
+	DirTreeClass* dir, int parentIndex, int msb) 
 {
-
-	*buff = dirEntry->id.length();	// Directory identifier length
-	buff++;
-	*buff = 0;						// Extended attribute record length (unused)
-	buff++;
-
-	// Write LBA and directory number index
-	dirIndex++;
-	*((int*)buff) = ((DirTreeClass*)dirEntry->subdir)->recordLBA;
-	memcpy( buff+4, &parentIndex, 2 );
-
-	if ( msb )
+	for ( int i=0; i<dir->entries.size(); i++ )
 	{
-		cd::SwapBytes( buff, 4 );
-		cd::SwapBytes( buff+4, 2 );
-	}
-
-	buff += 6;
-
-	// Put identifier (nullptr if first entry)
-	strncpy( (char*)buff, dirEntry->id.c_str(), dirEntry->id.length() );
-	buff += 2*((dirEntry->id.length()+1)/2);
-
-	parentIndex = dirIndex;
-
-	if ( dirEntry->subdir != nullptr )
-	{
-		for ( int i=0; i<((DirTreeClass*)dirEntry->subdir)->entries.size(); 
-			i++ )
+		if ( dir->entries[i].type == EntryDir ) 
 		{
-			if ( ((DirTreeClass*)dirEntry->subdir)->entries[i].type == 
-				EntryDir ) 
-			{
-				buff = GenPathTableSub( buff, 
-					&((DirTreeClass*)dirEntry->subdir)->entries[i],
-					parentIndex, msb );
-			}
+			PathEntryClass* entry = new PathEntryClass;
+
+			dirIndex++;
+			entry->dir_id		= &dir->entries[i].id;
+			entry->dir_level	= parentIndex;
+			entry->dir_lba		= ((DirTreeClass*)dir->entries[i].subdir)->recordLBA;
+			entry->dir			= dir->entries[i].subdir;
+			entry->next_parent	= dirIndex;
+
+			table->entries.push_back( entry );
 		}
 	}
-
-	return buff;
+	
+	for ( int i=0; i<table->entries.size(); i++ ) {
+		
+		DirTreeClass* subdir = (DirTreeClass*)table->entries[i]->dir;
+		PathTableClass* sub = new PathTableClass;
+		
+		GenPathTableSub( sub, subdir, table->entries[i]->next_parent, msb );
+		table->entries[i]->sub = sub;
+		
+	}
 }
 
 int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb)
 {
-	unsigned char* oldBuffPtr = buff;
-
+	PathTableClass pathTable;
+	
+	dirIndex = 1;
+	
+	for ( int i=0; i<entries.size(); i++ )
+	{
+		if ( entries[i].type == EntryDir )
+		{
+			PathEntryClass* entry = new PathEntryClass;
+			
+			dirIndex++;
+			entry->dir_id		= &entries[i].id;
+			entry->dir_level	= 1;
+			entry->dir_lba		= ((DirTreeClass*)entries[i].subdir)->recordLBA;
+			entry->dir			= entries[i].subdir;
+			entry->next_parent	= dirIndex;
+			
+			pathTable.entries.push_back(entry);
+			
+		}
+	}
+	
+	for ( int i=0; i<pathTable.entries.size(); i++ ) {
+		
+		DirTreeClass* subdir = (DirTreeClass*)pathTable.entries[i]->dir;
+		PathTableClass* sub = new PathTableClass;
+		
+		GenPathTableSub( sub, subdir, pathTable.entries[i]->next_parent, msb );
+		pathTable.entries[i]->sub = sub;
+		
+	}
+	
 	*buff = 1;	// Directory identifier length
 	buff++;
 	*buff = 0;	// Extended attribute record length (unused)
@@ -1203,10 +1223,9 @@ int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb)
 	int lba = recordLBA;
 
 	// Write LBA and directory number index
-	dirIndex = 1;
 	memcpy( buff, &lba, 4 );
-	memcpy( buff+4, &dirIndex, 2 );
-
+	*((short*)(buff+4)) = 1;
+	
 	if ( msb )
 	{
 		cd::SwapBytes( buff, 4 );
@@ -1218,17 +1237,11 @@ int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb)
 	// Put identifier (nullptr if first entry)
 	memset( buff, 0x00, 2 );
 	buff += 2;
-
-	for ( int i=0; i<entries.size(); i++ )
-	{
-		if ( entries[i].type == EntryDir )
-		{
-			buff = GenPathTableSub( buff, &entries[i], dirIndex, msb );
-		}
-
-	}
-
-	return (int)(buff-oldBuffPtr);
+	
+	unsigned char* newbuff = pathTable.GenTableData( buff, msb );
+	
+	return (int)(newbuff-buff);
+	
 }
 
 int iso::DirTreeClass::GetFileCountTotal()
@@ -1397,15 +1410,22 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	isoDescriptor.rootDirRecord.flags = 0x02;
 	cd::SetPair16( &isoDescriptor.rootDirRecord.volSeqNum, 1);
 	isoDescriptor.rootDirRecord.identifierLen = 1;
-	isoDescriptor.rootDirRecord.identifier = 0x01;
+	isoDescriptor.rootDirRecord.identifier = 0x0;
+
+	isoDescriptor.rootDirRecord.entryDate.year		= imageTime->tm_year;
+	isoDescriptor.rootDirRecord.entryDate.month		= imageTime->tm_mon+1;
+	isoDescriptor.rootDirRecord.entryDate.day		= imageTime->tm_mday;
+	isoDescriptor.rootDirRecord.entryDate.hour		= imageTime->tm_hour;
+	isoDescriptor.rootDirRecord.entryDate.minute	= imageTime->tm_min;
+	isoDescriptor.rootDirRecord.entryDate.second	= imageTime->tm_sec;
+		
 
 	isoDescriptor.pathTable1Offs = 18;
 	isoDescriptor.pathTable2Offs = isoDescriptor.pathTable1Offs+
 		pathTableSectors;
-
 	isoDescriptor.pathTable1MSBoffs = isoDescriptor.pathTable2Offs+1;
-	isoDescriptor.pathTable2MSBoffs = isoDescriptor.pathTable1MSBoffs+
-		pathTableSectors;
+	isoDescriptor.pathTable2MSBoffs = 
+		isoDescriptor.pathTable1MSBoffs+pathTableSectors;
 	cd::SwapBytes( &isoDescriptor.pathTable1MSBoffs, 4 );
 	cd::SwapBytes( &isoDescriptor.pathTable2MSBoffs, 4 );
 
@@ -1429,7 +1449,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	unsigned char sectorBuff[2048*pathTableSectors];
 	memset( sectorBuff, 0x00, 2048*pathTableSectors );
 
-	dirTree->GeneratePathTable(sectorBuff, false);
+	dirTree->GeneratePathTable( sectorBuff, false );
 
 	for ( int i=0; i<pathTableSectors; i++ )
 	{
@@ -1454,4 +1474,86 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 		writer->WriteBytes( &sectorBuff[2048*i], 2048, 
 			cd::IsoWriter::EdcEccForm1 );
 	}
+}
+
+iso::PathEntryClass::PathEntryClass() {
+	
+	dir_id = nullptr;
+	dir_level = 0;
+	dir_lba = 0;
+	
+	dir = nullptr;
+	sub = nullptr;
+			
+}
+
+iso::PathEntryClass::~PathEntryClass() {
+	
+	if ( sub != nullptr )
+	{
+		delete (PathTableClass*)sub;
+	}
+	
+}
+
+iso::PathTableClass::PathTableClass() {
+	
+}
+
+iso::PathTableClass::~PathTableClass() {
+	
+	if ( entries.size() > 0 )
+	{
+		for ( int i=0; i<entries.size(); i++ )
+		{
+			delete entries[i];
+		}
+	}
+	
+}
+
+unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, int msb) {
+	
+	if ( entries.size() == 0 )
+	{
+		return buff;
+	}
+	
+	for ( int i=0; i<entries.size(); i++ )
+	{
+		*buff = entries[i]->dir_id->length();	// Directory identifier length
+		buff++;
+		*buff = 0;								// Extended attribute record length (unused)
+		buff++;
+
+		// Write LBA and directory number index
+		*((int*)buff) = entries[i]->dir_lba;
+		*((unsigned short*)(buff+4)) = entries[i]->dir_level;
+
+		if ( msb )
+		{
+			cd::SwapBytes( buff, 4 );
+			cd::SwapBytes( buff+4, 2 );
+		}
+
+		buff += 6;
+
+		// Put identifier (nullptr if first entry)
+		strncpy( (char*)buff, entries[i]->dir_id->c_str(), 
+			entries[i]->dir_id->length() );
+		
+		buff += 2*((entries[i]->dir_id->length()+1)/2);
+	}
+	
+	for ( int i=0; i<entries.size(); i++ )
+	{
+		if ( entries[i]->sub )
+		{
+			buff = ((PathTableClass*)entries[i]->sub)->GenTableData( buff, msb );
+		}
+		
+	}
+	
+	return buff;
+	
 }

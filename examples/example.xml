@@ -83,11 +83,15 @@
 				Specifies a file in the directory tree.
 					
 				Attributes:
-					name	- File name to use in the directory tree (optional, a source attribute must be present, can be used for renaming).
+					name	- File name to use in the directory tree.
 					type	- The file's type. Options are 'data' for standard files, 'xa' for XA
 							  audio, 'str' for MDEC video streams and 'da' is for CD-DA audio files
 							  (optional, defaults to data).
-					source	- File name of the source file (optional, a name attribute must be present).
+					source	- File name of the source file.
+					
+				Note: Either name or source attribute can be omitted. If name is specified, it uses the specified
+				name as the name of the source file whereas specifying source strips off the path name if there's
+				any and uses that as the name of the file in the image. Omitting both will cause an error.
 			-->
 			<!-- Stores system.txt as system.cnf -->
 			<file name="system.cnf"	type="data"	source="system.txt"/>
@@ -101,8 +105,7 @@
 				Attributes:
 					name	- Specifies the name of the subdirectory.
 					srcdir	- Specifies the directory path to the source files if no source attribute is
-							  specified to the <file> elements (optional, take note that it does not behave
-							  like cd or chdir and must be a complete path, can be a relative or absolute path).
+							  specified to the <file> elements (optional, can be a relative or absolute path).
 						  
 			-->
 			<dir name="mydir">
@@ -143,7 +146,7 @@
 				the file will be packed as raw CD audio data and you cannot put file data past a CD
 				audio track. It will also be mapped as a conventional CD audio track in the CUE sheet.
 				
-				You can still use the <track> element after this.
+				You can still use <track> elements after this.
 			-->
 			<file name="audio1.da" type="da" source="myaudio.wav"/>
 		

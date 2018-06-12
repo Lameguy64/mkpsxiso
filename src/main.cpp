@@ -5,7 +5,7 @@
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.18"
+#define VERSION "1.19"
 
 
 namespace global
@@ -906,6 +906,8 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 {
 	std::string srcDir;
+	std::string srcFile;
+	std::string name;
 	int found_da = false;
 	
 	if ( dirElement->Attribute( "srcdir" ) != nullptr )
@@ -919,51 +921,82 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 		{
 			srcDir.replace( srcDir.rfind( "\\" ), 1, "/" );
 		}
+		if ( srcDir.back() != '/' )
+		{
+			srcDir += "/";
+		}	
 	}
-
+	
 	dirElement = dirElement->FirstChildElement();
 
 	while ( dirElement != nullptr )
 	{
         if ( compare( "file", dirElement->Name() ) == 0 )
 		{
-			
-			if ( dirElement->Attribute("name") != nullptr )
-			{
+			if ( ( dirElement->Attribute("name") == nullptr ) &&
+				( dirElement->Attribute("source") == nullptr ) ) {
 				
-				if ( ( strchr( dirElement->Attribute( "name" ), '\\' ) != nullptr ) 
-					|| ( strchr( dirElement->Attribute( "name" ), '/' ) 
-					!= nullptr))
+				if ( !global::QuietMode )
 				{
-					
-					if ( !global::QuietMode )
-					{
-						printf("      ");
-					}
-					
-					printf( "ERROR: Name attribute for file entry '%s' cannot be "
-						"a path on line %d.\n", dirElement->Attribute( "name" ), 
-						dirElement->GetLineNum() );
-					
-					return false;
-
+					printf("      ");
 				}
 
-				if ( strlen( dirElement->Attribute( "name" ) ) > 12 )
+				printf( "ERROR: Missing name and source attributes on "
+					"line %d.\n", dirElement->GetLineNum() );
+				
+				return false;
+			}
+			
+			
+			if ( dirElement->Attribute("source") != nullptr )
+			{
+				srcFile = dirElement->Attribute("source");
+				while ( srcFile.rfind( "\\" ) != std::string::npos )
 				{
-					if ( !global::QuietMode )
-					{
-						printf( "      " );
-					}
-					
-					printf( "ERROR: Name entry for file '%s' is more than 12 "
-						"characters long on line %d.\n", 
-						dirElement->Attribute( "name" ), 
-						dirElement->GetLineNum() );
-					
-					return false;
+					srcFile.replace( srcFile.rfind( "\\" ), 1, "/" );
+				}
+			}
+			
+			if ( dirElement->Attribute("name") )
+			{
+				name = dirElement->Attribute("name");
+			} 
+			else
+			{
+				if ( !srcFile.empty() )
+				{
+					name = srcFile;
+					name.erase( 0, name.rfind( '/' )+1 );
+				}
+			}
+			
+			if ( ( name.find( '\\', 0 ) != std::string::npos ) 
+				|| ( name.find( '/', 0 ) != std::string::npos ) )
+			{
+				if ( !global::QuietMode )
+				{
+					printf("      ");
 				}
 
+				printf( "ERROR: Name attribute for file entry '%s' cannot be "
+					"a path on line %d.\n", name.c_str(), 
+					dirElement->GetLineNum() );
+
+				return false;
+			}
+
+			if ( name.size() > 12 )
+			{
+				if ( !global::QuietMode )
+				{
+					printf( "      " );
+				}
+
+				printf( "ERROR: Name entry for file '%s' is more than 12 "
+					"characters long on line %d.\n", name.c_str(), 
+					dirElement->GetLineNum() );
+
+				return false;
 			}
 
 			int entry = iso::EntryFile;
@@ -985,13 +1018,14 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 				else if ( compare( "da", dirElement->Attribute( "type" ) ) == 0 )
 				{
 					entry = iso::EntryDA;
-					if ( ( found_da ) && ( global::cuefile == nullptr ) )
+					if ( global::cuefile == nullptr )
 					{
 						if ( !global::QuietMode )
 						{
 							printf( "      " );
 						}
-						printf( "WARNING: DA audio files found but no CUE sheet specified.\n" );
+						printf( "ERROR: DA audio file(s) found but no CUE sheet specified.\n" );
+						return false;
 					}
 					found_da = true;
 				}
@@ -1024,66 +1058,16 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 
 			}
 
-			std::string srcFile;
-
-			if ( dirElement->Attribute( "source" ) != nullptr )
-			{
-				srcFile = dirElement->Attribute("source");
-			}
-			
-			if ( srcFile.empty() )
-			{
-				if ( dirElement->Attribute( "name" ) != nullptr )
-				{
-					srcFile = dirElement->Attribute("name");
-				}
+			if ( srcFile.empty() ) {
+				srcFile = name;
 			}
 
 			if ( !srcDir.empty() )
 			{
-				srcFile = srcDir + "/" + srcFile;
-			}
-			
-			const char *name = dirElement->Attribute( "name" );
-
-			if ( name == nullptr )
-			{
-
-				if ( srcFile.empty() )
-				{
-					if ( !global::QuietMode )
-					{
-						printf( "      " );
-					}
-					
-					printf("WARNING: File entry without name or source "
-						"attributes found on line %d, will be ignored.\n",
-						dirElement->GetLineNum());
-
-					dirElement = dirElement->NextSiblingElement();
-
-					continue;
-				}
-
-				name = strrchr( srcFile.c_str(), '/' );
-
-				if ( name == nullptr )
-				{
-					name = srcFile.c_str();
-				}
-				else
-				{
-					if (strrchr(srcFile.c_str(), '\\') > name)
-					{
-						name = strrchr(srcFile.c_str(), '\\');
-					}
-					name++;
-				}
-
+				srcFile = srcDir + srcFile;
 			}
 
-
-			if ( !dirTree->AddFileEntry( name, entry, srcFile.c_str() ) )
+			if ( !dirTree->AddFileEntry( name.c_str(), entry, srcFile.c_str() ) )
 			{
 				return false;
 			}
