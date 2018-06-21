@@ -320,7 +320,7 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 	DIRENTRY entry;
 	memset( &entry, 0x00, sizeof(DIRENTRY) );
 	
-	entry.id.assign(temp_name);
+	entry.id.assign(temp_name.c_str());
 	entry.type		= type;
 	entry.subdir	= nullptr;
 
