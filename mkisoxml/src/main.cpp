@@ -87,8 +87,8 @@ int main(int argc, const char* argv[]) {
 
 	if (argc == 1) {
 
-		printf("MKISOXML " VERSION " - XML ISO Generator for MKPSXISO\n");
-		printf("2017 Meido-Tek Productions (Lameguy64)\n\n");
+		printf("MKISOXML " VERSION " - XML Project Generator for MKPSXISO\n");
+		printf("2017-2018 Meido-Tek Productions (Lameguy64)\n\n");
 
 		printf("mkisoxml -o <output> <path>\n\n");
 		printf("   -o     - Specifies the filename for the XML output.\n");

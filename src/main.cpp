@@ -5,7 +5,7 @@
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.19"
+#define VERSION "1.20"
 
 
 namespace global
@@ -154,7 +154,7 @@ int main(int argc, const char* argv[])
 		}
 		else
 		{
-			printf("%s on line %d\n", xmlFile.ErrorName(), xmlFile.GetErrorLineNum());
+			printf("%s on line %d\n", xmlFile.ErrorName(), xmlFile.ErrorLineNum());
 		}
 
 		return EXIT_FAILURE;

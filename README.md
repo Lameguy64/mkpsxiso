@@ -15,14 +15,15 @@ Another notable difference of MKPSXISO is that it injects the Sony license data 
 * Injects license data into ISO image correctly.
 * File LBA controlled by order of files allowing for file seek optimization (just like BUILDCD).
 * Supports mixed-mode CD-XA stream files such as XA audio and STR video.
-* Supports CD-DA audio tracks from uncompressed WAV files.
+* Supports CD-DA audio tracks from uncompressed WAV files either as plain tracks or DA/WAV files.
 * Can output log of all files packed with details such as LBA, size and timecode offset.
 
 ## Binary Download
 The latest precompiled Win32 binary of this program can be downloaded here:
-[mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
+[mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
 
 Older versions:
+[mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
 [mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
 [mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
 [mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
@@ -33,6 +34,7 @@ Older versions:
 
 ## Compiling
 This tool requires tinyxml2 to compile.
+Compile with --std=c++11 parameter.
 
 ### Windows (CodeBlocks without CMake)
 1. Install CodeBlocks (Preferably with MinGW32 GCC compiler bundled).
@@ -70,37 +72,44 @@ This tool requires tinyxml2 to compile.
 The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
 ```
 <dir name="dira">
-	<dir name="subdir1a">
-		<dir name="subdiraa"/>
-		<dir name="subdirab"/>
-		<dir name="subdirac"/>
-	</dir>
-	<dir name="subdir1b"/>
-	<dir name="subdir1c"/>
+    <dir name="subdir1a">
+        <dir name="subdiraa"/>
+        <dir name="subdirab"/>
+        <dir name="subdirac"/>
+    </dir>
+    <dir name="subdir1b"/>
+    <dir name="subdir1c"/>
 </dir>
 
 <dir name="dirb">
-	<dir name="subdir2a"/>
-	<dir name="subdir2b"/>
-	<dir name="subdir2c">
-		<dir name="subdirba"/>
-		<dir name="subdirbb"/>
-		<dir name="subdirbc"/>
-	</dir>
+    <dir name="subdir2a"/>
+    <dir name="subdir2b"/>
+    <dir name="subdir2c">
+        <dir name="subdirba"/>
+        <dir name="subdirbb"/>
+        <dir name="subdirbc"/>
+    </dir>
 </dir>
 
 <dir name="dirc">
-	<dir name="subdir3a"/>
-	<dir name="subdir3b"/>
-	<dir name="subdir3c"/>
+    <dir name="subdir3a"/>
+    <dir name="subdir3b"/>
+    <dir name="subdir3c"/>
 </dir>
 ```
 
-On Windows, browsing the subdirectories in dirb and dirc will not list the contents for some reason and trying to access it in a command prompt leads to a permission denied or similar error message. Disc image tools such as CDmage will display the contents of the aforementioned subdirectories without issue and the issue persists on disc images created with BuildCD suggesting it is likely an operating system related issue.
+On Windows, browsing the subdirectories in dirb and dirc will not list the contents for some reason and trying to access it in a command prompt leads to a permission denied or similar error message. Disc image tools such as CDmage will display the contents of the aforementioned subdirectories without issue and the issue persists on disc images created with BuildCD suggesting it is likely an operating system related issue and not an ISO generator issue.
 
 This can be avoided by minimizing identically named directories but its best to test your generated disc image before considering it ready for release.
 
 ## Changelog
+
+**Version 1.20 (6/21/2018)**
+* ISO names being blank or garbage when compiled using Microsoft's compiler has been fixed.
+* Replaced tinyxml2::GetErrorLineNum() method calls to tinyxml2::ErrorLineNum() for compatibility with the latest version of tinyxml2.
+* Fixed incorrect file size calculated for STR and DA audio files.
+* DA audio type files are now set with a CD-Audio attribute making them appear as WAV files when opening them (note: it does not turn the DA audio into a WAV file, the OS supporting said attribute transparently converts it into a WAV container as you read it, one game featuring such files is Wipeout 3 for example).
+* Brought back mkisoxml (just needed to be recompiled with the latest GCC).
 
 **Version 1.19 (6/12/2018)**
 * Path table generation logic significantly reworked. Previous implementation was flawed and caused issues on games and operating systems that utilize the path table. MKPSXISO should be truly ISO9660 compliant now (apologies for the misleading remark in the 1.15 changelog).

@@ -320,7 +320,7 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 	DIRENTRY entry;
 	memset( &entry, 0x00, sizeof(DIRENTRY) );
 	
-	entry.id		= temp_name;
+	entry.id.assign(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
 
@@ -482,11 +482,12 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			{
 				lba += (entries[i].length+2047)/2048;
 			}
-			else if ( ( entries[i].type == EntryXA ) || (entries[i].type == EntrySTR ) )
+			else if ( ( entries[i].type == EntryXA ) || 
+				(entries[i].type == EntrySTR ) )
 			{
 				lba += (entries[i].length+2335)/2336;
 			}
-			else if ( ( entries[i].type == EntryDA ) )
+			else if ( entries[i].type == EntryDA )
 			{
 				if ( !first_track )
 				{
@@ -682,8 +683,26 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 			entry->flags = 0x00;
 		}
 
-		SetPair32( &entry->entryOffs, entries[i].lba );
-		SetPair32( &entry->entrySize, entries[i].length );
+		// File length correction for certain file types
+		int lba = entries[i].lba;
+		int length = 0;
+		
+		if ( ( entries[i].type == EntryXA ) || ( entries[i].type == EntrySTR ) )
+		{
+			length = 2048*((entries[i].length+2335)/2336);
+		}
+		else if ( entries[i].type == EntryDA )
+		{
+			length = 2048*((entries[i].length+2351)/2352);
+			lba += 150;
+		}
+		else
+		{
+			length = entries[i].length;
+		}
+		
+		SetPair32( &entry->entryOffs, lba );
+		SetPair32( &entry->entrySize, length );
 		SetPair16( &entry->volSeqNum, 1 );
 
 		entry->identifierLen = entries[i].id.length();
@@ -710,9 +729,11 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 		{
 			xa->attributes	= 0x550d;
 		}
-		else if ( (entries[i].type == EntrySTR) || 
-			(entries[i].type == EntryXA) ||
-			(entries[i].type == EntryDA) )
+		else if (entries[i].type == EntryDA)
+		{
+			xa->attributes	= 0x5545;
+		}
+		else if ( (entries[i].type == EntrySTR) || (entries[i].type == EntryXA) )
 		{
 			xa->attributes	= 0x553d;
 		}
