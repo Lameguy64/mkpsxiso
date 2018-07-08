@@ -104,11 +104,11 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
-**Version 1.21**
+**Version 1.21 (7/8/2018)**
 * Corrected volume size calculation logic when DA audio files are included. Also fixed volume size value being 2 sectors larger than it should.
 * Corrected LBA header file output where the 150 sector pregap offset is not needed (libcd already does that).
 * Fixed path name being double appended when using srcdir attribute (this made mkpsxiso unable to parse an xml document produced by mkisoxml).
-* Added -noxa option and no_xa XML attribute to disable creation of CD-XA attribute for creating plain ISO9660 disc images.
+* Added -noxa option and no_xa XML attribute to disable CD-XA attribute creation (plain ISO9660).
 * Fixed quiet mode preventing cue_sheet attribute from being parsed.
 * Added RIFF header and XA/STR subheader checks to error on improperly ripped or encoded XA/STR source files.
 * Improved data sector detection for STR type files (Mode2/Form1 + Mode2/Form2 interleaves).
