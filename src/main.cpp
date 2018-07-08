@@ -5,7 +5,7 @@
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.20"
+#define VERSION "1.21"
 
 
 namespace global
@@ -16,6 +16,7 @@ namespace global
 
 	int			NoLimit		= false;
 	int			trackNum	= 1;
+	int			noXA		= false;
 	
 	std::string	XMLscript;
 	std::string LBAfile;
@@ -76,6 +77,10 @@ int main(int argc, const char* argv[])
 			{
 				global::Overwrite = true;
 			}
+			else if ( compare( "-noxa", argv[i] ) == 0 )
+			{
+				global::noXA = true;
+			}
 			else
 			{
 				printf( "Unknown parameter: %s\n", argv[i] );
@@ -115,13 +120,15 @@ int main(int argc, const char* argv[])
 			"information.\n" );
 		printf( "  -lbahead  - Outputs a C header of all the file's LBA "
 			"addresses.\n" );
-		printf( "  -nolimit  - No warning when a directory record exceeds "
+		printf( "  -nolimit  - Remove warning when a directory record exceeds "
 			"a sector.\n" );
 		printf( "  -noisogen - Do not generate ISO but calculates file "
-			"LBAs\n" );
+			"LBAs only\n" );
 		printf("              (To be used with -lba or -lbahead without "
 			"generating ISO).\n");
-
+		printf( "  -noxa     - Do not generate CD-XA file attributes\n" );
+		printf("              (XA data can still be included but "
+			"not recommended).\n");
 		return EXIT_SUCCESS;
 	}
 
@@ -199,17 +206,26 @@ int main(int argc, const char* argv[])
 			global::ImageName = projectElement->Attribute( "image_name" );
 		}
 
+		if ( projectElement->Attribute( "cue_sheet" ) != nullptr )
+		{
+			global::cuefile = projectElement->Attribute( "cue_sheet" );
+		}
+			
 		if ( !global::QuietMode )
 		{
 			printf( "Building ISO Image: %s", global::ImageName.c_str() );
-
-			if ( projectElement->Attribute( "cue_sheet" ) != nullptr )
+			
+			if ( global::cuefile )
 			{
-				printf( " + %s", projectElement->Attribute( "cue_sheet") );
-				global::cuefile = projectElement->Attribute( "cue_sheet" );
+				printf( " + %s", global::cuefile );
 			}
-
+			
 			printf( "\n" );
+		}
+		
+		if ( projectElement->Attribute( "no_xa" ) != nullptr )
+		{
+			global::noXA = projectElement->IntAttribute( "no_xa", 0 );
 		}
 
 		if ( ( !global::Overwrite ) && ( !global::NoIsoGen ) )
@@ -635,6 +651,11 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 				printf( "      Data Preparer: %s\n", 
 					identifierElement->Attribute( "datapreparer" ) );
 			}
+			if ( identifierElement->Attribute( "copyright" ) != nullptr )
+			{
+				printf( "      Copyright    : %s\n", 
+					identifierElement->Attribute( "copyright" ) );
+			}
 			printf( "\n" );
 
 		}
@@ -734,15 +755,20 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 
 
 	// Calculate directory tree LBAs and retrieve size of image
-	int imageLen = dirTree.CalculateTreeLBA( 
-		18+(((dirTree.CalculatePathTableLen()+2047)/2048)*4) );
+	int pathTableLen = dirTree.CalculatePathTableLen();
+	
+	int imageLen = dirTree.CalculateFileSystemSize( 
+		16+(((pathTableLen+2047)/2048)*4) );
+	
+	int totalLen = dirTree.CalculateTreeLBA(
+		18+(((pathTableLen+2047)/2048)*4) );
 
 	if ( !global::QuietMode )
 	{
 		printf( "      Files Total: %d\n", dirTree.GetFileCountTotal() );
 		printf( "      Directories: %d\n", dirTree.GetDirCountTotal() );
 		printf( "      Total file system size: %d bytes (%d sectors)\n\n", 
-			2352*imageLen, imageLen);
+			2352*totalLen, totalLen);
 	}
 
 	if ( !global::LBAfile.empty() )
@@ -806,8 +832,8 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		printf( "    Building filesystem... " );
 	}
 	
-	unsigned char subHead[] = { 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00 };
-	writer->SetSubheader( subHead );
+	//unsigned char subHead[] = { 0x00, 0x00, 0x08, 0x00 };
+	writer->SetSubheader( cd::IsoWriter::SubData );
 
 	if ( (global::NoLimit == false) && 
 		(dirTree.CalculatePathTableLen() > 2048) )
@@ -841,10 +867,9 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		printf( "      Writing filesystem... " );
 	}
 	
-	// Sort directory entries alphabetically
+	// Sort directory entries and write it
 	dirTree.SortDirEntries();
 	dirTree.WriteDirectoryRecords( writer, 0 );
-
 
 	// Set file system identifiers
 	iso::IDENTIFIERS isoIdentifiers;
@@ -858,6 +883,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		isoIdentifiers.Publisher	= identifierElement->Attribute( "publisher" );
 		isoIdentifiers.Application	= identifierElement->Attribute( "application" );
 		isoIdentifiers.DataPreparer	= identifierElement->Attribute( "datapreparer" );
+		isoIdentifiers.Copyright	= identifierElement->Attribute( "copyright" );
 
 		if ( isoIdentifiers.SystemID == nullptr )
 		{
@@ -868,9 +894,14 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		{
 			isoIdentifiers.Application = "PLAYSTATION";
 		}
+		
+		if ( isoIdentifiers.Copyright == nullptr )
+		{
+			isoIdentifiers.Copyright = "COPYLEFTED";
+		}
 	}
 
-	// Write file system descriptor to finish the image
+	// Write file system descriptors to finish the image
 	iso::WriteDescriptor( writer, isoIdentifiers, &dirTree, imageLen );
 
 	if ( !global::QuietMode )
@@ -947,7 +978,8 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 				return false;
 			}
 			
-			
+			srcFile = "";
+					
 			if ( dirElement->Attribute("source") != nullptr )
 			{
 				srcFile = dirElement->Attribute("source");
@@ -969,6 +1001,16 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 					name.erase( 0, name.rfind( '/' )+1 );
 				}
 			}
+			
+			if ( srcFile.empty() ) {
+				srcFile = name;
+			}
+
+			if ( !srcDir.empty() )
+			{
+				srcFile = srcDir + srcFile;
+			}
+			
 			
 			if ( ( name.find( '\\', 0 ) != std::string::npos ) 
 				|| ( name.find( '/', 0 ) != std::string::npos ) )
@@ -1057,16 +1099,7 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 				}
 
 			}
-
-			if ( srcFile.empty() ) {
-				srcFile = name;
-			}
-
-			if ( !srcDir.empty() )
-			{
-				srcFile = srcDir + srcFile;
-			}
-
+			
 			if ( !dirTree->AddFileEntry( name.c_str(), entry, srcFile.c_str() ) )
 			{
 				return false;

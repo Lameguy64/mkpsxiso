@@ -30,6 +30,12 @@ class IsoWriter {
 			EdcEccForm1,
 			EdcEccForm2,
 		};
+		
+		enum {
+			SubData	= 0x00080000,
+			SubEOL	= 0x00090000,
+			SubEOF	= 0x00890000,
+		};
 
 		IsoWriter();
 		virtual	~IsoWriter();
@@ -43,6 +49,7 @@ class IsoWriter {
 		int		CurrentSector();
 
 		void	SetSubheader(unsigned char* data);
+		void	SetSubheader(unsigned int data);
 
 		size_t	WriteBytes(void* data, size_t bytes, int edcEccEncode);
 		size_t	WriteBytesXA(void* data, size_t bytes, int edcEccEncode);

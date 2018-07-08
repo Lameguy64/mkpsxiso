@@ -30,6 +30,7 @@ namespace iso
 		const char*	Publisher;
 		const char*	DataPreparer;
 		const char*	Application;
+		const char* Copyright;
 	} IDENTIFIERS;
 
 	typedef struct
@@ -106,6 +107,8 @@ namespace iso
 
 		void OutputHeaderListing(FILE* fp, int level);
 
+		int CalculateFileSystemSize(int lba);
+		
 		/** Calculates the length of the directory record to be produced by this class in bytes.
 		 *
 		 *  Returns: Length of directory record in bytes.

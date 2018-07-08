@@ -5,9 +5,9 @@ Also, BUILDCD only produces CD images in a non standard CD image format used by 
 
 While other ISO creation tools such as MKISOFS may work as an alternative, most do not let you control the order of the files stored in the ISO image (and is essential for optimizing file order to speed up access times) and all do not support mixed-mode XA files for streamed data such as XA audio and MDEC video streams. MKPSXISO was made specifically to replace BUILDCD to aid in PlayStation homebrew development on modern systems as well as modification/hacking of existing PlayStation titles.
 
-MKPSXISO more or less replicates most of the functionality of BUILDCD but better! The most notable difference is that MKPSXISO creates ISO images in either standalone iso or cue+bin format so that generated images can immediately be run on an emulator or burned to a CD.
+MKPSXISO more or less replicates most of the functionality of BUILDCD but better! The most notable difference is that MKPSXISO is much faster and creates ISO images in either standalone iso or cue+bin format so that generated images can immediately be run on an emulator or burned to a CD.
 
-Another notable difference of MKPSXISO is that it injects the Sony license data correctly into the disc image which eliminates the need of having to use a separate program for licensing the ISO image. However, the license data is not included so one must have a copy of the official PlayStation Programmer's Tool SDK or the PsyQ SDK (both of which can be found in www.psxdev.net) for the license files to be able to take advantage of this feature. This is to avoid possible legal problems when including Sony's license data into open source programs... Better to be safe than sorry!
+Another notable difference of MKPSXISO is that it injects the Sony license data correctly into the disc image which eliminates the need of having to use a separate program for properly licensing the ISO image. However, the license data is not included so one must have a copy of the official PlayStation Programmer's Tool SDK or the PsyQ SDK (both of which can be found in www.psxdev.net) for the license files to be able to take advantage of this feature. This is to avoid possible legal problems when including Sony's license data into open source programs... Better to be safe than sorry!
 
 ## Features
 * Uses XML for scripting ISO projects.
@@ -19,10 +19,10 @@ Another notable difference of MKPSXISO is that it injects the Sony license data 
 * Can output log of all files packed with details such as LBA, size and timecode offset.
 
 ## Binary Download
-The latest precompiled Win32 binary of this program can be downloaded here:
-[mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
+The latest Win32 binaries is now a release download in this repository.
 
-Older versions:
+Older versions (probably going to be removed soon, there's no benefit to using these versions anyway):
+[mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
 [mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
 [mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
 [mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
@@ -34,7 +34,7 @@ Older versions:
 
 ## Compiling
 This tool requires tinyxml2 to compile.
-Compile with --std=c++11 parameter.
+Compile with --std=c++11.
 
 ### Windows (CodeBlocks without CMake)
 1. Install CodeBlocks (Preferably with MinGW32 GCC compiler bundled).
@@ -103,6 +103,20 @@ On Windows, browsing the subdirectories in dirb and dirc will not list the conte
 This can be avoided by minimizing identically named directories but its best to test your generated disc image before considering it ready for release.
 
 ## Changelog
+
+**Version 1.21**
+* Corrected volume size calculation logic when DA audio files are included. Also fixed volume size value being 2 sectors larger than it should.
+* Corrected LBA header file output where the 150 sector pregap offset is not needed (libcd already does that).
+* Fixed path name being double appended when using srcdir attribute (this made mkpsxiso unable to parse an xml document produced by mkisoxml).
+* Added -noxa option and no_xa XML attribute to disable creation of CD-XA attribute for creating plain ISO9660 disc images.
+* Fixed quiet mode preventing cue_sheet attribute from being parsed.
+* Added RIFF header and XA/STR subheader checks to error on improperly ripped or encoded XA/STR source files.
+* Improved data sector detection for STR type files (Mode2/Form1 + Mode2/Form2 interleaves).
+* Implemented proper EOL/EOF bits for subheaders at the ends of descriptors and files.
+* Fixed an XML parser bug where name attribute is used as the source file name when a source directory in a directory element is specified.
+* Fixed a major bug where directory record lengths are always set at 2048 bytes even for directory records spanning more than a sector resulting in missing files and directories.
+* Fixed incorrectly calculated record length set in the volume descriptor's root directory record.
+* Added copyright XML attribute for the identifiers element to specify a copyright identifier for the image file.
 
 **Version 1.20 (6/21/2018)**
 * ISO names being blank or garbage when compiled using Microsoft's compiler has been fixed.

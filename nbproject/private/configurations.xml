@@ -13,6 +13,8 @@
         <gdb_interceptlist>
           <gdbinterceptoptions gdb_all="false" gdb_unhandled="true" gdb_unexpected="true"/>
         </gdb_interceptlist>
+        <gdb_signals>
+        </gdb_signals>
         <gdb_options>
           <DebugOptions>
           </DebugOptions>
@@ -24,18 +26,18 @@
       </nativedebugger>
       <runprofile version="9">
         <runcommandpicklist>
-          <runcommandpicklistitem>"${OUTPUT_PATH}" mk</runcommandpicklistitem>
-          <runcommandpicklistitem>"${OUTPUT_PATH}" mkisoxml/</runcommandpicklistitem>
-          <runcommandpicklistitem>"${OUTPUT_PATH}" mkisoxml/output.xml</runcommandpicklistitem>
-          <runcommandpicklistitem>"${OUTPUT_PATH}" test/test.xml</runcommandpicklistitem>
-          <runcommandpicklistitem>"${OUTPUT_PATH}" -lba lba.txt -noisogen test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" -lba lba.txt test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" -lbahead lba.txt test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" -lbahead lba.h -noisogen test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" -lbahead lba.h test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" treetest.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -noxa test/test.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" mkisoxml/output.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" mkisoxml/ps.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -noxa -o ps.iso mkisoxml/ps.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -o ps.iso mkisoxml/ps.xml</runcommandpicklistitem>
         </runcommandpicklist>
-        <runcommand>"${OUTPUT_PATH}" treetest.xml</runcommand>
+        <runcommand>"${OUTPUT_PATH}" -o ps.iso mkisoxml/ps.xml</runcommand>
         <rundir></rundir>
         <buildfirst>true</buildfirst>
         <console-type>1</console-type>
@@ -67,11 +69,16 @@
       </nativedebugger>
       <runprofile version="9">
         <runcommandpicklist>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -lbahead lba.h test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}"</runcommandpicklistitem>
-          <runcommandpicklistitem>"${OUTPUT_PATH}" treetest.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -noxa test/test.xml</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" test/test.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" treetest.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" test/treetest.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" mkisoxml/ps.xml</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -o ps.iso mkisoxml/ps.xml</runcommandpicklistitem>
         </runcommandpicklist>
-        <runcommand>"${OUTPUT_PATH}" test/test.xml</runcommand>
+        <runcommand>"${OUTPUT_PATH}" -o ps.iso mkisoxml/ps.xml</runcommand>
         <rundir></rundir>
         <buildfirst>true</buildfirst>
         <console-type>1</console-type>

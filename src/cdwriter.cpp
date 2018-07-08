@@ -333,7 +333,15 @@ int cd::IsoWriter::CurrentSector() {
 
 void cd::IsoWriter::SetSubheader(unsigned char* data) {
 
-	memcpy(cd::IsoWriter::subHeadBuff, data, 8);
+	memcpy(cd::IsoWriter::subHeadBuff, data, 4);
+	memcpy(cd::IsoWriter::subHeadBuff+4, data, 4);
+
+}
+
+void cd::IsoWriter::SetSubheader(unsigned int data) {
+
+	memcpy(cd::IsoWriter::subHeadBuff, &data, 4);
+	memcpy(cd::IsoWriter::subHeadBuff+4, &data, 4);
 
 }
 
