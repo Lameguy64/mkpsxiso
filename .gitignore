@@ -1,7 +1,8 @@
-/bin*/
-/CMakeFiles/
-/pages/
-/test/
+bin*/
+CMakeFiles/
+pages/
+test/
+nbproject/private
 Makefile
 CMakeCache.txt
 *.cmake

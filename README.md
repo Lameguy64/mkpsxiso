@@ -104,6 +104,11 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
+**Version 1.22 (12/4/2018)**
+* Fixed some issues with subheader detection.
+* Fixed bug where CD-DA length of possibly being 1 sector larger than it should.
+* Fixed subheader detection logic and made it as a warning instead of a critical error.
+
 **Version 1.21 (7/8/2018)**
 * Corrected volume size calculation logic when DA audio files are included. Also fixed volume size value being 2 sectors larger than it should.
 * Corrected LBA header file output where the 150 sector pregap offset is not needed (libcd already does that).

@@ -273,7 +273,8 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 		return false;
     }
 
-	if ( ( type == EntryXA ) || ( type == EntrySTR ) )
+	// Check if XA data is valid
+	if ( type == EntryXA )
 	{
 		// Check header
 		char buff[4];
@@ -293,37 +294,80 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 			
 			return false;
 		}
+		
 		// Check if size is a multiple of 2336 bytes
-		else if ( ( fileAttrib.st_size % 2336 ) != 0 )
+		if ( ( fileAttrib.st_size % 2336 ) != 0 )
 		{
 			if ( !global::QuietMode )
 			{
 				printf("      ");
 			}
 
-			printf("ERROR: %s is not a multiple of 2336 bytes!\n", srcfile);
+			printf("ERROR: %s is not a multiple of 2336 bytes.\n", srcfile);
 
 			if ( !global::QuietMode )
 			{
 				printf("      ");
 			}
 
-			printf("Did you create your multichannel XA file with sub header data?\n");
+			printf("Did you create your multichannel XA file with subheader data?\n");
 			
 			return false;
 		}
-		// Check if first sub header is valid
-		else if ( !( ( buff[0] == 0x1 ) && ( buff[1] == 0x0 ) ) && 
-			!( ( buff[0] == 0x0 ) && ( buff[1] == 0x1 ) ) )
+		
+		// Check if first sub header is valid usually by checking 
+		// if the first four bytes match the next four bytes
+		else if ( ((int*)buff)[0] == ((int*)buff)[1] )
 		{
 			if ( !global::QuietMode )
 			{
 				printf("      ");
 			}
 
-			printf("ERROR: %s has no valid subheader.\n", srcfile);
+			printf("WARNING: %s does not have a valid subheader. ", srcfile);
+		}
+	
+	// Check STR data
+	} else if ( type == EntrySTR ) {
+		
+		// Check header
+		char buff[4];
+		FILE* fp = fopen(srcfile, "rb");
+		fread(buff, 1, 4, fp);
+		fclose(fp);
+		
+		// Check if its a RIFF (WAV container)
+		if ( strncmp(buff, "RIFF", 4) == 0 )
+		{
+			if (!global::QuietMode)
+			{
+				printf("      ");
+			}
+
+			printf("ERROR: %s is a WAV or is not properly ripped.\n", srcfile);
 			
 			return false;
+		}
+		
+		// Check if size is a multiple of 2336 bytes
+		if ( ( fileAttrib.st_size % 2336 ) != 0 )
+		{
+			if ( ( fileAttrib.st_size % 2048) == 0 )
+			{
+				type = EntrySTR_DO;
+			}
+			else 
+			{
+				if ( !global::QuietMode )
+				{
+					printf("      ");
+				}
+
+				printf("ERROR: %s is not a multiple of 2336 or 2048 bytes.\n", 
+					srcfile);
+				
+				return false;
+			}
 		}
 		
 	}
@@ -370,17 +414,17 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 
 	if ( srcfile != nullptr )
 	{
-		entry.srcfile	= srcfile;
+		entry.srcfile = srcfile;
 	}
 	
-	if ( type != EntryDir )
+	if ( type == EntryDA )
 	{
-		entry.length	= fileAttrib.st_size;
-	} 
-	else if ( type != EntryDA )
-	{
-		entry.length	= GetWavSize( srcfile );
+		entry.length = GetWavSize( srcfile );
 	}
+	else if ( type != EntryDir )
+	{
+		entry.length = fileAttrib.st_size;
+	} 
 	
     tm* fileTime = gmtime( &fileAttrib.st_mtime );
 
@@ -498,12 +542,13 @@ int iso::DirTreeClass::CalculateFileSystemSize(int lba) {
 		else
 		{
 			// Increment LBA by the size of files
-			if ( entries[i].type == EntryFile )
+			if ( ( entries[i].type == EntryFile ) || 
+				( entries[i].type == EntrySTR_DO ) )
 			{
 				lba += (entries[i].length+2047)/2048;
 			}
 			else if ( ( entries[i].type == EntryXA ) || 
-				(entries[i].type == EntrySTR ) )
+				( entries[i].type == EntrySTR ) )
 			{
 				lba += (entries[i].length+2335)/2336;
 			}
@@ -556,7 +601,8 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 		else
 		{
 			// Increment LBA by the size of file
-			if ( entries[i].type == EntryFile )
+			if ( ( entries[i].type == EntryFile ) || 
+				( entries[i].type == EntrySTR_DO ) )
 			{
 				lba += (entries[i].length+2047)/2048;
 			}
@@ -792,6 +838,10 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 		{
 			length = 2048*((entries[i].length+2335)/2336);
 		}
+		else if ( entries[i].type == EntrySTR_DO )
+		{
+			length = 2048*((entries[i].length+2047)/2048);
+		}
 		else if ( entries[i].type == EntryDA )
 		{
 			length = 2048*((entries[i].length+2351)/2352);
@@ -827,7 +877,8 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 			xa->id[0] = 'X';
 			xa->id[1] = 'A';
 
-			if (entries[i].type == EntryFile)
+			if ( (entries[i].type == EntryFile) || 
+				(entries[i].type == EntrySTR_DO) )
 			{
 				xa->attributes	= 0x550d;
 			}
@@ -835,7 +886,8 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 			{
 				xa->attributes	= 0x5545;
 			}
-			else if ( (entries[i].type == EntrySTR) || (entries[i].type == EntryXA) )
+			else if ( (entries[i].type == EntrySTR) || 
+				(entries[i].type == EntryXA) )
 			{
 				xa->attributes	= 0x553d;
 			}
@@ -1024,7 +1076,57 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			{
 				printf( "Done.\n" );
 			}
-		
+			
+		// Write data only STR streams as Mode 2 Form 1
+		}
+		else if ( entries[i].type == EntrySTR_DO )
+		{
+			char buff[2048];
+
+			if ( !entries[i].srcfile.empty() )
+			{
+				if ( !global::QuietMode )
+				{
+					printf( "      Packing STR-DO %s... ", entries[i].srcfile.c_str() );
+				}
+				
+				FILE *fp = fopen( entries[i].srcfile.c_str(), "rb" );
+
+				writer->SetSubheader( cd::IsoWriter::SubSTR );
+				
+				while( !feof( fp ) )
+				{
+					memset( buff, 0x00, 2048 );
+					fread( buff, 1, 2048, fp );
+					
+					writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
+				}
+
+				fclose( fp );
+				
+				writer->SetSubheader(0x00080000);
+
+				if ( !global::QuietMode )
+				{
+					printf("Done.\n");
+				}
+				
+			}
+			else
+			{
+				memset( buff, 0x00, 2048 );
+
+				writer->SetSubheader( cd::IsoWriter::SubData );
+				for ( int c=0; c<(entries[i].length/2048); c++ )
+				{
+					if ( c == ((entries[i].length/2048)-1) )
+					{
+						writer->SetSubheader( cd::IsoWriter::SubEOF );
+					}
+					writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
+				}
+			}
+			
 		// Write DA files as audio tracks
 		}
 		else if ( entries[i].type == EntryDA )
@@ -1065,9 +1167,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level)
 
 	for ( int i=0; i<entries.size(); i++ )
 	{
-		if ( ( !entries[i].id.empty() ) && ( ( entries[i].type == EntryFile ) || 
-			( entries[i].type == EntrySTR ) || ( entries[i].type == EntryXA ) ||
-			( entries[i].type == EntryDA ) ) )
+		if ( ( !entries[i].id.empty() ) && ( entries[i].type != EntryDir ) )
 		{
 			std::string temp_name;
 
@@ -1176,7 +1276,8 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level)
 			{
 				fprintf( fp, "Dir   " );
 			}
-			else if ( entries[i].type == EntrySTR )
+			else if ( ( entries[i].type == EntrySTR ) || 
+				( entries[i].type == EntrySTR_DO ) )
 			{
 				fprintf( fp, "STR   " );
 			}

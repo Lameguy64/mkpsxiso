@@ -33,6 +33,7 @@ class IsoWriter {
 		
 		enum {
 			SubData	= 0x00080000,
+			SubSTR	= 0x00480100,
 			SubEOL	= 0x00090000,
 			SubEOF	= 0x00890000,
 		};

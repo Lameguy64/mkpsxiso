@@ -19,6 +19,7 @@ namespace iso
 		EntryDir,
 		EntryXA,
 		EntrySTR,
+		EntrySTR_DO,
 		EntryDA
 	};
 
