@@ -2,7 +2,7 @@ bin*/
 CMakeFiles/
 pages/
 test/
-nbproject/private
+nbproject/private/
 Makefile
 CMakeCache.txt
 *.cmake
