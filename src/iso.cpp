@@ -67,9 +67,37 @@ int iso::DirTreeClass::GetWavSize(const char* wavFile)
 
 	fread( &WAV_Subchunk1, 1, sizeof(WAV_Subchunk1), fp );
 
+	// Check if its a valid WAVE file
+	if ( memcmp( &WAV_Subchunk1.id, "fmt ", 4 ) )
+	{
+		fclose( fp );
+		return 0;
+	}
+	
+	// Search for the data chunk
+	struct
+	{
+		char	id[4];
+		int		len;
+	} WAV_Subchunk2;
+
+	while ( 1 )
+	{
+		fread( &WAV_Subchunk2, 1, sizeof(WAV_Subchunk2), fp );
+
+		if ( memcmp( &WAV_Subchunk2.id, "data", 4 ) )
+		{
+			fseek( fp, WAV_Subchunk2.len, SEEK_CUR );
+		}
+		else
+		{
+			break;
+		}
+	}
+	
 	fclose( fp );
 	
-	return 2352*((WAV_Subchunk1.size+2351)/2352);
+	return 2352*((WAV_Subchunk2.len+2351)/2352);
 }
 
 int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap)
@@ -187,15 +215,15 @@ int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const char* wavFile, 
 	{
 		char	id[4];
 		int		len;
-	} Subchunk2;
+	} WAV_Subchunk2;
 
 	while ( 1 )
 	{
-		fread( &Subchunk2, 1, sizeof(Subchunk2), fp );
+		fread( &WAV_Subchunk2, 1, sizeof(WAV_Subchunk2), fp );
 
-		if ( memcmp( &Subchunk2.id, "data", 4 ) )
+		if ( memcmp( &WAV_Subchunk2.id, "data", 4 ) )
 		{
-			fseek( fp, Subchunk2.len, SEEK_CUR );
+			fseek( fp, WAV_Subchunk2.len, SEEK_CUR );
 		}
 		else
 		{
@@ -203,7 +231,7 @@ int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const char* wavFile, 
 		}
 	}
 
-	waveLen = Subchunk2.len;
+	waveLen = WAV_Subchunk2.len;
 	
 	// Write pregap region
 	memset(buff, 0x00, CD_SECTOR_SIZE);
@@ -324,7 +352,7 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 				printf("      ");
 			}
 
-			printf("WARNING: %s does not have a valid subheader. ", srcfile);
+			printf("WARNING: %s may not have a valid subheader. ", srcfile);
 		}
 	
 	// Check STR data
@@ -579,9 +607,9 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 	for ( int i=0; i<entries.size(); i++ )
 	{
 		// Set current LBA to directory record entry
-		if ( ( entries[i].type == EntryDA ) && ( first_track ) )
+		if ( ( entries[i].type == EntryDA ) && ( !first_track ) )
 		{
-			entries[i].lba = 150+lba;
+			entries[i].lba = lba;
 		}
 		else
 		{
@@ -615,12 +643,12 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			{
 				if ( !first_track )
 				{
-					lba += ((entries[i].length+2351)/2352);
+					lba += ((entries[i].length+2351)/2352)+150;
 					first_track = true;
 				}
 				else
 				{
-					lba += ((entries[i].length+2351)/2352)+150;
+					lba += ((entries[i].length+2351)/2352);
 				}
 			}
 		}
@@ -1248,6 +1276,7 @@ int iso::DirTreeClass::WriteCueEntries(FILE* fp, int* trackNum)
 		{
 			((DirTreeClass*)entries[i].subdir)->WriteCueEntries( fp, trackNum );
 		}
+		
 	}
 	
 	return *trackNum;

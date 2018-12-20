@@ -68,22 +68,22 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/mkpsxiso.exe: ${OBJECTFILES}
 ${OBJECTDIR}/src/cdwriter.o: src/cdwriter.cpp 
 	${MKDIR} -p ${OBJECTDIR}/src
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -I/C/tinyxml2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/src/cdwriter.o src/cdwriter.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -I/C/tinyxml2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/src/cdwriter.o src/cdwriter.cpp
 
 ${OBJECTDIR}/src/edcecc.o: src/edcecc.cpp 
 	${MKDIR} -p ${OBJECTDIR}/src
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -I/C/tinyxml2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/src/edcecc.o src/edcecc.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -I/C/tinyxml2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/src/edcecc.o src/edcecc.cpp
 
 ${OBJECTDIR}/src/iso.o: src/iso.cpp 
 	${MKDIR} -p ${OBJECTDIR}/src
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -I/C/tinyxml2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/src/iso.o src/iso.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -I/C/tinyxml2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/src/iso.o src/iso.cpp
 
 ${OBJECTDIR}/src/main.o: src/main.cpp 
 	${MKDIR} -p ${OBJECTDIR}/src
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -I/C/tinyxml2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/src/main.o src/main.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -I/C/tinyxml2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/src/main.o src/main.cpp
 
 # Subprojects
 .build-subprojects:

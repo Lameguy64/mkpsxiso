@@ -1,13 +1,11 @@
 # MKPSXISO
-Basically a modern clone of BUILDCD that came included with the leaked PlayStation PsyQ SDK used for creating ISO disc images for developing PlayStation software. The problem with BUILDCD however is that it is an old real-mode DOS program and will not work natively on 64-bit versions of Windows without a DOS emulator which not only makes automated build scripts that produce ISO images messy and inconvenient to manage but it also slows down ISO creation speed considerably.
+MKPSXISO is basically a modern clone of BUILDCD used for building CD images of PlayStation games in the official development tools. The problem with BUILDCD however is, apart from licensing issues, its an old 16-bit DOS program which will not work natively under 64-bit versions of Windows without a DOS emulator which not only makes automated build scripts that produce ISO images messy in homebrew development but it also slows ISO creation speed considerably. BUILDCD also only produces CD images in a special image format supported by early CD burners and must be converted to an ISO format with a separate tool making the already slow ISO creation process even slower.
 
-Also, BUILDCD only produces CD images in a non standard CD image format used by early CD burners which must be converted to a usable ISO format with a separate tool. This makes the already slow ISO generation process even slower.
-
-While other ISO creation tools such as MKISOFS may work as an alternative, most do not let you control the order of the files stored in the ISO image (and is essential for optimizing file order to speed up access times) and all do not support mixed-mode XA files for streamed data such as XA audio and MDEC video streams. MKPSXISO was made specifically to replace BUILDCD to aid in PlayStation homebrew development on modern systems as well as modification/hacking of existing PlayStation titles.
+While other ISO creation tools such as MKISOFS may work as an alternative most do not let you control the order of the files stored in the ISO image which is essential for optimizing file order to speed up access times and all do not support mixed-mode type files for CD streaming such as XA audio and MDEC video streams. MKPSXISO is made specifically to replace BUILDCD to aid in PlayStation homebrew development on modern systems as well as modification/hacking of existing PlayStation titles. MKPSXISO can also be used as a regular ISO creation tool that complies with the older ISO9660 standard with no Joliet extensions.
 
 MKPSXISO more or less replicates most of the functionality of BUILDCD but better! The most notable difference is that MKPSXISO is much faster and creates ISO images in either standalone iso or cue+bin format so that generated images can immediately be run on an emulator or burned to a CD.
 
-Another notable difference of MKPSXISO is that it injects the Sony license data correctly into the disc image which eliminates the need of having to use a separate program for properly licensing the ISO image. However, the license data is not included so one must have a copy of the official PlayStation Programmer's Tool SDK or the PsyQ SDK (both of which can be found in www.psxdev.net) for the license files to be able to take advantage of this feature. This is to avoid possible legal problems when including Sony's license data into open source programs... Better to be safe than sorry!
+Another notable difference of MKPSXISO is that it injects the Sony license data correctly into the disc image which eliminates the need of having to use a separate program for properly licensing the ISO image. However, the license data is not included so one must have a copy of the official PlayStation Programmer's Tool SDK or the PsyQ SDK (both of which can be found in www.psxdev.net) for the license files to be able to take advantage of this feature. This is to avoid possible legal problems when including Sony's license data into open source programs.
 
 ## Features
 * Uses XML for scripting ISO projects.
@@ -36,13 +34,18 @@ Older versions (probably going to be removed soon, there's no benefit to using t
 This tool requires tinyxml2 to compile.
 Compile with --std=c++11.
 
-### Windows (CodeBlocks without CMake)
-1. Install CodeBlocks (Preferably with MinGW32 GCC compiler bundled).
+### Windows (make, no Netbeans)
+1. Install your preferred MinGW GCC compiler.
 2. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
 3. Make sure the tinyxml2 library is named libtinyxml2.a.
-3. Open the project file mkpsxiso.cbp inside the src directory.
-4. Press Ctrl+F9 to compile the program.
-5. The result will be in the base folder named "mkpsxiso.exe"
+4. Run "mingw32-make CONF=Release" in the mkpsxiso directory.
+5. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
+
+### Windows (Netbeans)
+1. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
+2. Open the mkpsxiso directory as a project within the Netbeans IDE.
+3. Select Release build and press F6 to compile.
+4. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
 
 ### Windows (CMake)
 1. Install cygwin64 with the following:
@@ -55,10 +58,10 @@ Compile with --std=c++11.
 4. Run "cmake ." to generate the make file.
 5. Run "make" to compile the program.
 6. The result will be in bin_win, named "mkpsxiso.exe"
-
-### Linux (Ubuntu)
+  
+### Linux (Ubuntu/CMake)
 1. Install the following:
-  * Build Essentials
+  * Build Essentials (gcc, g++, make)
   * cmake
   * tinyxml2
 2. Open a terminal.
@@ -103,6 +106,10 @@ On Windows, browsing the subdirectories in dirb and dirc will not list the conte
 This can be avoided by minimizing identically named directories but its best to test your generated disc image before considering it ready for release.
 
 ## Changelog
+
+**Version 1.23 (12/20/2018)**
+* Fixed broken LBA and timecode calculation for audio tracks integrated as files (iso::DirTreeClass::GetWavSize returns an incorrect value from the WAV file).
+* Updated build instructions (CodeBlocks project had been replaced with Netbeans but forgot to update instructions).
 
 **Version 1.22 (12/4/2018)**
 * Fixed issues with subheader detection logic and made it as a warning instead of a critical error.

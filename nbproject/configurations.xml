@@ -52,6 +52,9 @@
           <incDir>
             <pElem>C:/tinyxml2</pElem>
           </incDir>
+          <preprocessorList>
+            <Elem>DEBUG</Elem>
+          </preprocessorList>
         </ccTool>
         <linkerTool>
           <linkerAddLib>

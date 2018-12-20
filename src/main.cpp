@@ -5,7 +5,7 @@
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.22"
+#define VERSION "1.23"
 
 
 namespace global
@@ -107,7 +107,7 @@ int main(int argc, const char* argv[])
 	if ( argc == 1 )
 	{
 		printf( "mkpsxiso [-y] [-q] [-o <file>] [-lba <file>] "
-			"[-lbahead <file>] [-nolimit] [-noisogen] <xml>\n\n" );
+			"[-lbahead <file>] [-nolimit]\n  [-noisogen] <xml>\n\n" );
 		printf( "  -y        - Always overwrite ISO image files.\n" );
 		printf( "  -q        - Quiet mode (prints nothing but warnings and "
 			"errors).\n" );
@@ -1066,7 +1066,7 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 						{
 							printf( "      " );
 						}
-						printf( "ERROR: DA audio file(s) found but no CUE sheet specified.\n" );
+						printf( "ERROR: DA audio file(s) specified but no CUE sheet specified.\n" );
 						return false;
 					}
 					found_da = true;
