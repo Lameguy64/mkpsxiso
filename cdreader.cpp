@@ -370,7 +370,6 @@ int cd::IsoPathTable::GetFullDirPath(int dirEntry, char* pathBuff, int pathMaxLe
 
 }
 
-
 cd::IsoDirEntries::IsoDirEntries() {
 
 	cd::IsoDirEntries::numDirEntries = 0;
@@ -406,60 +405,68 @@ void cd::IsoDirEntries::FreeDirEntries() {
 
 }
 
-int cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba) {
+int cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors) {
 
 	cd::IsoDirEntries::FreeDirEntries();
 
-	reader->SeekToSector(lba);
+    for (int sec = 0; sec < sectors; sec++)
+    {
+        size_t sectorBytesRead = 0;
+        reader->SeekToSector(lba +sec);
+		while(1)
+		{
+			cd::ISO_DIR_ENTRY dirEntry;
+			cd::ISO_XA_ATTRIB dirXAentry;
 
-	while(1) {
+            //check if there is enough data to read in the current sector. In case there is not, we must move to next sector.
+			if (2048 - sectorBytesRead < 33)
+                break;
 
-		cd::ISO_DIR_ENTRY dirEntry;
-		cd::ISO_XA_ATTRIB dirXAentry;
+			// Read 33 byte directory entry
+			sectorBytesRead += reader->ReadBytes(&dirEntry, 33);
 
-		// Read 33 byte directory entry
-		reader->ReadBytes(&dirEntry, 33);
+			// The file entry table usually ends with null bytes so break if we reached that area
+			if (dirEntry.entryLength == 0)
+				break;
 
-		// The file entry table usually ends with null bytes so break if we reached that area
-		if (dirEntry.entryLength == 0)
-			break;
+			// Read identifier string
+			dirEntry.identifier = (char*)calloc(dirEntry.identifierLen+1, 1);
+			sectorBytesRead += reader->ReadBytes(dirEntry.identifier, dirEntry.identifierLen);
 
-		// Read identifier string
-		dirEntry.identifier = (char*)calloc(dirEntry.identifierLen+1, 1);
-		reader->ReadBytes(dirEntry.identifier, dirEntry.identifierLen);
+			// Skip padding byte if identifier string length is even
+			if ((dirEntry.identifierLen%2) == 0)
+            {
+                reader->SkipBytes(1);
+                sectorBytesRead++;
+            }
 
-		// Skip padding byte if identifier string length is even
-		if ((dirEntry.identifierLen%2) == 0)
-			reader->SkipBytes(1);
-
-		// Read XA attribute data
-		reader->ReadBytes(&dirXAentry, 14);
+			// Read XA attribute data
+			sectorBytesRead += reader->ReadBytes(&dirXAentry, 14);
 
 
-		// Allocate or reallocate directory entry list to make way for the next entry
-		if (cd::IsoDirEntries::dirEntryList == NULL) {
+			// Allocate or reallocate directory entry list to make way for the next entry
+			if (cd::IsoDirEntries::dirEntryList == NULL) {
 
-			// Initial allocation
-			cd::IsoDirEntries::dirEntryList = (cd::ISO_DIR_ENTRY*)calloc(sizeof(cd::ISO_DIR_ENTRY), 1);
+				// Initial allocation
+				cd::IsoDirEntries::dirEntryList = (cd::ISO_DIR_ENTRY*)calloc(sizeof(cd::ISO_DIR_ENTRY), 1);
 
-		} else {
+			} else {
 
-			// Append
-			cd::IsoDirEntries::dirEntryList = (cd::ISO_DIR_ENTRY*)realloc(
-				cd::IsoDirEntries::dirEntryList, sizeof(cd::ISO_DIR_ENTRY)*(cd::IsoDirEntries::numDirEntries+1)
-			);
+				// Append
+				cd::IsoDirEntries::dirEntryList = (cd::ISO_DIR_ENTRY*)realloc(
+					cd::IsoDirEntries::dirEntryList, sizeof(cd::ISO_DIR_ENTRY)*(cd::IsoDirEntries::numDirEntries+1)
+				);
 
-			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = NULL;
+				cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = NULL;
 
+			}
+
+			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries] = dirEntry;
+			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = malloc(sizeof(cd::ISO_DIR_ENTRY));
+			memcpy(cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData, &dirXAentry, sizeof(cd::ISO_DIR_ENTRY));
+			cd::IsoDirEntries::numDirEntries++;
 		}
-
-		cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries] = dirEntry;
-		cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = malloc(sizeof(cd::ISO_DIR_ENTRY));
-		memcpy(cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData, &dirXAentry, sizeof(cd::ISO_DIR_ENTRY));
-		cd::IsoDirEntries::numDirEntries++;
-
-	}
-
+    }
 	return(cd::IsoDirEntries::numDirEntries);
 
 }

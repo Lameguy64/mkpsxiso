@@ -79,14 +79,14 @@ const char* CleanIdentifier(const char* id) {
 
 }
 
-void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element) {
+void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element, int sectors=1) {
 
     cd::IsoDirEntries dirEntries;
     tinyxml2::XMLElement* newelement = NULL;
     std::string outputPath;
     FILE *outFile;
 
-    int entriesFound = dirEntries.ReadDirEntries(&reader, offs);
+    int entriesFound = dirEntries.ReadDirEntries(&reader, offs, sectors);
     dirEntries.SortByLBA();
 
     for(int e=2; e<entriesFound; e++) {
@@ -104,7 +104,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
             }
 
-            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement);
+            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement, dirEntries.dirEntryList[e].entrySize.lsb/2048);
 
             BackDir(global::isoPath);
 
@@ -190,17 +190,22 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 					if (element != NULL)
 						newelement->SetAttribute("type", "str");
 
-					bytesLeft = dirEntries.dirEntryList[e].entrySize.lsb;	// For STR video streams
+					//bytesLeft = dirEntries.dirEntryList[e].entrySize.lsb;	// For STR video streams
 
 				} else {
 
 					if (element != NULL)
 						newelement->SetAttribute("type", "xa");
 
-					bytesLeft = 2336*(dirEntries.dirEntryList[e].entrySize.lsb/2048);	// For XA audio streams
 
 				}
 
+				// this is the data to be read in XA mode, both if the file is an STR or XA, because the STR contains audio.
+				size_t sectorsToRead = dirEntries.dirEntryList[e].entrySize.lsb/2048;
+				if (dirEntries.dirEntryList[e].entrySize.lsb % 2048 != 0)
+                    sectorsToRead++;
+
+                bytesLeft = 2336*sectorsToRead;
 
 				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
 
@@ -379,7 +384,7 @@ int main(int argc, char *argv[]) {
 
                 i++;
 
-            } else if (strcmp("xml", &argv[i][1]) == 0) {
+            } else if (strcmp("s", &argv[i][1]) == 0) {
 
                 param::xmlFile = argv[i+1];
                 i++;
