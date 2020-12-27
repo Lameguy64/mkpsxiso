@@ -92,6 +92,26 @@ const char* CleanIdentifier(const char* id) {
 
 }
 
+void ReadLicense(cd::IsoReader& reader, cd::ISO_LICENSE* license) {
+	reader.SeekToSector(0);
+	reader.ReadBytesXA(license->data, 28032);
+}
+
+void SaveLicense(cd::ISO_LICENSE& license) {
+    std::string outputPath = param::outPath;
+
+    outputPath = outputPath + "license_data.dat";
+    FILE* outFile = fopen(outputPath.c_str(), "wb");
+
+    if (outFile == NULL) {
+        printf("ERROR: Cannot create license file %s...", outputPath.c_str());
+        return;
+    }
+
+    fwrite(license.data, 1, 28032, outFile);
+    fclose(outFile);
+}
+
 void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element, int sectors=1) {
 
     cd::IsoDirEntries dirEntries;
@@ -232,14 +252,15 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				element->InsertEndChild(newelement);
 
         }
-
     }
-
 }
 
 void ParseISO(cd::IsoReader& reader) {
 
     cd::ISO_DESCRIPTOR	descriptor;
+	cd::ISO_LICENSE license;
+
+	ReadLicense(reader, &license);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -325,6 +346,12 @@ void ParseISO(cd::IsoReader& reader) {
 			newElement->SetAttribute("data_preparer", CleanVolumeId(descriptor.dataPreparerIdentifier));
 
 		trackElement->InsertEndChild(newElement);
+
+		newElement = xmldoc.NewElement("license");
+		newElement->SetAttribute("file", (param::outPath+"license_data.dat").c_str());
+
+		trackElement->InsertEndChild(newElement);
+
 		newElement = xmldoc.NewElement("directory_tree");
 
 		ParseDirectories(reader,
@@ -348,13 +375,15 @@ void ParseISO(cd::IsoReader& reader) {
 
     }
 
+    //Save license file anyway.
+    SaveLicense(license);
 }
 
 int main(int argc, char *argv[]) {
 
 
-    printf("isodump v0.25b - PlayStation ISO dumping tool\n");
-    printf("2017 Meido-Tek Productions (Lameguy64).\n\n");
+    printf("isodump v0.26 - PlayStation ISO dumping tool\n");
+    printf("2017 Meido-Tek Productions (Lameguy64), 2020 Phoenix (SadNES cITy).\n\n");
 
 	if (argc == 1) {
 

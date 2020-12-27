@@ -220,6 +220,11 @@ namespace cd {
 
 	} ISO_DESCRIPTOR;
 
+	//License data (just a sequence of 28032 bytes)
+	typedef struct {
+		char data[28032];
+	} ISO_LICENSE;
+
 	// Leave non-aligned structure packing
 	#pragma pack(pop)
 
