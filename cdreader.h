@@ -2,6 +2,7 @@
 #define _CDREADER_H
 
 #include "cd.h"
+#include "types.h"
 
 namespace cd {
 

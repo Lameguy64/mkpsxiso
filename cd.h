@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#ifdef __WIN32__
+#ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>

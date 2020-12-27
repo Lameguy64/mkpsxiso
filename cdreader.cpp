@@ -1,6 +1,13 @@
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
+
 #include "cd.h"
 #include "cdreader.h"
+#include <string.h>
+#include <stdlib.h>
 
 cd::IsoReader::IsoReader() {
 
@@ -408,7 +415,6 @@ void cd::IsoDirEntries::FreeDirEntries() {
 int cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors) {
 
 	cd::IsoDirEntries::FreeDirEntries();
-
     for (int sec = 0; sec < sectors; sec++)
     {
         size_t sectorBytesRead = 0;
@@ -462,8 +468,8 @@ int cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sector
 			}
 
 			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries] = dirEntry;
-			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = malloc(sizeof(cd::ISO_DIR_ENTRY));
-			memcpy(cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData, &dirXAentry, sizeof(cd::ISO_DIR_ENTRY));
+			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = malloc(sizeof(cd::ISO_XA_ATTRIB));
+			memcpy(cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData, &dirXAentry, sizeof(cd::ISO_XA_ATTRIB));
 			cd::IsoDirEntries::numDirEntries++;
 		}
     }

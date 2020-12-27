@@ -1,12 +1,25 @@
 #include <stdio.h>
-#include <conio.h>
-#include <unistd.h>
+
+#ifdef _WIN32
 #include <windows.h>
+
+#else
+#include <unistd.h>
+#endif
+
+
 #include <string>
-#include <tinyxml2.h>
+#include "tinyxml2.h"
 
 #include "cd.h"
 #include "cdreader.h"
+
+#if defined(_WIN32)
+    #include <direct.h>
+#else
+	#include <sys/stat.h>
+	int _mkdir(const char* dirname){ return mkdir(dirname, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); }
+#endif
 
 namespace param {
 
@@ -291,7 +304,7 @@ void ParseISO(cd::IsoReader& reader) {
 
     if (!param::outPath.empty()) {
 
-        if (param::outPath.rfind("/") != param::outPath.length()-1);
+        if (param::outPath.rfind("/") != param::outPath.length()-1)
             param::outPath += "/";
 
     }
@@ -305,7 +318,7 @@ void ParseISO(cd::IsoReader& reader) {
 		std::string dirPath = param::outPath;
 
 		dirPath += pathBuff;
-		mkdir(dirPath.c_str());
+		_mkdir(dirPath.c_str());
 
 	}
 
@@ -338,7 +351,11 @@ void ParseISO(cd::IsoReader& reader) {
 		trackElement->InsertEndChild(newElement);
 		newElement = xmldoc.NewElement("directory_tree");
 
-		ParseDirectories(reader, pathTable.pathTableList[0].dirOffs, &xmldoc, newElement);
+		ParseDirectories(reader,
+						descriptor.rootDirRecord.entryOffs.lsb,
+						&xmldoc,
+						newElement,
+						descriptor.rootDirRecord.entrySize.lsb/2048);
 
 		trackElement->InsertEndChild(newElement);
 		baseElement->InsertEndChild(trackElement);
@@ -347,7 +364,11 @@ void ParseISO(cd::IsoReader& reader) {
 
     } else {
 
-    	ParseDirectories(reader, pathTable.pathTableList[0].dirOffs, &xmldoc, NULL);
+    	ParseDirectories(reader,
+						descriptor.rootDirRecord.entryOffs.lsb,
+						&xmldoc,
+						NULL,
+						descriptor.rootDirRecord.entrySize.lsb/2048);
 
     }
 
@@ -356,7 +377,7 @@ void ParseISO(cd::IsoReader& reader) {
 int main(int argc, char *argv[]) {
 
 
-    printf("isodump v0.25a - PlayStation ISO dumping tool\n");
+    printf("isodump v0.25b - PlayStation ISO dumping tool\n");
     printf("2017 Meido-Tek Productions (Lameguy64).\n\n");
 
 	if (argc == 1) {
