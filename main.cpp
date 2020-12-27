@@ -181,44 +181,22 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 			} else {
 
 				// Extract XA
+				// All the effort of the original tool in trying to understand if a file is an STR or a XA audio
+				// is just useless.
+				// In both cases, we are extracting a file in Mode 2 Form 2, and thus:
+				// 1. We need anyway to extract the file in raw mode, reading 2336 bytes per sector.
+				// 2. When rebuilding the bin using mkpsxiso, either we mark the file with str or with xa
+				//    the source file will anyway be stored on our hard drive in raw form (with valid error correction).
+				// I still don't get what is the purpose of the "str" file type in mkpsxiso...
 
-				int isSTR = false;
+				if(element != NULL)
+					newelement->SetAttribute("type", "xa");
 
-				{
-
-					char readBuff[12];
-					reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
-					reader.ReadBytesXA(readBuff, 12);
-
-					// If first sector has a data subheader, then its definitely a STR file
-					if (!(readBuff[2] & 0x4))
-						isSTR = true;
-
-				}
-
-				int bytesLeft;
-
-				if (isSTR) {
-
-					if (element != NULL)
-						newelement->SetAttribute("type", "str");
-
-					//bytesLeft = dirEntries.dirEntryList[e].entrySize.lsb;	// For STR video streams
-
-				} else {
-
-					if (element != NULL)
-						newelement->SetAttribute("type", "xa");
-
-
-				}
-
-				// this is the data to be read in XA mode, both if the file is an STR or XA, because the STR contains audio.
+				// this is the data to be read in XA mode, both if the file is an STR or XA,
+				// because the STR contains audio.
 				size_t sectorsToRead = dirEntries.dirEntryList[e].entrySize.lsb/2048;
-				if (dirEntries.dirEntryList[e].entrySize.lsb % 2048 != 0)
-                    sectorsToRead++;
 
-                bytesLeft = 2336*sectorsToRead;
+				int bytesLeft = 2336*sectorsToRead;
 
 				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
 
@@ -248,8 +226,6 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				}
 
 				fclose(outFile);
-
-
 			}
 
 			if (element != NULL)
