@@ -166,9 +166,11 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
             }
 
+			unsigned short xa_attr = ((cd::ISO_XA_ATTRIB*)dirEntries.dirEntryList[e].extData)->attributes;
+
 			// Give priority to Mode 2 form 2 flag, as some regular files have the 0x08 flag not set
 			// (e.g., hidden files like in Vagrant Story).
-			if ((((cd::ISO_XA_ATTRIB*)dirEntries.dirEntryList[e].extData)->attributes&0xff)&0x10) {
+			if ((xa_attr&0xff)&0x10) {
 
 				// Extract XA
 				// All the effort of the original tool in trying to understand if a file is an STR or a XA audio
@@ -217,7 +219,42 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 				fclose(outFile);
 
-			} else { // TODO: check additional file types.
+			}
+			else if ((xa_attr & 0xff) & 0x40) {
+
+				// Extract CDDA file
+
+				if (element != NULL)
+					newelement->SetAttribute("type", "da");
+
+				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
+
+				outFile = fopen(outputPath.c_str(), "wb");
+
+				if (outFile == NULL) {
+					printf("ERROR: Cannot create file %s...", outputPath.c_str());
+					return;
+				}
+
+				int bytesLeft = dirEntries.dirEntryList[e].entrySize.lsb;
+				while (bytesLeft > 0) {
+
+					u_char copyBuff[2352];
+					int bytesToRead = bytesLeft;
+
+					if (bytesToRead > 2352)
+						bytesToRead = 2352;
+
+					reader.ReadBytesDA(copyBuff, bytesToRead);
+					fwrite(copyBuff, 1, bytesToRead, outFile);
+
+					bytesLeft -= bytesToRead;
+
+				}
+
+				fclose(outFile);
+
+			} else {
 
 				// Extract regular file
 
