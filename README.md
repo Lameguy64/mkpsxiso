@@ -8,8 +8,11 @@ This tool is meant to extract the contents of a PSX game iso/bin file and at the
 
 Windows binaries are released in the releases section of this repo.
 
-Below you can find the original README by Lameguy64.
+## Known Issues
+- The current version does not identify CDDA audio data yet, and thus it will be extracted as raw regular files.
+- This not really related to isodump, rather to mkpsxiso. mkpsxiso rebuilds bins not necessarily following the internal layout of some game images. See for example Vagrant Story of Final Fantasy 7. So, even if no files are changed, the rebuilt bin will assign different LBAs to the files. This might be an issue for games that use their own internal LBA table (e.g., FF7), rather than the iso9660 TOC.
 
+Below you can find the original README by Lameguy64.
 
 # ISODUMP
 A very basic PlayStation ISO dumping tool that extracts the contents of a PlayStation ISO file. It currently only supports extracting files from the ISO9660 file system which includes standard data files, XA and STR files. It also supports generating an MKPSXISO compatible XML project file so the ISO may be rebuilt from the extracted files.
