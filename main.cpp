@@ -183,13 +183,18 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				// if the mode 2 form 2 flag is set, and form 1 is not, we assume this is a pure audio xa file.
 				type = 2;
 			}  else {
-				// here all flags are of the same value. From what I could see until now, all games that leave both flags
-				// to the same value, essentially mean
-				// that the data is mixed mode (i.e., both form 1 and form 2). This means we have an str video with xa audio.
-				type = 3;
+				// here all flags are set to the same value. From what I could see until now, when both flags are the same,
+				// this is interpreted in the following two ways, which both lead us to choose str/xa type.
+				// 1. Both values are 1, which means there is an indication by the mode 2 form 2 flag that the data is not
+				//    regular mode 2 form 1 data (i.e., it is either mixed or just xa). 
+				// 2. Both values are 0. The fact that the mode 2 form 2 flag is 0 simply means that the data might not
+				//    be *pure* mode 2 form 2 data (i.e., xa), so, we do not conclude it is regular mode 2 form 1 data.
+				//    We thus give priority to the mode 2 form 1 flag, which is also zero,
+				//	  and conclude that the data is not regular mode 2 form 1 data, and thus can be either mode 2 form 2 or mixed.
+				type = 2;
 			}
 
-			if (type == 2 || type == 3) {
+			if (type == 2) {
 
 				// Extract XA or STR file.
 				// For both XA and STR files, we need to extract the data 2336 bytes per sector.
