@@ -191,6 +191,9 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				//    be *pure* mode 2 form 2 data (i.e., xa), so, we do not conclude it is regular mode 2 form 1 data.
 				//    We thus give priority to the mode 2 form 1 flag, which is also zero,
 				//	  and conclude that the data is not regular mode 2 form 1 data, and thus can be either mode 2 form 2 or mixed.
+
+				// Remark: Some games (Legend of Mana), use a very strange STR+XA format that is stored in plain mode 2 form 1.
+				// This is properly marked in the xa_attr, and there is nothing wrong in extracting them as data.
 				type = 2;
 			}
 
