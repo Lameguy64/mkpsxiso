@@ -208,7 +208,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 				// this is the data to be read 2336 bytes per sector, both if the file is an STR or XA,
 				// because the STR contains audio.
-				size_t sectorsToRead = dirEntries.dirEntryList[e].entrySize.lsb/2048;
+				size_t sectorsToRead = (dirEntries.dirEntryList[e].entrySize.lsb+2047)/2048;
 
 				int bytesLeft = 2336*sectorsToRead;
 
@@ -258,7 +258,10 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 					return;
 				}
 
-				int bytesLeft = dirEntries.dirEntryList[e].entrySize.lsb;
+				size_t sectorsToRead = (dirEntries.dirEntryList[e].entrySize.lsb + 2047) / 2048;
+
+				int bytesLeft = 2352 * sectorsToRead;
+
 				while (bytesLeft > 0) {
 
 					u_char copyBuff[2352];
