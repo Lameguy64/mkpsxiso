@@ -1,12 +1,25 @@
 #include <stdio.h>
-#include <conio.h>
-#include <unistd.h>
+
+#ifdef _WIN32
 #include <windows.h>
+
+#else
+#include <unistd.h>
+#endif
+
+
 #include <string>
-#include <tinyxml2.h>
+#include "tinyxml2.h"
 
 #include "cd.h"
 #include "cdreader.h"
+
+#if defined(_WIN32)
+    #include <direct.h>
+#else
+	#include <sys/stat.h>
+	int _mkdir(const char* dirname){ return mkdir(dirname, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); }
+#endif
 
 namespace param {
 
@@ -79,14 +92,34 @@ const char* CleanIdentifier(const char* id) {
 
 }
 
-void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element) {
+void ReadLicense(cd::IsoReader& reader, cd::ISO_LICENSE* license) {
+	reader.SeekToSector(0);
+	reader.ReadBytesXA(license->data, 28032);
+}
+
+void SaveLicense(cd::ISO_LICENSE& license) {
+    std::string outputPath = param::outPath;
+
+    outputPath = outputPath + "license_data.dat";
+    FILE* outFile = fopen(outputPath.c_str(), "wb");
+
+    if (outFile == NULL) {
+        printf("ERROR: Cannot create license file %s...", outputPath.c_str());
+        return;
+    }
+
+    fwrite(license.data, 1, 28032, outFile);
+    fclose(outFile);
+}
+
+void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element, int sectors=1) {
 
     cd::IsoDirEntries dirEntries;
     tinyxml2::XMLElement* newelement = NULL;
     std::string outputPath;
     FILE *outFile;
 
-    int entriesFound = dirEntries.ReadDirEntries(&reader, offs);
+    int entriesFound = dirEntries.ReadDirEntries(&reader, offs, sectors);
     dirEntries.SortByLBA();
 
     for(int e=2; e<entriesFound; e++) {
@@ -104,7 +137,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
             }
 
-            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement);
+            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement, dirEntries.dirEntryList[e].entrySize.lsb/2048);
 
             BackDir(global::isoPath);
 
@@ -123,6 +156,8 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 			outputPath = param::outPath + outputPath;
 
+			printf("%s\n",outputPath.c_str());
+
             if (element != NULL) {
 
                 newelement = doc->NewElement("file");
@@ -131,7 +166,95 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
             }
 
-			if ((((cd::ISO_XA_ATTRIB*)dirEntries.dirEntryList[e].extData)->attributes&0xff)&0x08) {
+			unsigned short xa_attr = ((cd::ISO_XA_ATTRIB*)dirEntries.dirEntryList[e].extData)->attributes;
+
+			// Give priority to Mode 2 form 2 flag, as some regular files have the 0x08 flag not set
+			// (e.g., hidden files like in Vagrant Story).
+			if ((xa_attr&0xff)&0x10) {
+
+				// Extract XA
+				// All the effort of the original tool in trying to understand if a file is an STR or a XA audio
+				// is just useless.
+				// In both cases, we are extracting a file in Mode 2 Form 2, and thus:
+				// 1. We need anyway to extract the file in raw mode, reading 2336 bytes per sector.
+				// 2. When rebuilding the bin using mkpsxiso, either we mark the file with str or with xa
+				//    the source file will anyway be stored on our hard drive in raw form (with valid error correction).
+				// I still don't get what is the purpose of the "str" file type in mkpsxiso...
+
+				if(element != NULL)
+					newelement->SetAttribute("type", "xa");
+
+				// this is the data to be read in XA mode, both if the file is an STR or XA,
+				// because the STR contains audio.
+				size_t sectorsToRead = dirEntries.dirEntryList[e].entrySize.lsb/2048;
+
+				int bytesLeft = 2336*sectorsToRead;
+
+				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
+
+				outFile = fopen(outputPath.c_str(), "wb");
+
+				if (outFile == NULL) {
+					printf("ERROR: Cannot create file %s...", outputPath.c_str());
+					return;
+				}
+
+				// Copy loop
+				while(bytesLeft > 0) {
+
+					u_char copyBuff[2336];
+
+					int bytesToRead = bytesLeft;
+
+					if (bytesToRead > 2336)
+						bytesToRead = 2336;
+
+					reader.ReadBytesXA(copyBuff, 2336);
+
+					fwrite(copyBuff, 1, 2336, outFile);
+
+					bytesLeft -= bytesToRead;
+
+				}
+
+				fclose(outFile);
+
+			}
+			else if ((xa_attr & 0xff) & 0x40) {
+
+				// Extract CDDA file
+
+				if (element != NULL)
+					newelement->SetAttribute("type", "da");
+
+				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
+
+				outFile = fopen(outputPath.c_str(), "wb");
+
+				if (outFile == NULL) {
+					printf("ERROR: Cannot create file %s...", outputPath.c_str());
+					return;
+				}
+
+				int bytesLeft = dirEntries.dirEntryList[e].entrySize.lsb;
+				while (bytesLeft > 0) {
+
+					u_char copyBuff[2352];
+					int bytesToRead = bytesLeft;
+
+					if (bytesToRead > 2352)
+						bytesToRead = 2352;
+
+					reader.ReadBytesDA(copyBuff, bytesToRead);
+					fwrite(copyBuff, 1, bytesToRead, outFile);
+
+					bytesLeft -= bytesToRead;
+
+				}
+
+				fclose(outFile);
+
+			} else {
 
 				// Extract regular file
 
@@ -165,87 +288,21 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 				fclose(outFile);
 
-			} else {
-
-				// Extract XA
-
-				int isSTR = false;
-
-				{
-
-					char readBuff[12];
-					reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
-					reader.ReadBytesXA(readBuff, 12);
-
-					// If first sector has a data subheader, then its definitely a STR file
-					if (!(readBuff[2] & 0x4))
-						isSTR = true;
-
-				}
-
-				int bytesLeft;
-
-				if (isSTR) {
-
-					if (element != NULL)
-						newelement->SetAttribute("type", "str");
-
-					bytesLeft = dirEntries.dirEntryList[e].entrySize.lsb;	// For STR video streams
-
-				} else {
-
-					if (element != NULL)
-						newelement->SetAttribute("type", "xa");
-
-					bytesLeft = 2336*(dirEntries.dirEntryList[e].entrySize.lsb/2048);	// For XA audio streams
-
-				}
-
-
-				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
-
-				outFile = fopen(outputPath.c_str(), "wb");
-
-				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %s...", outputPath.c_str());
-					return;
-				}
-
-				// Copy loop
-				while(bytesLeft > 0) {
-
-					u_char copyBuff[2336];
-
-					int bytesToRead = bytesLeft;
-
-					if (bytesToRead > 2336)
-						bytesToRead = 2336;
-
-					reader.ReadBytesXA(copyBuff, 2336);
-
-					fwrite(copyBuff, 1, 2336, outFile);
-
-					bytesLeft -= bytesToRead;
-
-				}
-
-				fclose(outFile);
-
-
 			}
 
 			if (element != NULL)
 				element->InsertEndChild(newelement);
 
         }
-
     }
-
 }
 
 void ParseISO(cd::IsoReader& reader) {
 
     cd::ISO_DESCRIPTOR	descriptor;
+	cd::ISO_LICENSE license;
+
+	ReadLicense(reader, &license);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -286,7 +343,7 @@ void ParseISO(cd::IsoReader& reader) {
 
     if (!param::outPath.empty()) {
 
-        if (param::outPath.rfind("/") != param::outPath.length()-1);
+        if (param::outPath.rfind("/") != param::outPath.length()-1)
             param::outPath += "/";
 
     }
@@ -300,7 +357,7 @@ void ParseISO(cd::IsoReader& reader) {
 		std::string dirPath = param::outPath;
 
 		dirPath += pathBuff;
-		mkdir(dirPath.c_str());
+		_mkdir(dirPath.c_str());
 
 	}
 
@@ -331,9 +388,19 @@ void ParseISO(cd::IsoReader& reader) {
 			newElement->SetAttribute("data_preparer", CleanVolumeId(descriptor.dataPreparerIdentifier));
 
 		trackElement->InsertEndChild(newElement);
+
+		newElement = xmldoc.NewElement("license");
+		newElement->SetAttribute("file", (param::outPath+"license_data.dat").c_str());
+
+		trackElement->InsertEndChild(newElement);
+
 		newElement = xmldoc.NewElement("directory_tree");
 
-		ParseDirectories(reader, pathTable.pathTableList[0].dirOffs, &xmldoc, newElement);
+		ParseDirectories(reader,
+						descriptor.rootDirRecord.entryOffs.lsb,
+						&xmldoc,
+						newElement,
+						descriptor.rootDirRecord.entrySize.lsb/2048);
 
 		trackElement->InsertEndChild(newElement);
 		baseElement->InsertEndChild(trackElement);
@@ -342,17 +409,23 @@ void ParseISO(cd::IsoReader& reader) {
 
     } else {
 
-    	ParseDirectories(reader, pathTable.pathTableList[0].dirOffs, &xmldoc, NULL);
+    	ParseDirectories(reader,
+						descriptor.rootDirRecord.entryOffs.lsb,
+						&xmldoc,
+						NULL,
+						descriptor.rootDirRecord.entrySize.lsb/2048);
 
     }
 
+    //Save license file anyway.
+    SaveLicense(license);
 }
 
 int main(int argc, char *argv[]) {
 
 
-    printf("isodump v0.25a - PlayStation ISO dumping tool\n");
-    printf("2017 Meido-Tek Productions (Lameguy64).\n\n");
+    printf("isodump v0.28 - PlayStation ISO dumping tool\n");
+    printf("2017 Meido-Tek Productions (Lameguy64), 2020 Phoenix (SadNES cITy).\n\n");
 
 	if (argc == 1) {
 
@@ -379,7 +452,7 @@ int main(int argc, char *argv[]) {
 
                 i++;
 
-            } else if (strcmp("xml", &argv[i][1]) == 0) {
+            } else if (strcmp("s", &argv[i][1]) == 0) {
 
                 param::xmlFile = argv[i+1];
                 i++;

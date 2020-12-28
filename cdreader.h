@@ -2,6 +2,7 @@
 #define _CDREADER_H
 
 #include "cd.h"
+#include "types.h"
 
 namespace cd {
 
@@ -83,7 +84,7 @@ namespace cd {
         virtual ~IsoDirEntries();
 
         void FreeDirEntries();
-        int ReadDirEntries(cd::IsoReader* reader, int lba);
+        int ReadDirEntries(cd::IsoReader* reader, int lba, int sectors=1);
         void SortByLBA();
 
     };

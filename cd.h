@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#ifdef __WIN32__
+#ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>
@@ -219,6 +219,11 @@ namespace cd {
 		unsigned char	pad4[653];
 
 	} ISO_DESCRIPTOR;
+
+	//License data (just a sequence of 28032 bytes)
+	typedef struct {
+		char data[28032];
+	} ISO_LICENSE;
 
 	// Leave non-aligned structure packing
 	#pragma pack(pop)
