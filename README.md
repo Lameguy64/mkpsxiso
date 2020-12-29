@@ -9,8 +9,9 @@ This tool is meant to extract the contents of a PSX game iso/bin file and at the
 Windows binaries are released in the releases section of this repo.
 
 ## Known Issues
-- The current version does not identify additional audio tracks yet, and thus, only the data track will be extracted.
-- This not really related to isodump, rather to mkpsxiso. mkpsxiso rebuilds bins not necessarily following the internal layout of some game images. See for example Vagrant Story of Final Fantasy 7. So, even if no files are changed, the rebuilt bin will assign different LBAs to the files. This might be an issue for games that use their own internal LBA table (e.g., FF7), rather than the iso9660 TOC.
+- The current version does not support cue sheets. This means that it supports extracting audio tracks only in the following case:
+  - the game has only one audio track that is not in a separate file (i.e., it is on the same iso file), and the audio track is referenced by a CDDA file in the data track. 
+- This is really not related to isodump, rather to mkpsxiso. mkpsxiso rebuilds bins not necessarily following the internal layout of some game images. See for example Vagrant Story of Final Fantasy 7. So, even if no files are changed, the rebuilt bin will assign different LBAs to the files. This might be an issue for games that use their own internal LBA table (e.g., FF7), rather than the iso9660 TOC.
 
 Below you can find the original README by Lameguy64.
 
