@@ -92,6 +92,23 @@ const char* CleanIdentifier(const char* id) {
 
 }
 
+void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
+	memcpy(header->chunkID,"RIFF",4);
+	header->chunkSize = 36 + dataSize;
+	memcpy(header->format, "WAVE", 4);
+
+	memcpy(header->subchunk1ID, "fmt ", 4);
+	header->subchunk1Size = 16;
+	header->audioFormat = 1;
+	header->numChannels = 2;
+	header->sampleRate = 44100;
+	header->bitsPerSample = 16;
+	header->byteRate = (header->sampleRate * header->numChannels * header->bitsPerSample) / 8;
+	header->blockAlign = (header->numChannels * header->bitsPerSample) / 8;
+
+	memcpy(header->subchunk2ID, "data", 4);
+	header->subchunk2Size = dataSize;
+}
 void ReadLicense(cd::IsoReader& reader, cd::ISO_LICENSE* license) {
 	reader.SeekToSector(0);
 	reader.ReadBytesXA(license->data, 28032);
@@ -252,7 +269,16 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				if (element != NULL)
 					newelement->SetAttribute("type", "da");
 
-				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
+				int result = reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
+
+				if (result) {
+					printf("WARNING: The CDDA file %s is out of the iso file bounds.\n", outputPath.c_str());
+					printf("This usually means that the game has audio tracks, and they are on separate files.\n");
+					printf("As isodump does not support dumping from a cue file, you should use an iso file containing all tracks.\n\n");
+					printf("isodump will write the file as a dummy (silent) cdda file.\n");
+					printf("This is generally fine, when the real CDDA file is also a dummy file.\n");
+					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n");
+				}
 
 				outFile = fopen(outputPath.c_str(), "wb");
 
@@ -263,17 +289,28 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 				size_t sectorsToRead = (dirEntries.dirEntryList[e].entrySize.lsb + 2047) / 2048;
 
-				int bytesLeft = 2352 * sectorsToRead;
+				int cddaSize = 2352 * sectorsToRead;
+				int bytesLeft = cddaSize;
+
+				cd::RIFF_HEADER riffHeader;
+
+				prepareRIFFHeader(&riffHeader, cddaSize);
+				fwrite((void*)&riffHeader, 1, sizeof(cd::RIFF_HEADER), outFile);
+
 
 				while (bytesLeft > 0) {
 
 					u_char copyBuff[2352];
+					memset(copyBuff, 0, 2352);
+
 					int bytesToRead = bytesLeft;
 
 					if (bytesToRead > 2352)
 						bytesToRead = 2352;
 
-					reader.ReadBytesDA(copyBuff, bytesToRead);
+					if (!result)
+						reader.ReadBytesDA(copyBuff, bytesToRead);
+					
 					fwrite(copyBuff, 1, bytesToRead, outFile);
 
 					bytesLeft -= bytesToRead;
@@ -396,6 +433,8 @@ void ParseISO(cd::IsoReader& reader) {
     if (!param::xmlFile.empty()) {
 
 		tinyxml2::XMLElement *baseElement = xmldoc.NewElement("iso_project");
+		baseElement->SetAttribute("image_name", "mkpsxiso.bin");
+		baseElement->SetAttribute("cue_sheet", "mkpsxiso.cue");
 
 		tinyxml2::XMLElement *trackElement = xmldoc.NewElement("track");
 		trackElement->SetAttribute("type", "data");
@@ -452,7 +491,7 @@ void ParseISO(cd::IsoReader& reader) {
 int main(int argc, char *argv[]) {
 
 
-    printf("isodump v0.29 - PlayStation ISO dumping tool\n");
+    printf("isodump v0.30 - PlayStation ISO dumping tool\n");
     printf("2017 Meido-Tek Productions (Lameguy64), 2020 Phoenix (SadNES cITy).\n\n");
 
 	if (argc == 1) {

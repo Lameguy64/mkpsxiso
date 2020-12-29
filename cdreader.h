@@ -22,7 +22,8 @@ namespace cd {
         int			currentSector;
         // Current data offset in current sector
         int			currentByte;
-
+		// Total number of sectors in the iso
+		int totalSectors;
     public:
 
         // Initializer
