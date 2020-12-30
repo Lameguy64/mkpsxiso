@@ -224,7 +224,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				// depending on the value of the sub-header (video or audio data).
 
 				if(element != NULL)
-					newelement->SetAttribute("type", "str");
+					newelement->SetAttribute("type", "mixed");
 
 				// this is the data to be read 2336 bytes per sector, both if the file is an STR or XA,
 				// because the STR contains audio.
@@ -491,7 +491,7 @@ void ParseISO(cd::IsoReader& reader) {
 int main(int argc, char *argv[]) {
 
 
-    printf("isodump v0.30 - PlayStation ISO dumping tool\n");
+    printf("isodump v0.31 - PlayStation ISO dumping tool\n");
     printf("2017 Meido-Tek Productions (Lameguy64), 2020 Phoenix (SadNES cITy).\n\n");
 
 	if (argc == 1) {
