@@ -107,6 +107,12 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
+**Version 1.25 (12/30/2020)**
+* Replaced xa and str modes with "mixed" mode (see example.xml for details). xa and str modes are now just aliases to the new "mixed" mode, for backwards compatibility.
+
+**Version 1.24 (12/28/2020)**
+* Fixed EDC generation for STR files.
+
 **Version 1.23 (12/20/2018)**
 * Fixed broken LBA and timecode calculation for audio tracks integrated as files (iso::DirTreeClass::GetWavSize returns an incorrect value from the WAV file).
 * Updated build instructions (CodeBlocks project had been replaced with Netbeans but forgot to update instructions).

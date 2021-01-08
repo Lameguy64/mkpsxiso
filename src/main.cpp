@@ -5,7 +5,7 @@
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.24"
+#define VERSION "1.25"
 
 
 namespace global
@@ -1048,12 +1048,9 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 				if ( compare( "data", dirElement->Attribute( "type" ) ) == 0 )
 				{
 					entry = iso::EntryFile;
-				}
-				else if ( compare( "xa", dirElement->Attribute( "type" ) ) == 0 )
-				{
-					entry = iso::EntryXA;
-				}
-				else if ( compare( "str", dirElement->Attribute( "type" ) ) == 0 )
+				} else if ( compare( "mixed", dirElement->Attribute( "type" ) ) == 0 ||
+                            compare( "xa", dirElement->Attribute( "type" ) ) == 0 || //alias xa and str to mixed
+                            compare( "str", dirElement->Attribute( "type" ) ) == 0 )
 				{
 					entry = iso::EntrySTR;
 				}

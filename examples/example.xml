@@ -87,12 +87,19 @@
 					
 				Attributes:
 					name	- File name to use in the directory tree.
-					type	- The file's type. Options are 'data' for standard files, 'xa' for XA
-							  audio, 'str' for MDEC/Data + XA interleaved streams and 'da' is for CD-DA
-							  audio files (optional, defaults to data).
 					source	- File name of the source file.
+					type	- The file's type. Options are
+								'data': for standard files.
+								'mixed': for mixed mode files, i.e., 2336 bytes per sector files where each sector
+										 is marked in its sub-header as either mode 2 form 1 or mode 2 form 2.
+										 mkpsxiso will properly encode each sector of the file in the iso, depending on this sub-header.
+										 Typical examples are XA-ADPCM  audio files (all sectors are mode 2 form 2),
+										 and STR videos, i.e., MDEC/Data + XA interleaved streams (these have mixed mode 1 and mode 2 sectors).
+										 'xa' and 'str' can also be used as aliases for 'mixed'.
+								'da': is for CD-DA audio files. More details below.
+							  If no value for type is specified, the default is 'data'.
 				
-				Note: Either name or source attribute can be omitted. If name is onky specified, it uses that
+				Note: Either name or source attribute can be omitted. If name is only specified, it uses that
 				as the name of the source file and specifying source only strips off the path name if there's
 				any and uses that as the name of the file. Omitting both will cause an error obviously.
 			-->
@@ -120,11 +127,23 @@
 				<!-- Specifies a directory named mystreams inside mydir -->
 				<dir name="mystreams">
 				
-					<!-- Specifies a file as XA audio -->
-					<file name="mymusic.xa" type="xa" source="mymusic.xa"/>
-					<!-- Specifies a file as STR MDEC video -->
-					<file name="mymovie.str" type="str" source="mymovie.str"/>
-
+					<!-- Specifies a file as mixed mode -->
+					<file name="mymovie1.str" type="mixed" source="mymovie1.str"/>
+					
+					<!-- Also this specifies a file as mixed mode -->
+					<file name="mymovie2.str" type="str" source="mymovie2.str"/>
+					
+					<!-- Also this specifies a file as mixed mode -->
+					<file name="mymovie3.str" type="xa" source="mymovie3.str"/>
+					
+					<!-- Also this specifies a file as mixed mode-->
+					<file name="mymusic1.xa" type="mixed" source="mymusic1.xa"/>
+					
+					<!-- Also this specifies a file as mixed mode-->
+					<file name="mymusic2.xa" type="xa" source="mymusic2.xa"/>
+					
+					<!-- Also this specifies a file as mixed mode-->
+					<file name="mymusic3.xa" type="str" source="mymusic3.xa"/>
 				</dir>
 			
 			</dir>
@@ -145,19 +164,22 @@
 			
 			<!-- Sample DA audio file entry.
 			
-				Unlike XA and STR file types, DA files can only be put last in the ISO file system as
-				the file will be packed as raw CD audio data and you cannot put file data past a CD
-				audio track. It will also be mapped as a conventional CD audio track in the CUE sheet.
+				Unlike data and mixed mode file types, DA files can only be put last in the ISO file system as
+				these files will not become actual files of the data track, but
+				just links to a separate audio track that mkpsxiso will automatically create, after the data track,
+				out of the content of the 'da' file (which is simply a WAV file).
+				The created audio track will also be mapped in the CUE sheet.
 				
-				You can still use <track> elements after this.
+				You can still use <track> elements after this, if you want to add further audio tracks
+				that are not referenced by any DA file in the data track.
 			-->
-			<file name="audio1.da" type="da" source="myaudio.wav"/>
+			<file name="audio1.da" type="da" source="myaudio1.wav"/>
 		
 		</directory_tree>
 		
 	</track>
 
-	<!-- Specifies CD-DA audio tracks to the CD image
+	<!-- Specifies additional CD-DA audio tracks to the CD image.
 	
 		WAV files must be in Microsoft format, 44100KHz 16-bit stereo, uncompressed. Mkpsxiso will not perform
 		transcoding if the input file format is not correct.
@@ -165,7 +187,7 @@
 		Plans for supporting FLAC as source audio were considered but dropped because Lameguy64 found it to
 		be impossible to compile libflac under Windows and that most people usually use XA audio over CDDA anyway.
 	-->
-	<track type="audio" source="mytrack2.wav"/>
-	<track type="audio" source="mytrack3.wav"/>
+	<track type="audio" source="myaudio2.wav"/>
+	<track type="audio" source="myaudio3.wav"/>
 	
 </iso_project>
