@@ -3,6 +3,7 @@ include(FindPkgConfig)
 
 #set global exe name
 set(MAIN "mkpsxiso")
+set (CMAKE_CXX_STANDARD 11)
 
 project(${MAIN})
 #include directory, same for all build types
@@ -22,11 +23,11 @@ if(MINGW OR CYGWIN)
   
 elseif(MSYS OR MSVC)
   message(FATAL_ERROR "CAN NOT BUILD ON MICROSOFT COMPILER")
-  
-elseif(APPLE OR WATCOM OR BORLAND)
+
+elseif(WATCOM OR BORLAND)
   message(FATAL_ERROR "CAN NOT BUILD FOR APPLE, WATCOM, BORLAND")
   
-elseif(UNIX)
+elseif(UNIX OR APPLE)
   message(STATUS "UNIX BUILD")
 
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin_nix)
