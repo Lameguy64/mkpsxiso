@@ -491,7 +491,7 @@ void ParseISO(cd::IsoReader& reader) {
 int main(int argc, char *argv[]) {
 
 
-    printf("isodump v0.31 - PlayStation ISO dumping tool\n");
+    printf("isodump v0.32 - PlayStation ISO dumping tool\n");
     printf("2017 Meido-Tek Productions (Lameguy64), 2020 Phoenix (SadNES cITy).\n\n");
 
 	if (argc == 1) {
