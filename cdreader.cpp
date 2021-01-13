@@ -371,7 +371,7 @@ int cd::IsoPathTable::GetFullDirPath(int dirEntry, char* pathBuff, int pathMaxLe
 
 		char* dirName = cd::IsoPathTable::pathTableList[dirEntryOrder[i]].name;
 
-        if ((strlen(pathBuff)+strlen(dirName)+1) > (u_int)pathMaxLen)
+        if ((strlen(pathBuff)+strlen(dirName)+1) > (unsigned int)pathMaxLen)
 			break;
 
 		strcat(pathBuff, dirName);
