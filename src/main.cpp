@@ -5,6 +5,11 @@
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 
+#define MA_NO_THREADING
+#define MA_NO_DEVICE_IO
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
+
 #define VERSION "1.26"
 
 
@@ -1166,9 +1171,63 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 
 int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 {
+	unsigned char buff[CD_SECTOR_SIZE];
+    ma_decoder decoder;
+	// open the decoder
+	ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_s16, 2, 44100);	
+	do {
+		// WAV
+		decoderConfig.encodingFormat = ma_encoding_format_wav;
+		if(MA_SUCCESS == ma_decoder_init_file(wavFile, &decoderConfig, &decoder)) break;
+
+		// FLAC
+		decoderConfig.encodingFormat = ma_encoding_format_flac;
+		if(MA_SUCCESS == ma_decoder_init_file(wavFile, &decoderConfig, &decoder)) break;
+
+		// MP3
+		decoderConfig.encodingFormat = ma_encoding_format_mp3;
+		if(MA_SUCCESS == ma_decoder_init_file(wavFile, &decoderConfig, &decoder))
+		{
+			// BROKEN BROKEN not printed
+			printf("WARN: %s is lossy mp3, will be decoded\n", wavFile);
+			break;
+		}
+
+		// PCM
+        printf("ERROR: PCM not reimplemented\n");
+		return false;
+	} while(0);
+
+    //  note if there's some data converting going on
+    ma_format internalFormat;
+	ma_uint32 internalChannels;
+	ma_uint32 internalSampleRate; 
+	if(MA_SUCCESS != ma_data_source_get_data_format(decoder.pBackend, &internalFormat, &internalChannels, &internalSampleRate))
+	{
+		printf("ERROR: unable to get internal metadata for %s\n", wavFile);
+		ma_decoder_uninit(&decoder);
+	    return false;
+	} 
+	if((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100))
+	{
+		printf("WARN: %s is not Redbook audio, quality may be lost converting\n", wavFile);			
+	}
+	
+	// read a sector and write a sector until done
+	const ma_uint64 framesToRead = (CD_SECTOR_SIZE/(2 * sizeof(int16_t))); // 2 channels 2 bytes per single channel sample (588 intrachannel pcm frames)
+	ma_uint64 framesRead;
+	do {
+		memset(buff, 0x00, CD_SECTOR_SIZE);
+		framesRead = ma_decoder_read_pcm_frames(&decoder, &buff, framesToRead);
+		writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
+	} while(framesToRead == framesRead);
+	ma_decoder_uninit(&decoder);
+    return true;   
+
+
 	FILE *fp;
 	int waveLen;
-	unsigned char buff[CD_SECTOR_SIZE];
+	//unsigned char buff[CD_SECTOR_SIZE];
 
 	if ( !( fp = fopen( wavFile, "rb" ) ) )
 	{
