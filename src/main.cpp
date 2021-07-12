@@ -1175,6 +1175,7 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
     ma_decoder decoder;
 	// open the decoder
 	ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_s16, 2, 44100);	
+	bool isLossy = false;
 	do {
 		// WAV
 		decoderConfig.encodingFormat = ma_encoding_format_wav;
@@ -1188,14 +1189,52 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 		decoderConfig.encodingFormat = ma_encoding_format_mp3;
 		if(MA_SUCCESS == ma_decoder_init_file(wavFile, &decoderConfig, &decoder))
 		{
-			// BROKEN BROKEN not printed
-			printf("WARN: %s is lossy mp3, will be decoded\n", wavFile);
+			isLossy = true;
 			break;
 		}
 
 		// PCM
-        printf("ERROR: PCM not reimplemented\n");
-		return false;
+        printf("\n    WARN: Unknown audio format, assuming it's just signed 16 bit stereo @ 44100 kHz pcm audio\n");
+		FILE *fp;
+		if ( !( fp = fopen( wavFile, "rb" ) ) )
+	    {
+	    	printf("\n    ERROR: File not found.\n");
+	    	return false;
+	    }
+		// get the file size
+		if(fseek(fp, 0, SEEK_END) != 0)
+		{
+			printf("\n    ERROR: fseek failed\n");
+	    	return false;
+		} 
+		long bytesLeft = ftell(fp);
+		if(bytesLeft < 0)
+		{
+			printf("\n    ERROR: ftell failed\n");
+	    	return false;
+		}
+		if(fseek(fp, 0, SEEK_SET) != 0)
+		{
+			printf("\n    ERROR: fseek failed\n");
+	    	return false;
+		}
+		for(;;) {
+			memset(buff, 0x00, CD_SECTOR_SIZE);
+			size_t nowRead = fread( buff, 1, CD_SECTOR_SIZE, fp );
+			writer->WriteBytesRaw( buff, CD_SECTOR_SIZE);
+			if(bytesLeft == nowRead)
+			{
+				fclose(fp);
+				return true;
+			}
+			else if(nowRead != CD_SECTOR_SIZE)
+			{
+				fclose(fp);				
+				printf("\n    ERROR: fread didn't read CD_SECTOR_SIZE\n");
+				return false;
+			}
+			bytesLeft -= nowRead;
+		};				
 	} while(0);
 
     //  note if there's some data converting going on
@@ -1204,13 +1243,13 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 	ma_uint32 internalSampleRate; 
 	if(MA_SUCCESS != ma_data_source_get_data_format(decoder.pBackend, &internalFormat, &internalChannels, &internalSampleRate))
 	{
-		printf("ERROR: unable to get internal metadata for %s\n", wavFile);
+		printf("\n    ERROR: unable to get internal metadata for %s\n", wavFile);
 		ma_decoder_uninit(&decoder);
 	    return false;
 	} 
-	if((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100))
+	if((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100) || isLossy)
 	{
-		printf("WARN: %s is not Redbook audio, quality may be lost converting\n", wavFile);			
+		printf("\n    WARN: This is not Redbook audio, converting.\n    ");			
 	}
 	
 	// read a sector and write a sector until done
@@ -1249,9 +1288,7 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 		memcmp( &HeaderChunk.format, "WAVE", 4 ) )
 	{
 		// Write data
-		fseek(fp, 0, SEEK_END);
-		waveLen = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
+		
 
 		while ( waveLen > 0 )
 		{
@@ -1264,7 +1301,7 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 				readLen = CD_SECTOR_SIZE;
 			}
 
-			fread( buff, 1, readLen, fp );
+			
 			writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
 
 			waveLen -= readLen;
