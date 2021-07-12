@@ -37,7 +37,7 @@ namespace global
 int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement);
 int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement* trackElement);
 
-int PackWaveFile(cd::IsoWriter* writer, const char* wavFile);
+bool PackFileAsCDDA(cd::IsoWriter* writer, const char* audioFile);
 int GetSize(const char* fileName);
 
 int compare( const char* a, const char* b );
@@ -518,7 +518,7 @@ int main(int argc, const char* argv[])
 								trackElement->Attribute( "source" ) );
 						}
 
-						if ( PackWaveFile( &writer,
+						if ( PackFileAsCDDA( &writer,
 							trackElement->Attribute( "source" ) ) )
 						{
 							if ( !global::QuietMode )
@@ -1169,7 +1169,28 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 	return true;
 }
 
-int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
+bool stdio_getFileSize(FILE *fp, long& readFileSize)
+{
+	if(fseek(fp, 0, SEEK_END) != 0)
+	{
+		printf("\n    ERROR: fseek failed\n");
+		return false;
+	} 
+	readFileSize = ftell(fp);
+	if(readFileSize < 0)
+	{
+		printf("\n    ERROR: ftell failed\n");
+		return false;
+	}
+	if(fseek(fp, 0, SEEK_SET) != 0)
+	{
+		printf("\n    ERROR: fseek failed\n");
+		return false;
+	}
+	return true;
+}
+
+bool PackFileAsCDDA(cd::IsoWriter* writer, const char* audioFile)
 {
 	unsigned char buff[CD_SECTOR_SIZE];
     ma_decoder decoder;
@@ -1179,15 +1200,15 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 	do {
 		// WAV
 		decoderConfig.encodingFormat = ma_encoding_format_wav;
-		if(MA_SUCCESS == ma_decoder_init_file(wavFile, &decoderConfig, &decoder)) break;
+		if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder)) break;
 
 		// FLAC
 		decoderConfig.encodingFormat = ma_encoding_format_flac;
-		if(MA_SUCCESS == ma_decoder_init_file(wavFile, &decoderConfig, &decoder)) break;
+		if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder)) break;
 
 		// MP3
 		decoderConfig.encodingFormat = ma_encoding_format_mp3;
-		if(MA_SUCCESS == ma_decoder_init_file(wavFile, &decoderConfig, &decoder))
+		if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder))
 		{
 			isLossy = true;
 			break;
@@ -1196,28 +1217,18 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 		// PCM
         printf("\n    WARN: Unknown audio format, assuming it's just signed 16 bit stereo @ 44100 kHz pcm audio\n");
 		FILE *fp;
-		if ( !( fp = fopen( wavFile, "rb" ) ) )
+		if ( !( fp = fopen( audioFile, "rb" ) ) )
 	    {
 	    	printf("\n    ERROR: File not found.\n");
 	    	return false;
 	    }
-		// get the file size
-		if(fseek(fp, 0, SEEK_END) != 0)
+		long bytesLeft;
+		if(!stdio_getFileSize(fp, bytesLeft))
 		{
-			printf("\n    ERROR: fseek failed\n");
-	    	return false;
-		} 
-		long bytesLeft = ftell(fp);
-		if(bytesLeft < 0)
-		{
-			printf("\n    ERROR: ftell failed\n");
-	    	return false;
+			fclose(fp);
+			return false;
 		}
-		if(fseek(fp, 0, SEEK_SET) != 0)
-		{
-			printf("\n    ERROR: fseek failed\n");
-	    	return false;
-		}
+		
 		for(;;) {
 			memset(buff, 0x00, CD_SECTOR_SIZE);
 			size_t nowRead = fread( buff, 1, CD_SECTOR_SIZE, fp );
@@ -1243,7 +1254,7 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 	ma_uint32 internalSampleRate; 
 	if(MA_SUCCESS != ma_data_source_get_data_format(decoder.pBackend, &internalFormat, &internalChannels, &internalSampleRate))
 	{
-		printf("\n    ERROR: unable to get internal metadata for %s\n", wavFile);
+		printf("\n    ERROR: unable to get internal metadata for %s\n", audioFile);
 		ma_decoder_uninit(&decoder);
 	    return false;
 	} 
@@ -1262,148 +1273,7 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 	} while(framesToRead == framesRead);
 	ma_decoder_uninit(&decoder);
     return true;   
-
-
-	FILE *fp;
-	int waveLen;
-	//unsigned char buff[CD_SECTOR_SIZE];
-
-	if ( !( fp = fopen( wavFile, "rb" ) ) )
-	{
-		printf("ERROR: File not found.\n");
-		return false;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		char	format[4];
-	} HeaderChunk;
-
-	fread( &HeaderChunk, 1, sizeof(HeaderChunk), fp );
-
-	if ( memcmp( &HeaderChunk.id, "RIFF", 4 ) ||
-		memcmp( &HeaderChunk.format, "WAVE", 4 ) )
-	{
-		// Write data
-		
-
-		while ( waveLen > 0 )
-		{
-			memset(buff, 0x00, CD_SECTOR_SIZE);
-
-			int readLen = waveLen;
-
-			if (readLen > CD_SECTOR_SIZE)
-			{
-				readLen = CD_SECTOR_SIZE;
-			}
-
-			
-			writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
-
-			waveLen -= readLen;
-		}
-
-		fclose( fp );
-
-		printf("Packed as raw... ");
-
-		return true;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		short	format;
-		short	chan;
-		int		freq;
-		int		brate;
-		short	balign;
-		short	bps;
-	} WAV_Subchunk1;
-
-	fread( &WAV_Subchunk1, 1, sizeof(WAV_Subchunk1), fp );
-
-	// Check if its a valid WAVE file
-	if ( memcmp( &WAV_Subchunk1.id, "fmt ", 4 ) )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "\n    " );
-		}
-
-		printf( "ERROR: Unsupported WAV format.\n" );
-
-		fclose( fp );
-		return false;
-	}
-
-
-    if ( (WAV_Subchunk1.chan != 2) || (WAV_Subchunk1.freq != 44100) ||
-		(WAV_Subchunk1.bps != 16) )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "\n    " );
-		}
-
-		printf( "ERROR: Only 44.1KHz, 16-bit Stereo WAV files are supported.\n" );
-
-		fclose( fp );
-		return false;
-    }
-
-
-	// Search for the data chunk
-	struct
-	{
-		char	id[4];
-		int		len;
-	} Subchunk2;
-
-	while ( 1 )
-	{
-		fread( &Subchunk2, 1, sizeof(Subchunk2), fp );
-
-		if ( memcmp( &Subchunk2.id, "data", 4 ) )
-		{
-			fseek( fp, Subchunk2.len, SEEK_CUR );
-		}
-		else
-		{
-			break;
-		}
-	}
-
-    waveLen = Subchunk2.len;
-
-	while ( waveLen > 0 )
-	{
-		memset(buff, 0x00, CD_SECTOR_SIZE);
-
-        int readLen = waveLen;
-
-        if (readLen > 2352)
-		{
-			readLen = 2352;
-		}
-
-		fread( buff, 1, readLen, fp );
-
-        writer->WriteBytesRaw( buff, 2352 );
-
-        waveLen -= readLen;
-	}
-
-	fclose( fp );
-
-	return true;
-}
+}	
 
 int GetSize(const char* fileName)
 {
