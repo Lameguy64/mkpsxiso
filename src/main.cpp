@@ -1169,84 +1169,143 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 	return true;
 }
 
-bool stdio_getFileSize(FILE *fp, long& readFileSize)
-{
-	if(fseek(fp, 0, SEEK_END) != 0)
-	{
-		printf("\n    ERROR: fseek failed\n");
-		return false;
-	} 
-	readFileSize = ftell(fp);
-	if(readFileSize < 0)
-	{
-		printf("\n    ERROR: ftell failed\n");
-		return false;
-	}
-	if(fseek(fp, 0, SEEK_SET) != 0)
-	{
-		printf("\n    ERROR: fseek failed\n");
-		return false;
-	}
-	return true;
-}
+typedef enum {
+	DAF_WAV,
+	DAF_FLAC,
+	DAF_MP3,
+	DAF_PCM
+} DecoderAudioFormats;
 
 bool PackFileAsCDDA(cd::IsoWriter* writer, const char* audioFile)
 {
-	unsigned char buff[CD_SECTOR_SIZE];
-    ma_decoder decoder;
 	// open the decoder
+    ma_decoder decoder;	
 	ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_s16, 2, 44100);	
 	bool isLossy = false;
-	do {
-		// WAV
-		decoderConfig.encodingFormat = ma_encoding_format_wav;
-		if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder)) break;
-
-		// FLAC
-		decoderConfig.encodingFormat = ma_encoding_format_flac;
-		if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder)) break;
-
-		// MP3
-		decoderConfig.encodingFormat = ma_encoding_format_mp3;
-		if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder))
+	bool isPCM = false;
+	long pcmBytesLeft;
+	FILE *pcmFp;
+	// determine which format to try based on file extension
+    DecoderAudioFormats tryorder[4] = {DAF_WAV, DAF_FLAC, DAF_MP3, DAF_PCM};
+	const size_t pathLen = strlen(audioFile);
+	if(pathLen >= 3)
+	{
+		//nothing to change if wav
+		if((pathLen >= 4) && (strcasecmp(&audioFile[pathLen-4], "flac") == 0))
 		{
-			isLossy = true;
-			break;
+			tryorder[0] = DAF_FLAC;
+			tryorder[1] = DAF_WAV;
 		}
-
-		// PCM
-        printf("\n    WARN: Unknown audio format, assuming it's just signed 16 bit stereo @ 44100 kHz pcm audio\n");
-		FILE *fp;
-		if ( !( fp = fopen( audioFile, "rb" ) ) )
-	    {
-	    	printf("\n    ERROR: File not found.\n");
-	    	return false;
-	    }
-		long bytesLeft;
-		if(!stdio_getFileSize(fp, bytesLeft))
+		else if(strcasecmp(&audioFile[pathLen-3], "mp3") == 0)
 		{
-			fclose(fp);
-			return false;
+			tryorder[0] = DAF_MP3;
+			tryorder[1] = DAF_WAV;
+			tryorder[2] = DAF_FLAC;
 		}
-		
+		else if((strcasecmp(&audioFile[pathLen-3], "pcm") == 0) || (strcasecmp(&audioFile[pathLen-3], "raw") == 0))
+		{
+			tryorder[0] = DAF_PCM;
+			tryorder[1] = DAF_WAV;
+			tryorder[2] = DAF_FLAC;
+			tryorder[3] = DAF_MP3;
+		}
+	}
+    const int num_tries = (sizeof(tryorder)/sizeof(tryorder[0]));
+	int i;
+	for(i = 0; i < num_tries; i++)
+	{
+		if(tryorder[i] == DAF_WAV)
+		{
+	        decoderConfig.encodingFormat = ma_encoding_format_wav;
+	        if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder)) break;				
+		}
+        else if(tryorder[i] == DAF_FLAC)
+		{
+	        decoderConfig.encodingFormat = ma_encoding_format_flac;
+	        if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder)) break;
+		}
+		else if(tryorder[i] == DAF_MP3)
+		{
+	        decoderConfig.encodingFormat = ma_encoding_format_mp3;
+	        if(MA_SUCCESS == ma_decoder_init_file(audioFile, &decoderConfig, &decoder))
+	        {
+	        	isLossy = true;
+	        	break;
+	        }
+		}
+		else if(tryorder[i] == DAF_PCM)
+		{
+			printf("\n    WARN: Guessing it's just signed 16 bit stereo @ 44100 kHz pcm audio\n");		
+	        if((pcmFp = fopen( audioFile, "rb" )) != NULL)
+	        {
+	        	do {
+	        	    if(fseek(pcmFp, 0, SEEK_END) != 0)
+	                {
+	                	printf("    ERROR: (PCM) fseek failed\n");
+	                	break;
+	                } 
+	                pcmBytesLeft = ftell(pcmFp);    
+	                if(pcmBytesLeft < 0)
+	                {
+	                	printf("    ERROR: (PCM) ftell failed\n");
+	                	break;
+	                }
+	        		if(pcmBytesLeft == 0)
+	        		{
+	        			printf("    ERROR: (PCM) byte count is 0\n");
+	        			break;
+	        		}
+	        		// 2 channels of 16 bit samples
+	        		if((pcmBytesLeft % (2 * sizeof(int16_t))) != 0)
+	        		{
+	        			printf("    ERROR: (PCM) byte count indicates non-integer sample count\n");
+	        			break;
+	        		}
+	                if(fseek(pcmFp, 0, SEEK_SET) != 0)
+	                {
+	                	printf("    ERROR: (PCM) fseek failed\n");
+	                	break;
+	                }
+                    isPCM = true;
+	        	} while(0);
+	        	if(isPCM) break;
+	            fclose(pcmFp);
+	        }
+	        else
+	        {
+	        	printf("    ERROR: (PCM) fopen failed\n");
+	        }
+		}
+	}
+	if(i == num_tries)
+	{
+		// no more formats to try, return false
+	    printf("    ERROR: No valid format found\n");
+	    return false;	
+	}
+
+    // if it's stereo s16lepcm just copy the data sector by sector
+	if(isPCM)
+	{
+		unsigned char buff[CD_SECTOR_SIZE];
 		for(;;) {
 			memset(buff, 0x00, CD_SECTOR_SIZE);
-			size_t nowRead = fread( buff, 1, CD_SECTOR_SIZE, fp );
+			size_t nowRead = fread( buff, 1, CD_SECTOR_SIZE, pcmFp );
 			writer->WriteBytesRaw( buff, CD_SECTOR_SIZE);
-			if(bytesLeft == nowRead)
+			if(pcmBytesLeft == nowRead)
 			{
-				fclose(fp);
+				fclose(pcmFp);
 				return true;
 			}
 			else if(nowRead != CD_SECTOR_SIZE)
 			{
-				fclose(fp);				
+				fclose(pcmFp);				
 				printf("\n    ERROR: fread didn't read CD_SECTOR_SIZE\n");
 				return false;
 			}
-			bytesLeft -= nowRead;
-		};				
-	} while(0);
+			pcmBytesLeft -= nowRead;
+		};	
+	}
 
     //  note if there's some data converting going on
     ma_format internalFormat;
@@ -1262,16 +1321,34 @@ bool PackFileAsCDDA(cd::IsoWriter* writer, const char* audioFile)
 	{
 		printf("\n    WARN: This is not Redbook audio, converting.\n    ");			
 	}
+
+	// get expected pcm frame count (if your file isn't redbook this can vary from the input file's amount)
+	// unfortunately it needs to decode the whole file to determine this for mp3
+	const ma_uint64 expectedPCMFrames = ma_decoder_get_length_in_pcm_frames(&decoder);
+    if(expectedPCMFrames == 0)
+	{
+		printf("\n    ERROR: corrupt file? unable to get_length_in_pcm_frames\n");
+		ma_decoder_uninit(&decoder);
+        return false;
+	}
 	
 	// read a sector and write a sector until done
 	const ma_uint64 framesToRead = (CD_SECTOR_SIZE/(2 * sizeof(int16_t))); // 2 channels 2 bytes per single channel sample (588 intrachannel pcm frames)
 	ma_uint64 framesRead;
+	ma_uint64 totalFramesProcessed = 0;
+	unsigned char buff[CD_SECTOR_SIZE];
 	do {
 		memset(buff, 0x00, CD_SECTOR_SIZE);
 		framesRead = ma_decoder_read_pcm_frames(&decoder, &buff, framesToRead);
 		writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
+		totalFramesProcessed += framesRead;
 	} while(framesToRead == framesRead);
 	ma_decoder_uninit(&decoder);
+	if(totalFramesProcessed != expectedPCMFrames)
+	{
+		printf("\n    ERROR: corrupt file? (totalFramesProcessed != expectedPCMFrames)\n");
+		return false;
+	}
     return true;   
 }	
 
