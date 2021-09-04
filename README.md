@@ -31,49 +31,39 @@ Older versions (probably going to be removed soon, there's no benefit to using t
 [mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
 
 ## Compiling
-This tool requires tinyxml2 to compile.
-Compile with --std=c++11.
 
-### Windows (make, no Netbeans)
+### Windows/Linux (CMake)
+1. Install CMake and a compiler toolchain (MSVC or MinGW on Windows, `build-essential` on Linux).
+2. Build and install `tinyxml2` (using vcpkg, your distro's package manager or manually from [its repo](https://github.com/leethomason/tinyxml2)).
+3. Run the following commands from the mkpsxiso directory:
+
+```bash
+cmake -S . -B build/ -DCMAKE_BUILD_TYPE=Release
+cmake --build build/
+cmake --install build/
+```
+
+**NOTE**: Add `sudo` to the install command if necessary. If you are using vcpkg, add `-DCMAKE_TOOLCHAIN_FILE` to the first command as explained [here](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
+
+The default installation path is `C:\Program Files\mkpsxiso` on Windows or `/usr/local/bin` on Linux. You can change it by passing `--install-prefix` to the first command.
+
+### Windows (MinGW with make, no Netbeans)
 1. Install your preferred MinGW GCC compiler.
 2. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
 3. Make sure the tinyxml2 library is named libtinyxml2.a.
 4. Run "mingw32-make CONF=Release" in the mkpsxiso directory.
 5. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
 
-### Windows (Netbeans)
+### Windows (MinGW with Netbeans)
 1. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
 2. Open the mkpsxiso directory as a project within the Netbeans IDE.
 3. Select Release build and press F6 to compile.
 4. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
 
-### Windows (CMake)
-1. Install cygwin64 with the following:
-  * make
-  * cmake
-  * gcc
-  * tinyxml2
-2. Open the cygwin64 terminal.
-3. Navigate to the download of this repo.
-4. Run "cmake ." to generate the make file.
-5. Run "make" to compile the program.
-6. The result will be in bin_win, named "mkpsxiso.exe"
-  
-### Linux (Ubuntu/CMake)
-1. Install the following:
-  * Build Essentials (gcc, g++, make)
-  * cmake
-  * tinyxml2
-2. Open a terminal.
-3. Navigate to the download of this repo.
-4. Run "cmake ." to generate the make file.
-5. Run "make" to compile the program.
-6. The result will be in bin_nix, named "mkpsxiso"
-
 ## Issues
 
 The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
-```
+```xml
 <dir name="dira">
     <dir name="subdir1a">
         <dir name="subdiraa"/>

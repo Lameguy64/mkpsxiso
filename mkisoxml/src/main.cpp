@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <unistd.h>
 #include <string.h>
 #include <tinyxml2.h>
-
-
-#define VERSION "0.40"
 
 
 int ParseDir(tinyxml2::XMLElement *dirElement, tinyxml2::XMLDocument *xmldoc) {

@@ -5,8 +5,6 @@
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 
-#define VERSION "1.26"
-
 
 namespace global
 {
