@@ -1739,7 +1739,8 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 		cd::IsoWriter::EdcEccForm1 );
 
 	// Generate and write L-path table
-	unsigned char sectorBuff[2048*pathTableSectors];
+	//unsigned char sectorBuff[2048*pathTableSectors];
+	unsigned char *sectorBuff = new unsigned char[2048*pathTableSectors];
 	memset( sectorBuff, 0x00, 2048*pathTableSectors );
 
 	dirTree->GeneratePathTable( sectorBuff, false );
