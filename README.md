@@ -34,20 +34,7 @@ Older versions (probably going to be removed soon, there's no benefit to using t
 This tool requires tinyxml2 to compile.
 Compile with --std=c++11.
 
-### Windows (make, no Netbeans)
-1. Install your preferred MinGW GCC compiler.
-2. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
-3. Make sure the tinyxml2 library is named libtinyxml2.a.
-4. Run "mingw32-make CONF=Release" in the mkpsxiso directory.
-5. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
-
-### Windows (Netbeans)
-1. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
-2. Open the mkpsxiso directory as a project within the Netbeans IDE.
-3. Select Release build and press F6 to compile.
-4. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
-
-### Windows (CMake)
+### Windows (Cygwin64)
 1. Install cygwin64 with the following:
   * make
   * cmake
@@ -59,7 +46,19 @@ Compile with --std=c++11.
 5. Run "make" to compile the program.
 6. The result will be in bin_win, named "mkpsxiso.exe"
   
-### Linux (Ubuntu/CMake)
+### Windows (MSys64)
+1. If MSys64 is preferred, install the following packages:
+  * cmake
+  * make
+  * mingw-w64-x86_64-gcc
+  * mingw-w64-x86_64-tinyxml2
+2. Navigate to the cloned repository directory.
+3. Run "cmake ." to generate makefile.
+4. Run "make" to compile the program.
+5. The result might be in bin_win named "mkpsxiso.exe"
+   Note: It seems libstdc++ isn't being included in the link process, throwing a lot of undefined reference errors on link.
+
+### Linux (Ubuntu)
 1. Install the following:
   * Build Essentials (gcc, g++, make)
   * cmake
