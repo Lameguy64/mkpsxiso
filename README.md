@@ -20,21 +20,23 @@ Another notable difference of MKPSXISO is that it injects the Sony license data 
 The latest Win32 binaries is now a release download in this repository.
 
 Older versions (probably going to be removed soon, there's no benefit to using these versions anyway):
-[mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
-[mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
-[mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
-[mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
-[mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
-[mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
-[mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
-[mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
-[mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
+* [mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
+* [mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
+* [mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
+* [mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
+* [mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
+* [mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
+* [mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
+* [mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
+* [mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
 
 ## Compiling
 
-### Windows/Linux (CMake)
-1. Install CMake and a compiler toolchain (MSVC or MinGW on Windows, `build-essential` on Linux).
-2. Build and install `tinyxml2` (using vcpkg, your distro's package manager or manually from [its repo](https://github.com/leethomason/tinyxml2)).
+1. Set up CMake and a compiler toolchain. Install the `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
+   * MSVC with vcpkg (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
+   * MSys64 with the following packages: `make`, `cmake`, `mingw-w64-x86_64-gcc`, `mingw-w64-x86_64-tinyxml2`
+   * Cygwin64 with the following packages: `make`, `cmake`, `gcc`, `tinyxml2`
+2. Install `tinyxml2` using vcpkg, your distro's package manager or build it manually from [its repo](https://github.com/leethomason/tinyxml2).
 3. Run the following commands from the mkpsxiso directory:
 
 ```bash
@@ -45,20 +47,7 @@ cmake --install build/
 
 **NOTE**: Add `sudo` to the install command if necessary. If you are using vcpkg, add `-DCMAKE_TOOLCHAIN_FILE` to the first command as explained [here](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
 
-The default installation path is `C:\Program Files\mkpsxiso` on Windows or `/usr/local/bin` on Linux. You can change it by passing `--install-prefix` to the first command.
-
-### Windows (MinGW with make, no Netbeans)
-1. Install your preferred MinGW GCC compiler.
-2. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
-3. Make sure the tinyxml2 library is named libtinyxml2.a.
-4. Run "mingw32-make CONF=Release" in the mkpsxiso directory.
-5. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
-
-### Windows (MinGW with Netbeans)
-1. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
-2. Open the mkpsxiso directory as a project within the Netbeans IDE.
-3. Select Release build and press F6 to compile.
-4. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
+The default installation path is `C:\Program Files\mkpsxiso\bin` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 
 ## Issues
 
