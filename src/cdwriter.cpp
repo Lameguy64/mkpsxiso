@@ -19,6 +19,7 @@ void cd::SwapBytes(void *var, int size) {
 		((unsigned char*)var)[i] = temp[(size-1)-i];
 	}
 
+	delete[] temp;
 }
 
 void cd::SetPair16(cd::ISO_USHORT_PAIR* pair, unsigned short val) {
