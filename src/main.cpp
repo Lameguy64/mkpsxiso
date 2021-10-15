@@ -1,11 +1,14 @@
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 #include <stdio.h>
 #include <tinyxml2.h>
-#include <unistd.h>
 #include <string>
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
-
-#define VERSION "1.26"
 
 
 namespace global

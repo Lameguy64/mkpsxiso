@@ -20,59 +20,39 @@ Another notable difference of MKPSXISO is that it injects the Sony license data 
 The latest Win32 binaries is now a release download in this repository.
 
 Older versions (probably going to be removed soon, there's no benefit to using these versions anyway):
-[mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
-[mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
-[mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
-[mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
-[mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
-[mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
-[mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
-[mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
-[mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
+* [mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
+* [mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
+* [mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
+* [mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
+* [mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
+* [mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
+* [mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
+* [mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
+* [mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
 
 ## Compiling
-This tool requires tinyxml2 to compile.
-Compile with --std=c++11.
 
-### Windows (Cygwin64)
-1. Install cygwin64 with the following:
-  * make
-  * cmake
-  * gcc
-  * tinyxml2
-2. Open the cygwin64 terminal.
-3. Navigate to the download of this repo.
-4. Run "cmake ." to generate the make file.
-5. Run "make" to compile the program.
-6. The result will be in bin_win, named "mkpsxiso.exe"
-  
-### Windows (MSys64)
-1. If MSys64 is preferred, install the following packages:
-  * cmake
-  * make
-  * mingw-w64-x86_64-gcc
-  * mingw-w64-x86_64-tinyxml2
-2. Navigate to the cloned repository directory.
-3. Run "cmake ." to generate makefile.
-4. Run "make" to compile the program.
-5. The result might be in bin_win named "mkpsxiso.exe"
-   Note: It seems libstdc++ isn't being included in the link process, throwing a lot of undefined reference errors on link.
+1. Set up CMake and a compiler toolchain. Install the `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
+   * MSVC with vcpkg (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
+   * MSys64 with the following packages: `make`, `cmake`, `mingw-w64-x86_64-gcc`, `mingw-w64-x86_64-tinyxml2`
+   * Cygwin64 with the following packages: `make`, `cmake`, `gcc`, `tinyxml2`
+2. Install `tinyxml2` using vcpkg, your distro's package manager or build it manually from [its repo](https://github.com/leethomason/tinyxml2).
+3. Run the following commands from the mkpsxiso directory:
 
-### Linux (Ubuntu)
-1. Install the following:
-  * Build Essentials (gcc, g++, make)
-  * cmake
-  * tinyxml2
-2. Open a terminal.
-3. Navigate to the download of this repo.
-4. Run "cmake ." to generate the make file.
-5. Run "make" to compile the program.
-6. The result will be in bin_nix, named "mkpsxiso"
+```bash
+cmake -S . -B build/ -DCMAKE_BUILD_TYPE=Release
+cmake --build build/
+cmake --install build/
+```
+
+**NOTE**: Add `sudo` to the install command if necessary. If you are using vcpkg, add `-DCMAKE_TOOLCHAIN_FILE` to the first command as explained [here](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
+
+The default installation path is `C:\Program Files\mkpsxiso\bin` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 
 ## Issues
 
 The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
-```
+```xml
 <dir name="dira">
     <dir name="subdir1a">
         <dir name="subdiraa"/>

@@ -1,4 +1,9 @@
+#ifdef WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
+
 #include <string.h>
 #include "cdwriter.h"
 #include "edcecc.h"
@@ -6,13 +11,15 @@
 
 void cd::SwapBytes(void *var, int size) {
 
-	unsigned char temp[size];
+	//unsigned char temp[size];
+	unsigned char *temp = new unsigned char[size];
 
 	memcpy(temp, var, size);
 	for(short i=0; i<size; i++) {
 		((unsigned char*)var)[i] = temp[(size-1)-i];
 	}
 
+	delete[] temp;
 }
 
 void cd::SetPair16(cd::ISO_USHORT_PAIR* pair, unsigned short val) {

@@ -1,8 +1,13 @@
 #ifndef _ISO_H
 #define _ISO_H
 
-#include <sys/stat.h>
+#ifdef WIN32
+#include <windows.h>
+#else
 #include <sys/time.h>
+#endif
+
+#include <sys/stat.h>
 #include <time.h>
 #include <stdlib.h>
 #include <tinyxml2.h>
