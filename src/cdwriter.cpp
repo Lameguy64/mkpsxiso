@@ -91,7 +91,7 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 		// Encode ECC data
 		unsigned char tempAddr[4];
 
-		for(int i=0; i<4; i++) {
+		for(int i=0; i<3; i++) {
 
 			tempAddr[i] = cd::IsoWriter::sectorM2F1->addr[i];
 			cd::IsoWriter::sectorM2F1->addr[i] = 0x00;
@@ -103,7 +103,7 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 		// Compute ECC Q code
 		edcEccGen.ComputeEccBlock(cd::IsoWriter::sectorBuff+0xC, 52, 43, 86, 88, cd::IsoWriter::sectorBuff+0x8C8);
 
-		for(int i=0; i<4; i++) {
+		for(int i=0; i<3; i++) {
 
 			cd::IsoWriter::sectorM2F1->addr[i] = tempAddr[i];
 

@@ -86,6 +86,10 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
+**Version 1.27**
+* Fixed stringop overflow bug when temporarily clearing sector address bytes.
+* Path is now stripped for the .bin file specification of cue sheets.
+
 **Version 1.25 (12/30/2020)**
 * Replaced xa and str modes with "mixed" mode (see example.xml for details). xa and str modes are now just aliases to the new "mixed" mode, for backwards compatibility.
 
