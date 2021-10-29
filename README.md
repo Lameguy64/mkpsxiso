@@ -33,19 +33,25 @@ Older versions (probably going to be removed soon, there's no benefit to using t
 ## Compiling
 
 1. Set up CMake and a compiler toolchain. Install the `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
-   * MSVC with vcpkg (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
-   * MSys64 with the following packages: `make`, `cmake`, `mingw-w64-x86_64-gcc`, `mingw-w64-x86_64-tinyxml2`
-   * Cygwin64 with the following packages: `make`, `cmake`, `gcc`, `tinyxml2`
-2. Install `tinyxml2` using vcpkg, your distro's package manager or build it manually from [its repo](https://github.com/leethomason/tinyxml2).
-3. Run the following commands from the mkpsxiso directory:
+   * MSVC (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
+   * MSys64 (use the "MinGW 64-bit" shell) with the following packages: `git`, `mingw-w64-x86_64-make`, `mingw-w64-x86_64-cmake`, `mingw-w64-x86_64-gcc`
+   * Cygwin64 with the following packages: `git`, `make`, `cmake`, `gcc`
 
-```bash
-cmake -S . -B build/ -DCMAKE_BUILD_TYPE=Release
-cmake --build build/
-cmake --install build/
-```
+2. Clone/download the repo, then run the following command from the mkpsxiso directory to ensure `tinyxml2` is also downloaded:
 
-**NOTE**: Add `sudo` to the install command if necessary. If you are using vcpkg, add `-DCMAKE_TOOLCHAIN_FILE` to the first command as explained [here](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
+   ```bash
+   git submodule update --init
+   ```
+
+3. Run the following commands:
+
+   ```bash
+   cmake -S . -B ./build -DCMAKE_BUILD_TYPE=Release
+   cmake --build ./build
+   cmake --install ./build
+   ```
+
+   Add `sudo` to the install command if necessary.
 
 The default installation path is `C:\Program Files\mkpsxiso\bin` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 
