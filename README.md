@@ -1,4 +1,6 @@
+
 # MKPSXISO
+
 MKPSXISO is basically a modern clone of BUILDCD used for building CD images of PlayStation games in the official development tools. The problem with BUILDCD however is, apart from licensing issues, its an old 16-bit DOS program which will not work natively under 64-bit versions of Windows without a DOS emulator which not only makes automated build scripts that produce ISO images messy in homebrew development but it also slows ISO creation speed considerably. BUILDCD also only produces CD images in a special image format supported by early CD burners and must be converted to an ISO format with a separate tool making the already slow ISO creation process even slower.
 
 While other ISO creation tools such as MKISOFS may work as an alternative most do not let you control the order of the files stored in the ISO image which is essential for optimizing file order to speed up access times and all do not support mixed-mode type files for CD streaming such as XA audio and MDEC video streams. MKPSXISO is made specifically to replace BUILDCD to aid in PlayStation homebrew development on modern systems as well as modification/hacking of existing PlayStation titles. MKPSXISO can also be used as a regular ISO creation tool that complies with the older ISO9660 standard with no Joliet extensions.
@@ -8,6 +10,7 @@ MKPSXISO more or less replicates most of the functionality of BUILDCD but better
 Another notable difference of MKPSXISO is that it injects the Sony license data correctly into the disc image which eliminates the need of having to use a separate program for properly licensing the ISO image. However, the license data is not included so one must have a copy of the official PlayStation Programmer's Tool SDK or the PsyQ SDK (both of which can be found in www.psxdev.net) for the license files to be able to take advantage of this feature. This is to avoid possible legal problems when including Sony's license data into open source programs.
 
 ## Features
+
 * Uses XML for scripting ISO projects.
 * Outputs ISO images directly to iso or bin+cue image format.
 * Injects license data into ISO image correctly.
@@ -17,9 +20,11 @@ Another notable difference of MKPSXISO is that it injects the Sony license data 
 * Can output log of all files packed with details such as LBA, size and timecode offset.
 
 ## Binary Download
+
 The latest Win32 binaries is now a release download in this repository.
 
 Older versions (probably going to be removed soon, there's no benefit to using these versions anyway):
+
 * [mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
 * [mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
 * [mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
@@ -34,13 +39,13 @@ Older versions (probably going to be removed soon, there's no benefit to using t
 
 1. Set up CMake and a compiler toolchain. Install the `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
    * MSVC (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
-   * MSys64 (use the "MinGW 64-bit" shell) with the following packages: `git`, `mingw-w64-x86_64-make`, `mingw-w64-x86_64-cmake`, `mingw-w64-x86_64-gcc`
+   * MSys2 (use the "MinGW 64-bit" shell) with the following packages: `git`, `mingw-w64-x86_64-make`, `mingw-w64-x86_64-cmake`, `mingw-w64-x86_64-g++`
    * Cygwin64 with the following packages: `git`, `make`, `cmake`, `gcc`
 
-2. Clone/download the repo, then run the following command from the mkpsxiso directory to ensure `tinyxml2` is also downloaded:
+2. Clone/download the repo, then run the following command from the mkpsxiso directory to ensure `tinyxml2` is also downloaded and updated:
 
    ```bash
-   git submodule update --init
+   git submodule update --init --recursive --remote
    ```
 
 3. Run the following commands:
@@ -58,6 +63,7 @@ The default installation path is `C:\Program Files\mkpsxiso\bin` on Windows or `
 ## Issues
 
 The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
+
 ```xml
 <dir name="dira">
     <dir name="subdir1a">
@@ -95,6 +101,7 @@ This can be avoided by minimizing identically named directories but its best to 
 **Version 1.27**
 * Fixed stringop overflow bug when temporarily clearing sector address bytes.
 * Path is now stripped for the .bin file specification of cue sheets.
+* Added tinyxml2 as a submodule, so manual installation is no longer needed and built binaries will always be statically linked.
 
 **Version 1.25 (12/30/2020)**
 * Replaced xa and str modes with "mixed" mode (see example.xml for details). xa and str modes are now just aliases to the new "mixed" mode, for backwards compatibility.

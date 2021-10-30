@@ -2,7 +2,6 @@
 # (C) 2021 spicyjpeg
 
 cmake_minimum_required(VERSION 3.21)
-#include(FindPkgConfig)
 
 project(
 	mkpsxiso
@@ -18,8 +17,8 @@ set(CMAKE_CXX_STANDARD         11)
 
 ## External dependencies
 
-if(NOT EXISTS tinyxml2/tinyxml2.cpp)
-	message(FATAL_ERROR "The tinyxml2 directory is empty. Run 'git submodule update --init' to populate it.")
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/tinyxml2/tinyxml2.cpp)
+	message(FATAL_ERROR "The tinyxml2 directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
 # Build tinyxml2. I didn't bother with tinyxml2's actual CMake integration
@@ -52,3 +51,5 @@ install(
 	#PRE_EXCLUDE_REGEXES ".*"
 	#PRE_INCLUDE_REGEXES "tinyxml2"
 )
+
+include(InstallRequiredSystemLibraries)
