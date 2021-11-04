@@ -90,7 +90,7 @@ namespace cd {
 		unsigned char	hour;		/// hour, in the range from 0 to 23
 		unsigned char	minute;		/// minute, in the range from 0 to 59
 		unsigned char	second;		/// Second, in the range from 0 to 59
-		unsigned char	GMToffs;	/// Greenwich Mean Time offset
+		signed char		GMToffs;	/// Greenwich Mean Time offset, in 15 minute intervals
 	} ISO_DATESTAMP;
 
 	/// Structure of an ISO path table entry (specifically for the cd::IsoReader class)

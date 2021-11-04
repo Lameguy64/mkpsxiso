@@ -14,6 +14,8 @@
 #include "cd.h"
 #include "cdreader.h"
 
+#include <time.h>
+
 #if defined(_WIN32)
     #include <direct.h>
 #else
@@ -114,6 +116,43 @@ void ReadLicense(cd::IsoReader& reader, cd::ISO_LICENSE* license) {
 	reader.ReadBytesXA(license->data, 28032);
 }
 
+#if defined(_WIN32)
+static FILETIME TimetToFileTime(time_t t)
+{
+	FILETIME ft;
+    LARGE_INTEGER ll;
+	ll.QuadPart = t * 10000000ll + 116444736000000000ll;
+    ft.dwLowDateTime = ll.LowPart;
+    ft.dwHighDateTime = ll.HighPart;
+	return ft;
+}
+#endif
+
+void UpdateTimestamps(const std::string& path, const cd::ISO_DATESTAMP* entryDate)
+{
+// utime can't update timestamps of directories, so a platform-specific approach is needed
+#if defined(_WIN32)
+	HANDLE file = CreateFileA(path.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	if (file != INVALID_HANDLE_VALUE)
+	{
+		tm timeBuf {};
+		timeBuf.tm_year = entryDate->year;
+		timeBuf.tm_mon = entryDate->month - 1;
+		timeBuf.tm_mday = entryDate->day;
+		timeBuf.tm_hour = entryDate->hour;
+		timeBuf.tm_min = entryDate->minute - (15 * entryDate->GMToffs);
+		timeBuf.tm_sec = entryDate->second;
+
+		const FILETIME ft = TimetToFileTime(_mkgmtime(&timeBuf));
+		SetFileTime(file, &ft, nullptr, &ft);
+
+		CloseHandle(file);
+	}
+#else
+	// TODO: Do
+#endif
+}
+
 void SaveLicense(cd::ISO_LICENSE& license) {
     std::string outputPath = param::outPath;
 
@@ -133,13 +172,21 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
     cd::IsoDirEntries dirEntries;
     tinyxml2::XMLElement* newelement = NULL;
-    std::string outputPath;
     FILE *outFile;
 
     int entriesFound = dirEntries.ReadDirEntries(&reader, offs, sectors);
     dirEntries.SortByLBA();
 
     for(int e=2; e<entriesFound; e++) {
+
+		std::string outputPath = global::isoPath;
+
+		if (!outputPath.empty()) {
+			outputPath.erase(0, 1);
+			outputPath += "/";
+		}
+
+		outputPath = param::outPath + outputPath + CleanIdentifier(dirEntries.dirEntryList[e].identifier);
 
         if (dirEntries.dirEntryList[e].flags & 0x2) {
 
@@ -160,18 +207,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
         } else {
 
-			outputPath = global::isoPath;
-
-			if (!outputPath.empty()) {
-				outputPath.erase(0, 1);
-				outputPath += "/";
-			}
-
-			outputPath = outputPath + CleanIdentifier(dirEntries.dirEntryList[e].identifier);
-
 			printf("   Extracting %s...\n", dirEntries.dirEntryList[e].identifier);
-
-			outputPath = param::outPath + outputPath;
 
 			printf("%s\n",outputPath.c_str());
 
@@ -359,6 +395,8 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				element->InsertEndChild(newelement);
 
         }
+
+		UpdateTimestamps(outputPath, &dirEntries.dirEntryList[e].entryDate);
     }
 }
 
