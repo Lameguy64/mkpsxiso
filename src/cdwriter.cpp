@@ -104,6 +104,14 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 
 }
 
+size_t cd::IsoWriter::WriteSectorToDisc()
+{
+	const size_t bytesRead = fwrite(sectorBuff, CD_SECTOR_SIZE, 1, filePtr);
+	currentByte = 0;
+	memset(sectorBuff, 0, CD_SECTOR_SIZE);
+	return bytesRead;
+}
+
 bool cd::IsoWriter::Create(const char* fileName) {
 
 	cd::IsoWriter::filePtr	= fopen(fileName, "wb");
@@ -130,8 +138,7 @@ int cd::IsoWriter::SeekToSector(int sector) {
 	if (cd::IsoWriter::currentByte) {
 
 		cd::IsoWriter::PrepSector(cd::IsoWriter::lastSectorType);
-		fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr);
-
+		WriteSectorToDisc();
 	}
 
 	fseek(cd::IsoWriter::filePtr, CD_SECTOR_SIZE*sector, SEEK_SET);
@@ -151,8 +158,7 @@ int cd::IsoWriter::SeekToEnd() {
 	if (cd::IsoWriter::currentByte) {
 
 		cd::IsoWriter::PrepSector(cd::IsoWriter::lastSectorType);
-		fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr);
-
+		WriteSectorToDisc();
 	}
 
 	fseek(cd::IsoWriter::filePtr, 0, SEEK_END);
@@ -198,7 +204,7 @@ size_t cd::IsoWriter::WriteBytes(void* data, size_t bytes, int edcEccEncode) {
 
 			cd::IsoWriter::PrepSector(edcEccEncode);
 
-            if (fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr) == 0) {
+            if (WriteSectorToDisc() == 0) {
 
 				cd::IsoWriter::currentByte = 0;
 				return(writeBytes);
@@ -248,7 +254,7 @@ size_t cd::IsoWriter::WriteBytesXA(void* data, size_t bytes, int edcEccEncode) {
 
 			cd::IsoWriter::PrepSector(edcEccEncode);
 
-            if (fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr) == 0) {
+            if (WriteSectorToDisc() == 0) {
 
 				cd::IsoWriter::currentByte = 0;
 				return(writeBytes);
@@ -296,7 +302,7 @@ size_t cd::IsoWriter::WriteBytesRaw(void* data, size_t bytes) {
 
 		if (cd::IsoWriter::currentByte >= 2352) {
 
-            if (fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr) == 0) {
+            if (WriteSectorToDisc() == 0) {
 
 				cd::IsoWriter::currentByte = 0;
 				return(writeBytes);
@@ -345,7 +351,7 @@ void cd::IsoWriter::Close() {
 
 		if (cd::IsoWriter::currentByte > 0) {
 			cd::IsoWriter::PrepSector(cd::IsoWriter::lastSectorType);
-			fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr);
+			WriteSectorToDisc();
 		}
 
 		fclose(cd::IsoWriter::filePtr);

@@ -1574,8 +1574,7 @@ void iso::WriteLicenseData(cd::IsoWriter* writer, void* data)
 
 	for( int i=0; i<4; i++ ) {
 
-		writer->WriteBytes( blank, 2048, cd::IsoWriter::EdcEccForm1 );
-
+		writer->WriteBytes( blank, 2048, cd::IsoWriter::EdcEccForm2 );
 	}
 
 	writer->SetSubheader(0x00080000);

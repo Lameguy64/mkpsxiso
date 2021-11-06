@@ -22,6 +22,7 @@ class IsoWriter {
 		int				lastSectorType;
 
 		void			PrepSector(int edcEccMode);
+		size_t			WriteSectorToDisc();
 
 	public:
 
