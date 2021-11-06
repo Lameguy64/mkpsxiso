@@ -1002,12 +1002,13 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 
 				writer->SetSubheader( cd::IsoWriter::SubData );
 
-				while( !feof( fp ) )
+				size_t totalBytesRead = 0;
+				while( totalBytesRead < entries[i].length )
 				{
 					memset( buff, 0x00, 2048 );
-					fread( buff, 1, 2048, fp );
+					totalBytesRead += fread( buff, 1, 2048, fp );
 
-					if ( feof( fp ) )
+					if ( totalBytesRead >= entries[i].length )
 					{
 						writer->SetSubheader( cd::IsoWriter::SubEOF );
 					}
@@ -1028,9 +1029,12 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 				memset( buff, 0x00, 2048 );
 
 				writer->SetSubheader( cd::IsoWriter::SubData );
-				for ( int c=0; c<(entries[i].length/2048); c++ )
+
+				size_t totalBytesRead = 0;
+				while( totalBytesRead < entries[i].length )
 				{
-					if ( c == ((entries[i].length/2048)-1) )
+					totalBytesRead += 2048;
+					if ( totalBytesRead >= entries[i].length )
 					{
 						writer->SetSubheader( cd::IsoWriter::SubEOF );
 					}
@@ -1145,9 +1149,12 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 				memset( buff, 0x00, 2048 );
 
 				writer->SetSubheader( cd::IsoWriter::SubData );
-				for ( int c=0; c<(entries[i].length/2048); c++ )
+
+				size_t totalBytesRead = 0;
+				while( totalBytesRead < entries[i].length )
 				{
-					if ( c == ((entries[i].length/2048)-1) )
+					totalBytesRead += 2048;
+					if ( totalBytesRead >= entries[i].length )
 					{
 						writer->SetSubheader( cd::IsoWriter::SubEOF );
 					}
