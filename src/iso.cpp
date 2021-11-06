@@ -1564,102 +1564,56 @@ void iso::WriteLicenseData(cd::IsoWriter* writer, void* data)
 	writer->SetSubheader(0x00080000);
 }
 
+template<size_t N>
+static void CopyStringPadWithSpaces(char (&dest)[N], const char* src)
+{
+	auto begin = std::begin(dest);
+	auto end = std::end(dest);
+
+	size_t i = 0;
+	const size_t len = strlen(src);
+	for (; begin != end && i < len; ++begin, ++i)
+	{
+		*begin = std::toupper( src[i] );
+	}
+
+	// Pad the remaining space with spaces
+	std::fill( begin, end, ' ' );
+}
+
 void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	iso::DirTreeClass* dirTree, int imageLen)
 {
-	cd::ISO_DESCRIPTOR	isoDescriptor;
-
-	memset( &isoDescriptor, 0x00, sizeof(cd::ISO_DESCRIPTOR) );
+	cd::ISO_DESCRIPTOR	isoDescriptor {};
 
 	isoDescriptor.header.type = 1;
 	isoDescriptor.header.version = 1;
-	strncpy( (char*)isoDescriptor.header.id, "CD001", 5 );
+	CopyStringPadWithSpaces( isoDescriptor.header.id, "CD001" );
 
 	// Set System identifier
-	memset( isoDescriptor.systemID, 0x20, 32 );
-
-	if ( id.SystemID != nullptr )
-	{
-		for ( int i=0; i<(int)strlen(id.SystemID); i++ )
-		{
-			isoDescriptor.systemID[i] = std::toupper( id.SystemID[i] );
-		}
-	}
+	CopyStringPadWithSpaces( isoDescriptor.systemID, id.SystemID );
 
 	// Set Volume identifier
-	memset( isoDescriptor.volumeID, 0x20, 32 );
-
-	if ( id.VolumeID != nullptr )
-	{
-		for ( int i=0; i<(int)strlen(id.VolumeID); i++ )
-		{
-			isoDescriptor.volumeID[i] = std::toupper( id.VolumeID[i] );
-		}
-	}
+	CopyStringPadWithSpaces( isoDescriptor.volumeID, id.VolumeID );
 
 	// Set Application identifier
-	memset( isoDescriptor.applicationIdentifier, 0x20, 128 );
-
-	if ( id.Application != nullptr )
-	{
-		for ( int i=0; i<(int)strlen(id.Application); i++ )
-		{
-			isoDescriptor.applicationIdentifier[i] =
-				std::toupper( id.Application[i] );
-		}
-	}
+	CopyStringPadWithSpaces( isoDescriptor.applicationIdentifier, id.Application );
 
 	// Volume Set identifier
-	memset( isoDescriptor.volumeSetIdentifier, 0x20, 128 );
-	if ( id.VolumeSet != nullptr )
-	{
-		for(int i=0; i<(int)strlen(id.VolumeSet); i++)
-		{
-			isoDescriptor.volumeSetIdentifier[i] =
-				std::toupper(id.VolumeSet[i]);
-		}
-	}
+	CopyStringPadWithSpaces( isoDescriptor.volumeSetIdentifier, id.VolumeSet );
 
 	// Publisher identifier
-	memset( isoDescriptor.publisherIdentifier, 0x20, 128 );
-	if ( id.Publisher != nullptr )
-	{
-		for ( int i=0; i<(int)strlen(id.Publisher); i++ )
-		{
-			isoDescriptor.publisherIdentifier[i] =
-				std::toupper(id.Publisher[i]);
-		}
-	}
+	CopyStringPadWithSpaces( isoDescriptor.publisherIdentifier, id.Publisher );
 
 	// Data preparer identifier
-	memset( isoDescriptor.dataPreparerIdentifier, 0x20, 128 );
-	strcpy( isoDescriptor.dataPreparerIdentifier, "DISC IMAGE CREATED "
-		"WITH MKPSXISO BY LAMEGUY64 OF MEIDO-TEK PRODUCTIONS "
-		"HTTPS://GITHUB.COM/LAMEGUY64/MKPSXISO" );
-	*strchr( isoDescriptor.dataPreparerIdentifier, 0x00 ) = 0x20;
-	if ( id.DataPreparer != nullptr )
-	{
-		for ( int i=0; i<(int)strlen(id.DataPreparer); i++ )
-		{
-			isoDescriptor.dataPreparerIdentifier[i] =
-				std::toupper( id.DataPreparer[i] );
-		}
-	}
+	CopyStringPadWithSpaces( isoDescriptor.dataPreparerIdentifier, id.DataPreparer );
 
 	// Copyright (file) identifier
-	memset( isoDescriptor.copyrightFileIdentifier, 0x20, 128 );
-	if ( id.Copyright != nullptr )
-	{
-		for ( int i=0; i<(int)strlen(id.Copyright); i++ )
-		{
-			isoDescriptor.copyrightFileIdentifier[i] =
-				std::toupper( id.Copyright[i] );
-		}
-	}
+	CopyStringPadWithSpaces( isoDescriptor.copyrightFileIdentifier, id.Copyright );
 
 	// Unneeded identifiers
-	memset( isoDescriptor.abstractFileIdentifier, 0x20, 37 );
-	memset( isoDescriptor.bibliographicFilelIdentifier, 0x20, 37 );
+	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, "" );
+	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, "" );
 
 	tm* imageTime = localtime( &global::BuildTime );
 

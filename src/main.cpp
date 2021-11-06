@@ -623,61 +623,87 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	tinyxml2::XMLElement* licenseElement =
 		trackElement->FirstChildElement("license");
 
-	// Print out identifiers if present
-	if ( !global::QuietMode )
+	// Set file system identifiers
+	iso::IDENTIFIERS isoIdentifiers {};
+
+	if ( identifierElement != nullptr )
 	{
-		if ( identifierElement != nullptr )
+		isoIdentifiers.SystemID		= identifierElement->Attribute( "system" );
+		isoIdentifiers.VolumeID		= identifierElement->Attribute( "volume" );
+		isoIdentifiers.VolumeSet	= identifierElement->Attribute( "volume_set" );
+		isoIdentifiers.Publisher	= identifierElement->Attribute( "publisher" );
+		isoIdentifiers.Application	= identifierElement->Attribute( "application" );
+		isoIdentifiers.DataPreparer	= identifierElement->Attribute( "data_preparer" );
+		isoIdentifiers.Copyright	= identifierElement->Attribute( "copyright" );
+
+		bool hasSystemID = true;
+		if ( isoIdentifiers.SystemID == nullptr )
 		{
-			printf("    Identifiers:\n");
-			if ( identifierElement->Attribute( "system" ) != nullptr )
-			{
-				printf( "      System       : %s\n",
-					identifierElement->Attribute( "system" ) );
-			}
-			else
-			{
-				printf( "      System       : PLAYSTATION (default)\n" );
-			}
-
-			if ( identifierElement->Attribute( "application" ) != nullptr )
-			{
-				printf( "      Application  : %s\n",
-					identifierElement->Attribute( "application" ) );
-			}
-			else
-			{
-				printf( "      Application  : PLAYSTATION (default)\n" );
-			}
-
-			if ( identifierElement->Attribute( "volume" ) != nullptr )
-			{
-				printf( "      Volume       : %s\n",
-					identifierElement->Attribute( "volume" ) );
-			}
-			if ( identifierElement->Attribute( "volumeset" ) != nullptr )
-			{
-				printf( "      Volume Set   : %s\n",
-					identifierElement->Attribute( "volumeset" ) );
-			}
-			if ( identifierElement->Attribute( "publisher" ) != nullptr )
-			{
-				printf( "      Publisher    : %s\n",
-					identifierElement->Attribute( "publisher" ) );
-			}
-			if ( identifierElement->Attribute( "datapreparer" ) != nullptr )
-			{
-				printf( "      Data Preparer: %s\n",
-					identifierElement->Attribute( "datapreparer" ) );
-			}
-			if ( identifierElement->Attribute( "copyright" ) != nullptr )
-			{
-				printf( "      Copyright    : %s\n",
-					identifierElement->Attribute( "copyright" ) );
-			}
-			printf( "\n" );
-
+			hasSystemID = false;
+			isoIdentifiers.SystemID = "PLAYSTATION";
 		}
 
+		bool hasApplication = true;
+		if ( isoIdentifiers.Application == nullptr )
+		{
+			hasApplication = false;
+			isoIdentifiers.Application = "PLAYSTATION";
+		}
+
+		bool hasCopyright = true;
+		if ( isoIdentifiers.Copyright == nullptr )
+		{
+			hasCopyright = false;
+			isoIdentifiers.Copyright = "COPYLEFTED";
+		}
+
+		bool hasDataPreparer = true;
+		if ( isoIdentifiers.DataPreparer == nullptr )
+		{
+			hasDataPreparer = false;
+			isoIdentifiers.DataPreparer = "DISC IMAGE CREATED "
+				"WITH MKPSXISO BY LAMEGUY64 OF MEIDO-TEK PRODUCTIONS";
+		}
+
+		// Print out identifiers if present
+		if ( !global::QuietMode )
+		{
+			printf("    Identifiers:\n");
+			printf( "      System       : %s%s\n",
+				isoIdentifiers.SystemID,
+				hasSystemID ? "" : " (default)" );
+
+			printf( "      Application  : %s%s\n",
+				isoIdentifiers.Application,
+				hasApplication ? "" : " (default)" );
+
+			if ( isoIdentifiers.VolumeID != nullptr )
+			{
+				printf( "      Volume       : %s\n",
+					isoIdentifiers.VolumeID );
+			}
+			if ( isoIdentifiers.VolumeSet != nullptr )
+			{
+				printf( "      Volume Set   : %s\n",
+					isoIdentifiers.VolumeSet );
+			}
+			if ( isoIdentifiers.Publisher != nullptr )
+			{
+				printf( "      Publisher    : %s\n",
+					isoIdentifiers.Publisher );
+			}
+			if ( hasDataPreparer )
+			{
+				printf( "      Data Preparer: %s\n",
+					isoIdentifiers.DataPreparer );
+			}
+			if ( hasCopyright )
+			{
+				printf( "      Copyright    : %s\n",
+					isoIdentifiers.Copyright );
+			}
+			printf( "\n" );
+		}
 	}
 
 	if ( licenseElement != nullptr )
@@ -889,36 +915,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	// Sort directory entries and write it
 	dirTree.SortDirEntries();
 	dirTree.WriteDirectoryRecords( writer, 0 );
-
-	// Set file system identifiers
-	iso::IDENTIFIERS isoIdentifiers;
-	memset( &isoIdentifiers, 0x00, sizeof(iso::IDENTIFIERS) );
-
-	if ( identifierElement != nullptr )
-	{
-		isoIdentifiers.SystemID		= identifierElement->Attribute( "system" );
-		isoIdentifiers.VolumeID		= identifierElement->Attribute( "volume" );
-		isoIdentifiers.VolumeSet	= identifierElement->Attribute( "volumeset" );
-		isoIdentifiers.Publisher	= identifierElement->Attribute( "publisher" );
-		isoIdentifiers.Application	= identifierElement->Attribute( "application" );
-		isoIdentifiers.DataPreparer	= identifierElement->Attribute( "datapreparer" );
-		isoIdentifiers.Copyright	= identifierElement->Attribute( "copyright" );
-
-		if ( isoIdentifiers.SystemID == nullptr )
-		{
-			isoIdentifiers.SystemID = "PLAYSTATION";
-		}
-
-		if ( isoIdentifiers.Application == nullptr )
-		{
-			isoIdentifiers.Application = "PLAYSTATION";
-		}
-
-		if ( isoIdentifiers.Copyright == nullptr )
-		{
-			isoIdentifiers.Copyright = "COPYLEFTED";
-		}
-	}
 
 	// Write file system descriptors to finish the image
 	iso::WriteDescriptor( writer, isoIdentifiers, &dirTree, imageLen );
