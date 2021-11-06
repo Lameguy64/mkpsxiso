@@ -1614,18 +1614,33 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, "" );
 	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, "" );
 
-	tm* imageTime = localtime( &global::BuildTime );
+	tm* imageTime;
+	tm discTime;
+	if ( id.CreationDate == nullptr )
+	{
+		// Use local time
+		imageTime = localtime( &global::BuildTime );
 
-	sprintf( isoDescriptor.volumeCreateDate, "%04d%02d%02d%02d%02d%02d00",
-		imageTime->tm_year+1900, imageTime->tm_mon, imageTime->tm_mday,
-		imageTime->tm_hour, imageTime->tm_min, imageTime->tm_sec );
+		sprintf( isoDescriptor.volumeCreateDate, "%04d%02d%02d%02d%02d%02d00",
+			imageTime->tm_year+1900, imageTime->tm_mon, imageTime->tm_mday,
+			imageTime->tm_hour, imageTime->tm_min, imageTime->tm_sec );
+		imageTime->tm_mon += 1;
+	}
+	else
+	{
+		// Use time from XML
+		imageTime = &discTime;
+		sscanf( id.CreationDate, "%04d%02d%02d%02d%02d%02d",
+			&imageTime->tm_year, &imageTime->tm_mon, &imageTime->tm_mday,
+			&imageTime->tm_hour, &imageTime->tm_min, &imageTime->tm_sec );
+		imageTime->tm_year -= 1900;
 
-	sprintf( isoDescriptor.volumeModifyDate, "%04d%02d%02d%02d%02d%02d00",
-		imageTime->tm_year+1900, imageTime->tm_mon, imageTime->tm_mday,
-		imageTime->tm_hour, imageTime->tm_min, imageTime->tm_sec );
+		strncpy( isoDescriptor.volumeCreateDate, id.CreationDate, std::size(isoDescriptor.volumeCreateDate) );
+	}
 
-	strcpy( isoDescriptor.volumeEffeciveDate, "0000000000000000" );
-	strcpy( isoDescriptor.volumeExpiryDate, "0000000000000000" );
+	strncpy( isoDescriptor.volumeModifyDate, "0000000000000000", std::size(isoDescriptor.volumeModifyDate) );
+	strncpy( isoDescriptor.volumeEffeciveDate, "0000000000000000", std::size(isoDescriptor.volumeEffeciveDate) );
+	strncpy( isoDescriptor.volumeExpiryDate, "0000000000000000", std::size(isoDescriptor.volumeExpiryDate) );
 
 	isoDescriptor.fileStructVersion = 1;
 
@@ -1655,7 +1670,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	isoDescriptor.rootDirRecord.identifier = 0x0;
 
 	isoDescriptor.rootDirRecord.entryDate.year		= imageTime->tm_year;
-	isoDescriptor.rootDirRecord.entryDate.month		= imageTime->tm_mon+1;
+	isoDescriptor.rootDirRecord.entryDate.month		= imageTime->tm_mon;
 	isoDescriptor.rootDirRecord.entryDate.day		= imageTime->tm_mday;
 	isoDescriptor.rootDirRecord.entryDate.hour		= imageTime->tm_hour;
 	isoDescriptor.rootDirRecord.entryDate.minute	= imageTime->tm_min;
@@ -1682,7 +1697,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	memset( &isoDescriptor, 0x00, sizeof(cd::ISO_DESCRIPTOR) );
 	isoDescriptor.header.type = 255;
 	isoDescriptor.header.version = 1;
-	strncpy( isoDescriptor.header.id, "CD001", 5 );
+	CopyStringPadWithSpaces( isoDescriptor.header.id, "CD001" );
 
 	writer->SetSubheader( cd::IsoWriter::SubEOF );
 	writer->WriteBytes( &isoDescriptor, sizeof(cd::ISO_DESCRIPTOR),

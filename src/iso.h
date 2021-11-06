@@ -37,6 +37,7 @@ namespace iso
 		const char*	DataPreparer;
 		const char*	Application;
 		const char* Copyright;
+		const char* CreationDate;
 	} IDENTIFIERS;
 
 	typedef struct

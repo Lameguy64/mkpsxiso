@@ -635,6 +635,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		isoIdentifiers.Application	= identifierElement->Attribute( "application" );
 		isoIdentifiers.DataPreparer	= identifierElement->Attribute( "data_preparer" );
 		isoIdentifiers.Copyright	= identifierElement->Attribute( "copyright" );
+		isoIdentifiers.CreationDate = identifierElement->Attribute( "creation_date" );
 
 		bool hasSystemID = true;
 		if ( isoIdentifiers.SystemID == nullptr )
@@ -701,6 +702,11 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 			{
 				printf( "      Copyright    : %s\n",
 					isoIdentifiers.Copyright );
+			}
+			if ( isoIdentifiers.CreationDate != nullptr )
+			{
+				printf( "      Creation Date : %s\n",
+					isoIdentifiers.CreationDate );
 			}
 			printf( "\n" );
 		}
