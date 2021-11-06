@@ -89,25 +89,12 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 		edcEccGen.ComputeEdcBlock(cd::IsoWriter::sectorM2F1->subHead, 0x808, cd::IsoWriter::sectorM2F1->edc);
 
 		// Encode ECC data
-		unsigned char tempAddr[4];
-
-		for(int i=0; i<3; i++) {
-
-			tempAddr[i] = cd::IsoWriter::sectorM2F1->addr[i];
-			cd::IsoWriter::sectorM2F1->addr[i] = 0x00;
-
-		}
 
 		// Compute ECC P code
-		edcEccGen.ComputeEccBlock(cd::IsoWriter::sectorBuff+0xC, 86, 24, 2, 86, cd::IsoWriter::sectorBuff+0x81C);
+		static const unsigned char zeroaddress[4] = { 0, 0, 0, 0 };
+		edcEccGen.ComputeEccBlock(zeroaddress, cd::IsoWriter::sectorBuff+0x10, 86, 24, 2, 86, cd::IsoWriter::sectorBuff+0x81C);
 		// Compute ECC Q code
-		edcEccGen.ComputeEccBlock(cd::IsoWriter::sectorBuff+0xC, 52, 43, 86, 88, cd::IsoWriter::sectorBuff+0x8C8);
-
-		for(int i=0; i<3; i++) {
-
-			cd::IsoWriter::sectorM2F1->addr[i] = tempAddr[i];
-
-		}
+		edcEccGen.ComputeEccBlock(zeroaddress, cd::IsoWriter::sectorBuff+0x10, 52, 43, 86, 88, cd::IsoWriter::sectorBuff+0x8C8);
 
 	} else if (edcEccMode == cd::IsoWriter::EdcEccForm2) {
 
