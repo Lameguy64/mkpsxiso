@@ -126,6 +126,12 @@ static FILETIME TimetToFileTime(time_t t)
     ft.dwHighDateTime = ll.HighPart;
 	return ft;
 }
+
+// TODO: Move to a header shared with mkpsxiso
+time_t timegm(struct tm* tm)
+{
+	return _mkgmtime(tm);
+}
 #endif
 
 void UpdateTimestamps(const std::string& path, const cd::ISO_DATESTAMP* entryDate)
@@ -143,7 +149,7 @@ void UpdateTimestamps(const std::string& path, const cd::ISO_DATESTAMP* entryDat
 		timeBuf.tm_min = entryDate->minute - (15 * entryDate->GMToffs);
 		timeBuf.tm_sec = entryDate->second;
 
-		const FILETIME ft = TimetToFileTime(_mkgmtime(&timeBuf));
+		const FILETIME ft = TimetToFileTime(timegm(&timeBuf));
 		SetFileTime(file, &ft, nullptr, &ft);
 
 		CloseHandle(file);
@@ -491,6 +497,8 @@ void ParseISO(cd::IsoReader& reader) {
 			newElement->SetAttribute("publisher", CleanVolumeId(descriptor.publisherIdentifier));
 		if (descriptor.dataPreparerIdentifier[0] != 0x20)
 			newElement->SetAttribute("data_preparer", CleanVolumeId(descriptor.dataPreparerIdentifier));
+
+		newElement->SetAttribute("creation_date", descriptor.volumeCreateDate);
 
 		trackElement->InsertEndChild(newElement);
 
