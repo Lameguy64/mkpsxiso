@@ -923,7 +923,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	dirTree.WriteDirectoryRecords( writer, 0 );
 
 	// Write file system descriptors to finish the image
-	iso::WriteDescriptor( writer, isoIdentifiers, &dirTree, imageLen );
+	iso::WriteDescriptor( writer, isoIdentifiers, &dirTree, totalLen );
 
 	if ( !global::QuietMode )
 	{
