@@ -433,10 +433,9 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 
     }
 
-	DIRENTRY entry;
-	memset( &entry, 0x00, sizeof(DIRENTRY) );
+	DIRENTRY entry {};
 
-	entry.id.assign(temp_name.c_str());
+	entry.id = std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
 
@@ -464,7 +463,7 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
     entry.date.year		= fileTime->tm_year;
     entry.date.GMToffs	= 0;
 
-	entries.push_back( entry );
+	entries.emplace_back( std::move(entry) );
 
 	return true;
 
