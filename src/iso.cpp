@@ -1550,14 +1550,13 @@ void iso::WriteLicenseData(cd::IsoWriter* writer, void* data)
 	writer->SeekToSector( 0 );
 	writer->WriteBytesXA( data, 2336*12, cd::IsoWriter::EdcEccForm1 );
 
-	char blank[2048];
-	memset(blank, 0, 2048);
+	char blank[2048] {};
 
 	writer->SetSubheader(0x00200000);
 
 	for( int i=0; i<4; i++ ) {
 
-		writer->WriteBytes( data, 2048, cd::IsoWriter::EdcEccForm1 );
+		writer->WriteBytes( blank, 2048, cd::IsoWriter::EdcEccForm1 );
 
 	}
 
