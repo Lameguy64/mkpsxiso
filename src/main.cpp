@@ -32,7 +32,7 @@ namespace global
 };
 
 
-int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement);
+int ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, bool& found_da);
 int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement* trackElement);
 
 int PackWaveFile(cd::IsoWriter* writer, const char* wavFile);
@@ -765,8 +765,9 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		return false;
 	}
 
+	bool found_da = false;
 	if ( !ParseDirectory( &dirTree, trackElement->FirstChildElement(
-		"directory_tree" ) ) )
+		"directory_tree" ), found_da ) )
 	{
 		return false;
 	}
@@ -952,12 +953,11 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	return true;
 }
 
-int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
+int ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, bool& found_da)
 {
 	std::string srcDir;
 	std::string srcFile;
 	std::string name;
-	int found_da = false;
 
 	if ( dirElement->Attribute( "srcdir" ) != nullptr )
 	{
@@ -1169,7 +1169,7 @@ int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
 				return false;
 			}
 
-            if ( !ParseDirectory( subdir, dirElement ) )
+            if ( !ParseDirectory( subdir, dirElement, found_da ) )
 			{
 				return false;
 			}
