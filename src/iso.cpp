@@ -474,7 +474,7 @@ void iso::DirTreeClass::AddDummyEntry(int sectors)
 	DIRENTRY entry;
 
 	entry.subdir	= nullptr;
-	entry.type		= EntryFile;
+	entry.type		= EntryDummy;
 	entry.length	= 2048*sectors;
 
 	entries.push_back( entry );
@@ -569,13 +569,11 @@ int iso::DirTreeClass::CalculateFileSystemSize(int lba) {
 		else
 		{
 			// Increment LBA by the size of files
-			if ( ( entries[i].type == EntryFile ) ||
-				( entries[i].type == EntrySTR_DO ) )
+			if ( entries[i].type == EntryFile || entries[i].type == EntrySTR_DO || entries[i].type == EntryDummy )
 			{
 				lba += (entries[i].length+2047)/2048;
 			}
-			else if ( ( entries[i].type == EntryXA ) ||
-				( entries[i].type == EntrySTR ) )
+			else if ( entries[i].type == EntryXA || entries[i].type == EntrySTR )
 			{
 				lba += (entries[i].length+2335)/2336;
 			}
@@ -628,13 +626,11 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 		else
 		{
 			// Increment LBA by the size of file
-			if ( ( entries[i].type == EntryFile ) ||
-				( entries[i].type == EntrySTR_DO ) )
+			if ( entries[i].type == EntryFile || entries[i].type == EntrySTR_DO || entries[i].type == EntryDummy )
 			{
 				lba += (entries[i].length+2047)/2048;
 			}
-			else if ( ( entries[i].type == EntryXA ) ||
-				(entries[i].type == EntrySTR ) )
+			else if ( entries[i].type == EntryXA || entries[i].type == EntrySTR )
 			{
 				lba += (entries[i].length+2335)/2336;
 			}
@@ -905,7 +901,8 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 			xa->id[1] = 'A';
 
 			if ( (entries[i].type == EntryFile) ||
-				(entries[i].type == EntrySTR_DO) )
+				(entries[i].type == EntrySTR_DO) ||
+				(entries[i].type == EntryDummy) )
 			{
 				xa->attributes	= 0x550d;
 			}
@@ -986,7 +983,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			writer->SeekToSector( entries[i].lba );
 		}
 
-		// Write files and dummies as regular data sectors
+		// Write files as regular data sectors
 		if ( entries[i].type == EntryFile )
 		{
 			char buff[2048];
@@ -1184,6 +1181,20 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		else if ( entries[i].type == EntryDir )
 		{
 			((DirTreeClass*)entries[i].subdir)->WriteFiles( writer );
+		}
+		// Write dummies as gaps without data
+		else if ( entries[i].type == EntryDummy )
+		{
+			char buff[2048] {};
+
+			writer->SetSubheader( 0u );
+
+			size_t totalBytesRead = 0;
+			while( totalBytesRead < entries[i].length )
+			{
+				totalBytesRead += 2048;
+				writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
+			}
 		}
 	}
 

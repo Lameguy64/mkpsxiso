@@ -25,7 +25,8 @@ namespace iso
 		EntryXA,
 		EntrySTR,
 		EntrySTR_DO,
-		EntryDA
+		EntryDA,
+		EntryDummy
 	};
 
 	typedef struct
