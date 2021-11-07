@@ -1,7 +1,7 @@
 # mkpsxiso build script (rewritten)
 # (C) 2021 spicyjpeg
 
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.20)
 
 project(
 	mkpsxiso
@@ -45,11 +45,6 @@ endfunction()
 _add_target(mkpsxiso src)
 #_add_target(mkisoxml mkisoxml/src)
 
-install(
-	TARGETS mkpsxiso
-	#RUNTIME_DEPENDENCIES
-	#PRE_EXCLUDE_REGEXES ".*"
-	#PRE_INCLUDE_REGEXES "tinyxml2"
-)
+install(TARGETS mkpsxiso)
 
 include(InstallRequiredSystemLibraries)
