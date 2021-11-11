@@ -1585,11 +1585,14 @@ static void CopyStringPadWithSpaces(char (&dest)[N], const char* src)
 	auto begin = std::begin(dest);
 	auto end = std::end(dest);
 
-	size_t i = 0;
-	const size_t len = strlen(src);
-	for (; begin != end && i < len; ++begin, ++i)
+	if ( src != nullptr )
 	{
-		*begin = std::toupper( src[i] );
+		size_t i = 0;
+		const size_t len = strlen(src);
+		for (; begin != end && i < len; ++begin, ++i)
+		{
+			*begin = std::toupper( src[i] );
+		}
 	}
 
 	// Pad the remaining space with spaces
@@ -1627,8 +1630,8 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	CopyStringPadWithSpaces( isoDescriptor.copyrightFileIdentifier, id.Copyright );
 
 	// Unneeded identifiers
-	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, "" );
-	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, "" );
+	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, nullptr );
+	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, nullptr );
 
 	isoDescriptor.volumeCreateDate = GetLongDateFromDate( volumeDate );
 	isoDescriptor.volumeModifyDate = isoDescriptor.volumeEffectiveDate = isoDescriptor.volumeExpiryDate = GetUnspecifiedLongDate();
