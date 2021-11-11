@@ -14,6 +14,7 @@ namespace global {
 	extern int		noXA;
 	extern int		NoLimit;
 	extern int		trackNum;
+	extern int		GMToffset;
 };
 
 #endif // _GLOBAL_H

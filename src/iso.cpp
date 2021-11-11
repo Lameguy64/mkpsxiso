@@ -20,6 +20,26 @@ static bool icompare(const std::string& a, const std::string& b)
 	}
 }
 
+static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
+{
+	// GMToffs is specified in 15 minute units
+	const time_t GMToffsSeconds = static_cast<time_t>(15) * 60 * GMToffs;
+
+	time += GMToffsSeconds;
+	const tm timestamp = *gmtime( &time );
+
+	cd::ISO_DATESTAMP result;
+	result.hour		= timestamp.tm_hour;
+	result.minute	= timestamp.tm_min;
+	result.second	= timestamp.tm_sec;
+	result.month	= timestamp.tm_mon+1;
+	result.day		= timestamp.tm_mday;
+	result.year		= timestamp.tm_year;
+	result.GMToffs	= GMToffs;
+
+	return result;
+}
+
 int iso::DirTreeClass::GetWavSize(const char* wavFile)
 {
 	FILE *fp;
@@ -453,15 +473,7 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 		entry.length = fileAttrib.st_size;
 	}
 
-    tm* fileTime = gmtime( &fileAttrib.st_mtime );
-
-    entry.date.hour		= fileTime->tm_hour;
-    entry.date.minute	= fileTime->tm_min;
-    entry.date.second	= fileTime->tm_sec;
-    entry.date.day		= fileTime->tm_mday;
-    entry.date.month	= fileTime->tm_mon+1;
-    entry.date.year		= fileTime->tm_year;
-    entry.date.GMToffs	= 0;
+    entry.date = GetISODateStamp( fileAttrib.st_mtime, global::GMToffset ); // TODO: Per file GMToffs
 
 	entries.emplace_back( std::move(entry) );
 
@@ -522,13 +534,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id)
 
 	tm*	dirTime = gmtime( &global::BuildTime );
 
-	entries.back().date.hour	= dirTime->tm_hour;
-	entries.back().date.minute	= dirTime->tm_min;
-	entries.back().date.second	= dirTime->tm_sec;
-	entries.back().date.month	= dirTime->tm_mon+1;
-	entries.back().date.day		= dirTime->tm_mday;
-	entries.back().date.year	= dirTime->tm_year;
-	entries.back().date.GMToffs	= 0;
+	entries.back().date = GetISODateStamp( global::BuildTime, global::GMToffset ); // TODO: Per file GMToffs
 
 	for ( int i=0; entry.id[i] != 0x00; i++ )
 	{
@@ -759,7 +765,7 @@ void iso::DirTreeClass::SortDirEntries()
 
 }
 
-int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
+int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const cd::ISO_DATESTAMP& currentDirDate)
 {
 	char	dataBuff[2048];
 	char*	dataBuffPtr=dataBuff;
@@ -822,14 +828,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 		entry->flags = 0x02;
 		entry->entryLength = dataLen;
 
-		tm* dirTime = gmtime( &global::BuildTime );
-
-		entry->entryDate.year	= dirTime->tm_year;
-		entry->entryDate.month	= dirTime->tm_mon+1;
-		entry->entryDate.day	= dirTime->tm_mday;
-		entry->entryDate.hour	= dirTime->tm_hour;
-		entry->entryDate.minute	= dirTime->tm_min;
-		entry->entryDate.second	= dirTime->tm_sec;
+		entry->entryDate = currentDirDate;
 
 		dataBuffPtr += dataLen;
 	}
@@ -944,21 +943,21 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA)
 	return 1;
 }
 
-int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, int lastDirLBA)
+int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, int lastDirLBA, const cd::ISO_DATESTAMP& currentDirDate)
 {
 	if (lastDirLBA == 0)
 	{
 		lastDirLBA = recordLBA;
 	}
 
-	WriteDirEntries( writer, lastDirLBA );
+	WriteDirEntries( writer, lastDirLBA, currentDirDate );
 
 	for ( int i=0; i<entries.size(); i++ )
 	{
 		if ( entries[i].type == EntryDir )
 		{
 			if ( !((DirTreeClass*)entries[i].subdir)->WriteDirectoryRecords(
-				writer, recordLBA ) )
+				writer, recordLBA, entries[i].date ) )
 			{
 				return 0;
 			}
@@ -1598,7 +1597,7 @@ static void CopyStringPadWithSpaces(char (&dest)[N], const char* src)
 }
 
 void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
-	iso::DirTreeClass* dirTree, int imageLen)
+	iso::DirTreeClass* dirTree, const cd::ISO_DATESTAMP& volumeDate, int imageLen)
 {
 	cd::ISO_DESCRIPTOR	isoDescriptor {};
 
@@ -1631,34 +1630,8 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, "" );
 	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, "" );
 
-	tm* imageTime;
-	tm discTime;
-	if ( id.CreationDate == nullptr )
-	{
-		// Use local time
-		imageTime = localtime( &global::BuildTime );
-
-		sprintf( isoDescriptor.volumeCreateDate, "%04d%02d%02d%02d%02d%02d00",
-			imageTime->tm_year+1900, imageTime->tm_mon, imageTime->tm_mday,
-			imageTime->tm_hour, imageTime->tm_min, imageTime->tm_sec );
-		imageTime->tm_mon += 1;
-	}
-	else
-	{
-		// Use time from XML
-		imageTime = &discTime;
-		sscanf( id.CreationDate, "%04d%02d%02d%02d%02d%02d",
-			&imageTime->tm_year, &imageTime->tm_mon, &imageTime->tm_mday,
-			&imageTime->tm_hour, &imageTime->tm_min, &imageTime->tm_sec );
-		imageTime->tm_year -= 1900;
-
-		strncpy( isoDescriptor.volumeCreateDate, id.CreationDate, std::size(isoDescriptor.volumeCreateDate) );
-	}
-
-	strncpy( isoDescriptor.volumeModifyDate, "0000000000000000", std::size(isoDescriptor.volumeModifyDate) );
-	strncpy( isoDescriptor.volumeEffeciveDate, "0000000000000000", std::size(isoDescriptor.volumeEffeciveDate) );
-	strncpy( isoDescriptor.volumeExpiryDate, "0000000000000000", std::size(isoDescriptor.volumeExpiryDate) );
-
+	isoDescriptor.volumeCreateDate = GetLongDateFromDate( volumeDate );
+	isoDescriptor.volumeModifyDate = isoDescriptor.volumeEffectiveDate = isoDescriptor.volumeExpiryDate = GetUnspecifiedLongDate();
 	isoDescriptor.fileStructVersion = 1;
 
 	if ( !global::noXA )
@@ -1686,12 +1659,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	isoDescriptor.rootDirRecord.identifierLen = 1;
 	isoDescriptor.rootDirRecord.identifier = 0x0;
 
-	isoDescriptor.rootDirRecord.entryDate.year		= imageTime->tm_year;
-	isoDescriptor.rootDirRecord.entryDate.month		= imageTime->tm_mon;
-	isoDescriptor.rootDirRecord.entryDate.day		= imageTime->tm_mday;
-	isoDescriptor.rootDirRecord.entryDate.hour		= imageTime->tm_hour;
-	isoDescriptor.rootDirRecord.entryDate.minute	= imageTime->tm_min;
-	isoDescriptor.rootDirRecord.entryDate.second	= imageTime->tm_sec;
+	isoDescriptor.rootDirRecord.entryDate = volumeDate;
 
 	isoDescriptor.pathTable1Offs = 18;
 	isoDescriptor.pathTable2Offs = isoDescriptor.pathTable1Offs+

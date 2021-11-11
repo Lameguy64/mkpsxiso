@@ -90,7 +90,7 @@ namespace iso
 		int			first_track;
 		
 		/// Internal function for generating and writing directory records
-		int	WriteDirEntries(cd::IsoWriter* writer, int lastLBA);
+		int	WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const cd::ISO_DATESTAMP& currentDirDate);
 
 		/// Internal function for recursive path table length calculation
 		int CalculatePathTableLenSub(DIRENTRY* dirEntry);
@@ -174,10 +174,11 @@ namespace iso
 		/**	Writes the file system of the directory records to a CD image. Execute this after the source files
 		 *	have been written to the CD image.
 		 *
-		 *	*writer		- Pointer to a cd::IsoWriter class that is ready for writing.
-		 *	lastDirLBA	- Used for recursive calls, always set to 0.
+		 *	*writer		   - Pointer to a cd::IsoWriter class that is ready for writing.
+		 *	lastDirLBA	   - Used for recursive calls, always set to 0.
+		 *  currentDirDate - Timestamp to use for . and .. directories.
 		 */
-		int	WriteDirectoryRecords(cd::IsoWriter* writer, int lastDirLBA);
+		int	WriteDirectoryRecords(cd::IsoWriter* writer, int lastDirLBA, const cd::ISO_DATESTAMP& currentDirDate);
 
 		void SortDirEntries();
 
@@ -192,7 +193,7 @@ namespace iso
 
 	void WriteLicenseData(cd::IsoWriter* writer, void* data);
 
-	void WriteDescriptor(cd::IsoWriter* writer, IDENTIFIERS id, DirTreeClass* dirTree, int imageLen);
+	void WriteDescriptor(cd::IsoWriter* writer, IDENTIFIERS id, DirTreeClass* dirTree, const cd::ISO_DATESTAMP& volumeDate, int imageLen);
 
 };
 

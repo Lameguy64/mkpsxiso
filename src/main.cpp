@@ -20,6 +20,7 @@ namespace global
 	int			NoLimit		= false;
 	int			trackNum	= 1;
 	int			noXA		= false;
+	int			GMToffset	= 0;
 
 	std::string	XMLscript;
 	std::string LBAfile;
@@ -778,6 +779,9 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 
 	}
 
+	// TODO: Global/per file GMT offset
+	global::GMToffset = 9 * 4;
+
 	// Parse directory entries in the directory_tree element
 	if ( !global::QuietMode )
 	{
@@ -883,6 +887,45 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		printf( "    Building filesystem... " );
 	}
 
+	// Establish the volume timestamp to either the current local time or isoIdentifiers.CreationDate (if specified)
+	cd::ISO_DATESTAMP volumeDate;
+	bool gotDateFromXML = false;
+	if ( isoIdentifiers.CreationDate != nullptr )
+	{
+		// Try to use time from XML. If it's malformed, fall back to local time.
+		short int year;
+		const int argsRead = sscanf( isoIdentifiers.CreationDate, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%*02hhu%hhd",
+			&year, &volumeDate.month, &volumeDate.day,
+			&volumeDate.hour, &volumeDate.minute, &volumeDate.second, &volumeDate.GMToffs );
+		if ( argsRead == 7 )
+		{
+			volumeDate.year = year - 1900;
+			gotDateFromXML = true;
+		}
+	}
+
+	if ( !gotDateFromXML )
+	{
+		// Use local time
+		const tm imageTime = *gmtime( &global::BuildTime );
+
+		volumeDate.year = imageTime.tm_year;
+		volumeDate.month = imageTime.tm_mon + 1;
+		volumeDate.day = imageTime.tm_mday;
+		volumeDate.hour = imageTime.tm_hour;
+		volumeDate.minute = imageTime.tm_min;
+		volumeDate.second = imageTime.tm_sec;
+
+		// Calculate the GMT offset. It doesn't have to be perfect, but this should cover most/all normal cases.
+		const time_t timeUTC = global::BuildTime;
+
+		tm localTime = imageTime;
+		const time_t timeLocal = mktime(&localTime);
+
+		const double diff = difftime(timeUTC, timeLocal);
+		volumeDate.GMToffs = static_cast<signed char>(diff / 60.0 / 15.0); // Seconds to 15-minute units
+	}
+
 	//unsigned char subHead[] = { 0x00, 0x00, 0x08, 0x00 };
 	writer->SetSubheader( cd::IsoWriter::SubData );
 
@@ -920,10 +963,10 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 
 	// Sort directory entries and write it
 	dirTree.SortDirEntries();
-	dirTree.WriteDirectoryRecords( writer, 0 );
+	dirTree.WriteDirectoryRecords( writer, 0, volumeDate );
 
 	// Write file system descriptors to finish the image
-	iso::WriteDescriptor( writer, isoIdentifiers, &dirTree, totalLen );
+	iso::WriteDescriptor( writer, isoIdentifiers, &dirTree, volumeDate, totalLen );
 
 	if ( !global::QuietMode )
 	{
