@@ -1,6 +1,7 @@
 #include "global.h"
 #include "iso.h"
 #include "cd.h"
+#include "xa.h"
 
 char rootname[] = { "<root>" };
 
@@ -687,7 +688,7 @@ int iso::DirTreeClass::CalculateDirEntryLen()
 
 		if ( !global::noXA )
 		{
-			dataLen += sizeof( cd::ISO_XA_ATTRIB );
+			dataLen += sizeof( cdxa::ISO_XA_ATTRIB );
 		}
 
 		if ( ((dirEntryLen%2048)+dataLen) > 2048 )
@@ -774,7 +775,6 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 	int		dirlen;
 
 	cd::ISO_DIR_ENTRY*	entry;
-	cd::ISO_XA_ATTRIB*	xa;
 
 	memset(dataBuff, 0x00, 2048);
 
@@ -816,14 +816,14 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 
 		if ( !global::noXA )
 		{
-			xa = (cd::ISO_XA_ATTRIB*)(dataBuffPtr+dataLen);
-			memset( xa, 0x00, sizeof(cd::ISO_XA_ATTRIB) );
+			cdxa::ISO_XA_ATTRIB* xa = (cdxa::ISO_XA_ATTRIB*)(dataBuffPtr+dataLen);
+			memset( xa, 0x00, sizeof(*xa) );
 
 			xa->id[0] = 'X';
 			xa->id[1] = 'A';
 			xa->attributes  = 0x558d;
 
-			dataLen += sizeof(cd::ISO_XA_ATTRIB);
+			dataLen += sizeof(*xa);
 		}
 
 		entry->flags = 0x02;
@@ -894,8 +894,8 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 
 		if ( !global::noXA )
 		{
-			xa = (cd::ISO_XA_ATTRIB*)(entryBuff+dataLen);
-			memset(xa, 0x00, sizeof(cd::ISO_XA_ATTRIB));
+			cdxa::ISO_XA_ATTRIB* xa = (cdxa::ISO_XA_ATTRIB*)(entryBuff+dataLen);
+			memset(xa, 0x00, sizeof(*xa));
 
 			xa->id[0] = 'X';
 			xa->id[1] = 'A';
@@ -920,7 +920,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 				xa->attributes	= 0x558d;
 			}
 
-			dataLen += sizeof(cd::ISO_XA_ATTRIB);
+			dataLen += sizeof(*xa);
 		}
 
 		entry->entryLength = dataLen;
