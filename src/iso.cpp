@@ -1,5 +1,6 @@
 #include "global.h"
 #include "iso.h"
+#include "cd.h"
 
 char rootname[] = { "<root>" };
 
@@ -783,7 +784,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 	{
 		entry = (cd::ISO_DIR_ENTRY*)dataBuffPtr;
 
-		SetPair16( &entry->volSeqNum, 1 );
+		entry->volSeqNum = cd::SetPair16( 1 );
 		entry->identifierLen = 1;
 
 		int dataLen = 32;
@@ -793,8 +794,8 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 			// Current
 			dirlen = 2048*((CalculateDirEntryLen()+2047)/2048);
 
-			SetPair32( &entry->entrySize, dirlen );
-			SetPair32( &entry->entryOffs, recordLBA );
+			entry->entrySize = cd::SetPair32( dirlen );
+			entry->entryOffs = cd::SetPair32( recordLBA );
 		}
 		else
 		{
@@ -806,8 +807,8 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 			}
 			dirlen = 2048*((dirlen+2047)/2048);
 
-			SetPair32( &entry->entrySize, dirlen );
-			SetPair32( &entry->entryOffs, lastLBA );
+			entry->entrySize = cd::SetPair32( dirlen );
+			entry->entryOffs = cd::SetPair32( lastLBA );
 			dataBuffPtr[dataLen+1] = 0x01;
 		}
 
@@ -874,9 +875,9 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 			length = entries[i].length;
 		}
 
-		SetPair32( &entry->entryOffs, lba );
-		SetPair32( &entry->entrySize, length );
-		SetPair16( &entry->volSeqNum, 1 );
+		entry->entryOffs = cd::SetPair32( lba );
+		entry->entrySize = cd::SetPair32( length );
+		entry->volSeqNum = cd::SetPair16( 1 );
 
 		entry->identifierLen = entries[i].id.length();
 		entry->entryDate = entries[i].date;
@@ -1500,17 +1501,16 @@ int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb)
 	*buff = 0;	// Extended attribute record length (unused)
 	buff++;
 
-	int lba = recordLBA;
-
 	// Write LBA and directory number index
-	memcpy( buff, &lba, 4 );
-	*((short*)(buff+4)) = 1;
-
+	unsigned int lba = recordLBA;
+	unsigned short dirIndex = 1;
 	if ( msb )
 	{
-		cd::SwapBytes( buff, 4 );
-		cd::SwapBytes( buff+4, 2 );
+		lba = SwapBytes32( lba );
+		dirIndex = SwapBytes16( dirIndex );
 	}
+	memcpy( buff, &lba, sizeof(lba) );
+	memcpy( buff+4, &dirIndex, sizeof(dirIndex) );
 
 	buff += 6;
 
@@ -1645,20 +1645,20 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	int pathTableLen = dirTree->CalculatePathTableLen();
 	int pathTableSectors = (pathTableLen+2047)/2048;
 
-	cd::SetPair16( &isoDescriptor.volumeSetSize, 1 );
-	cd::SetPair16( &isoDescriptor.volumeSeqNumber, 1 );
-	cd::SetPair16( &isoDescriptor.sectorSize, 2048 );
-	cd::SetPair32( &isoDescriptor.pathTableSize, pathTableLen );
+	isoDescriptor.volumeSetSize = cd::SetPair16( 1 );
+	isoDescriptor.volumeSeqNumber = cd::SetPair16( 1 );
+	isoDescriptor.sectorSize = cd::SetPair16( 2048 );
+	isoDescriptor.pathTableSize = cd::SetPair32( pathTableLen );
 
 	// Setup the root directory record
 	isoDescriptor.rootDirRecord.entryLength = 34;
 	isoDescriptor.rootDirRecord.extLength	= 0;
-	cd::SetPair32( &isoDescriptor.rootDirRecord.entryOffs,
+	isoDescriptor.rootDirRecord.entryOffs = cd::SetPair32(
 		18+(pathTableSectors*4) );
-	cd::SetPair32( &isoDescriptor.rootDirRecord.entrySize,
+	isoDescriptor.rootDirRecord.entrySize = cd::SetPair32(
 		2048*((dirTree->CalculateDirEntryLen()+2047)/2048) );
 	isoDescriptor.rootDirRecord.flags = 0x02;
-	cd::SetPair16( &isoDescriptor.rootDirRecord.volSeqNum, 1);
+	isoDescriptor.rootDirRecord.volSeqNum = cd::SetPair16( 1 );
 	isoDescriptor.rootDirRecord.identifierLen = 1;
 	isoDescriptor.rootDirRecord.identifier = 0x0;
 
@@ -1670,10 +1670,10 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	isoDescriptor.pathTable1MSBoffs = isoDescriptor.pathTable2Offs+1;
 	isoDescriptor.pathTable2MSBoffs =
 		isoDescriptor.pathTable1MSBoffs+pathTableSectors;
-	cd::SwapBytes( &isoDescriptor.pathTable1MSBoffs, 4 );
-	cd::SwapBytes( &isoDescriptor.pathTable2MSBoffs, 4 );
+	isoDescriptor.pathTable1MSBoffs = SwapBytes32( isoDescriptor.pathTable1MSBoffs );
+	isoDescriptor.pathTable2MSBoffs = SwapBytes32( isoDescriptor.pathTable2MSBoffs );
 
-	SetPair32( &isoDescriptor.volumeSize, imageLen );
+	isoDescriptor.volumeSize = cd::SetPair32( imageLen );
 
 	// Write the descriptor
 	writer->SeekToSector( 16 );
@@ -1803,14 +1803,16 @@ unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, int msb) {
 		buff++;
 
 		// Write LBA and directory number index
-		*((int*)buff) = entries[i]->dir_lba;
-		*((unsigned short*)(buff+4)) = entries[i]->dir_level;
+		unsigned int lba = entries[i]->dir_lba;
+		unsigned short dirLevel = entries[i]->dir_level;
 
 		if ( msb )
 		{
-			cd::SwapBytes( buff, 4 );
-			cd::SwapBytes( buff+4, 2 );
+			lba = SwapBytes32( lba );
+			dirLevel = SwapBytes16( dirLevel );
 		}
+		memcpy( buff, &lba, sizeof(lba) );
+		memcpy( buff+4, &dirLevel, sizeof(dirLevel) );
 
 		buff += 6;
 

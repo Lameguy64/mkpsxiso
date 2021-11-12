@@ -9,35 +9,12 @@
 #include "edcecc.h"
 
 
-void cd::SwapBytes(void *var, int size) {
-
-	//unsigned char temp[size];
-	unsigned char *temp = new unsigned char[size];
-
-	memcpy(temp, var, size);
-	for(short i=0; i<size; i++) {
-		((unsigned char*)var)[i] = temp[(size-1)-i];
-	}
-
-	delete[] temp;
+cd::ISO_USHORT_PAIR cd::SetPair16(unsigned short val) {
+    return { val, SwapBytes16(val) };
 }
 
-void cd::SetPair16(cd::ISO_USHORT_PAIR* pair, unsigned short val) {
-
-    pair->lsb = val;
-    pair->msb = val;
-
-    SwapBytes(&pair->msb, 2);
-
-}
-
-void cd::SetPair32(cd::ISO_UINT_PAIR* pair, unsigned int val) {
-
-    pair->lsb = val;
-    pair->msb = val;
-
-    SwapBytes(&pair->msb, 4);
-
+cd::ISO_UINT_PAIR cd::SetPair32(unsigned int val) {
+	return { val, SwapBytes32(val) };
 }
 
 

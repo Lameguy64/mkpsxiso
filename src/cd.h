@@ -225,4 +225,8 @@ namespace cd {
 cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
 cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
 
+// Endianness swap
+unsigned short SwapBytes16(unsigned short val);
+unsigned int SwapBytes32(unsigned int val);
+
 #endif // _CD_H

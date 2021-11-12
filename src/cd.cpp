@@ -51,3 +51,17 @@ ISO_LONG_DATESTAMP GetUnspecifiedLongDate()
 
 	return result;
 }
+
+unsigned short SwapBytes16(unsigned short val)
+{
+	return  ((val & 0xFF) << 8) |
+			((val & 0xFF00) >> 8); 
+}
+
+unsigned int SwapBytes32(unsigned int val)
+{
+	return  ((val & 0xFF) << 24) |
+			((val & 0xFF00) << 8) |
+			((val & 0xFF0000) >> 8) |
+			((val & 0xFF000000) >> 24);
+}
