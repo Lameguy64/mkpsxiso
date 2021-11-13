@@ -498,7 +498,7 @@ void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
 	entries.push_back( entry );
 }
 
-iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const EntryAttributes& attributes)
+iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes)
 {
     for ( int i=0; i<entries.size(); i++ )
 	{
@@ -519,6 +519,17 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const Entry
 		}
 
     }
+
+	time_t dirTime;
+	struct stat fileAttrib;
+    if ( stat( srcDir, &fileAttrib ) == 0 )
+	{
+		dirTime = fileAttrib.st_mtime;
+	}
+	else
+	{
+		dirTime = global::BuildTime;
+	}
 
 	DIRENTRY entry;
 
@@ -541,9 +552,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const Entry
 
 	((DirTreeClass*)entry.subdir)->parent = this;
 
-	tm*	dirTime = gmtime( &global::BuildTime );
-
-	entries.back().date = GetISODateStamp( global::BuildTime, attributes.GMTOffs.value() );
+	entries.back().date = GetISODateStamp( dirTime, attributes.GMTOffs.value() );
 
 	for ( int i=0; entry.id[i] != 0x00; i++ )
 	{

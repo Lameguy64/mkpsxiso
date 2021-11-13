@@ -197,7 +197,7 @@ namespace iso
 		 *
 		 *	Returns: Pointer to another DirTreeClass for accessing the directory record of the subdirectory.
 		 */
-		DirTreeClass* AddSubDirEntry(const char* id, const EntryAttributes& attributes);
+		DirTreeClass* AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes);
 
 		/**	Writes the source files assigned to the directory entries to a CD image. Its recommended to execute
 		 *	this first before writing the actual file system.

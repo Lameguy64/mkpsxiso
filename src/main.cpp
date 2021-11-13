@@ -1250,7 +1250,7 @@ int ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirEl
 			const iso::EntryAttributes attribs = iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement));
 
 			iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
-				dirElement->Attribute( "name" ), attribs );
+				dirElement->Attribute( "name" ), dirElement->Attribute( "source" ), attribs );
 
 			if ( subdir == nullptr )
 			{
