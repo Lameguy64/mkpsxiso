@@ -6,6 +6,7 @@ nbproject/private/
 Makefile
 CMakeCache.txt
 CMakeUserPresets.json
+CMakeSettings.json
 *.cmake
 *.layout
 *.depend
@@ -15,5 +16,7 @@ CMakeUserPresets.json
 .dep.inc
 build
 dist
+out
+.vs
 .vscode
 .DS_Store
