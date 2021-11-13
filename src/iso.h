@@ -11,6 +11,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <tinyxml2.h>
+#include <optional>
 #include <string>
 #include <vector>
 #include "cdwriter.h"
@@ -49,11 +50,42 @@ namespace iso
 
 		std::string	srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		int			type;		/// File type (0 - file, 1 - directory)
+		unsigned short perms;	/// XA permissions
+		unsigned short GID;		/// Owner group ID
+		unsigned short UID;		/// Owner user ID
 		void*		subdir;
 
 		cd::ISO_DATESTAMP date;
 
 	} DIRENTRY;
+
+
+	// Inheritable attributes of files and/or directories
+	// They are applied in the following order:
+	// 1. mkpsxiso defaults
+	// 2. directory_tree attributes
+	// 3. dir attributes
+	// 4. file attributes
+	class EntryAttributes
+	{
+	private:
+		static constexpr signed char DEFAULT_GMFOFFS = 0;
+		static constexpr unsigned short DEFAULT_XAPERM = 0x555; // rx
+		static constexpr unsigned short	DEFAULT_OWNER_ID = 0;
+
+	public:
+		std::optional<signed char> GMTOffs;
+		std::optional<unsigned short> XAPerm;
+		std::optional<unsigned short> GID;
+		std::optional<unsigned short> UID;
+
+	public:
+		// Default attributes, specified above
+		static EntryAttributes MakeDefault();
+
+		// "Overlay" the derived attributes (if they exist) on the base ones
+		static EntryAttributes Overlay(EntryAttributes base, const EntryAttributes& derived);
+	};
 	
 	class PathEntryClass {
 	public:
@@ -137,8 +169,9 @@ namespace iso
 		 *	type		- The type of file to add, EntryFile is for standard files, EntryXA is for XA streams and
 		 *				EntryStr is for STR streams. To add directories, use AddDirEntry().
 		 *	*srcfile	- Path and filename to the source file.
+		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 */
-		int	AddFileEntry(const char* id, int type, const char* srcfile);
+		int	AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes);
 
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.
@@ -159,10 +192,11 @@ namespace iso
 		/** Adds a subdirectory to the directory record.
 		 *
 		 *	*id		- The name of the subdirectory to add. It will be converted to uppercase automatically.
+		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 *
 		 *	Returns: Pointer to another DirTreeClass for accessing the directory record of the subdirectory.
 		 */
-		DirTreeClass* AddSubDirEntry(const char* id);
+		DirTreeClass* AddSubDirEntry(const char* id, const EntryAttributes& attributes);
 
 		/**	Writes the source files assigned to the directory entries to a CD image. Its recommended to execute
 		 *	this first before writing the actual file system.

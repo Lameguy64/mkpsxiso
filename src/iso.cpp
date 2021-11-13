@@ -308,7 +308,7 @@ iso::DirTreeClass::~DirTreeClass()
 	}
 }
 
-int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfile)
+int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes)
 {
 	struct stat fileAttrib;
 
@@ -460,6 +460,9 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 	entry.id = std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
+	entry.perms		= attributes.XAPerm.value();
+	entry.GID		= attributes.GID.value();
+	entry.UID		= attributes.UID.value();
 
 	if ( srcfile != nullptr )
 	{
@@ -475,7 +478,7 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 		entry.length = fileAttrib.st_size;
 	}
 
-    entry.date = GetISODateStamp( fileAttrib.st_mtime, global::GMToffset ); // TODO: Per file GMToffs
+    entry.date = GetISODateStamp( fileAttrib.st_mtime, attributes.GMTOffs.value() );
 
 	entries.emplace_back( std::move(entry) );
 
@@ -485,7 +488,7 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 
 void iso::DirTreeClass::AddDummyEntry(int sectors)
 {
-	DIRENTRY entry;
+	DIRENTRY entry {};
 
 	entry.subdir	= nullptr;
 	entry.type		= EntryDummy;
@@ -494,7 +497,7 @@ void iso::DirTreeClass::AddDummyEntry(int sectors)
 	entries.push_back( entry );
 }
 
-iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id)
+iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const EntryAttributes& attributes)
 {
     for ( int i=0; i<entries.size(); i++ )
 	{
@@ -527,6 +530,9 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id)
 
 	entry.type		= EntryDir;
 	entry.subdir	= (void*) new DirTreeClass; // TODO: when should this be freed?
+	entry.perms		= attributes.XAPerm.value();
+	entry.GID		= attributes.GID.value();
+	entry.UID		= attributes.UID.value();
 
 	entries.push_back( entry );
 
@@ -536,7 +542,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id)
 
 	tm*	dirTime = gmtime( &global::BuildTime );
 
-	entries.back().date = GetISODateStamp( global::BuildTime, global::GMToffset ); // TODO: Per file GMToffs
+	entries.back().date = GetISODateStamp( global::BuildTime, attributes.GMTOffs.value() );
 
 	for ( int i=0; entry.id[i] != 0x00; i++ )
 	{
@@ -900,25 +906,30 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 			xa->id[0] = 'X';
 			xa->id[1] = 'A';
 
+			unsigned short attributes = entries[i].perms;
 			if ( (entries[i].type == EntryFile) ||
 				(entries[i].type == EntrySTR_DO) ||
 				(entries[i].type == EntryDummy) )
 			{
-				xa->attributes	= 0x550d;
+				attributes |= 0x800;
 			}
 			else if (entries[i].type == EntryDA)
 			{
-				xa->attributes	= 0x5545;
+				attributes |= 0x4000;
 			}
 			else if ( (entries[i].type == EntrySTR) ||
 				(entries[i].type == EntryXA) )
 			{
-				xa->attributes	= 0x553d;
+				attributes |= 0x3800;
+				xa->filenum = 1;
 			}
 			else if (entries[i].type == EntryDir)
 			{
-				xa->attributes	= 0x558d;
+				attributes |= 0x8800;
 			}
+			xa->attributes = SwapBytes16(attributes);
+			xa->ownergroupid = SwapBytes16(entries[i].GID);
+			xa->owneruserid = SwapBytes16(entries[i].UID);
 
 			dataLen += sizeof(*xa);
 		}
@@ -1834,4 +1845,37 @@ unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, int msb) {
 
 	return buff;
 
+}
+
+iso::EntryAttributes iso::EntryAttributes::MakeDefault()
+{
+	EntryAttributes result;
+
+	result.GMTOffs = DEFAULT_GMFOFFS;
+	result.XAPerm = DEFAULT_XAPERM;
+	result.GID = result.UID = DEFAULT_OWNER_ID;
+
+	return result;
+}
+
+iso::EntryAttributes iso::EntryAttributes::Overlay(EntryAttributes base, const EntryAttributes& derived)
+{
+	if (derived.GMTOffs.has_value())
+	{
+		base.GMTOffs = derived.GMTOffs;
+	}
+	if (derived.XAPerm.has_value())
+	{
+		base.XAPerm = derived.XAPerm;
+	}
+	if (derived.GID.has_value())
+	{
+		base.GID = derived.GID;
+	}
+	if (derived.UID.has_value())
+	{
+		base.UID = derived.UID;
+	}
+
+	return base;
 }
