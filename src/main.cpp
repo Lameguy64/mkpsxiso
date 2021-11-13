@@ -1208,7 +1208,21 @@ int ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirEl
 				return false;
 			}
 
-			dirTree->AddDummyEntry( atoi( dirElement->Attribute( "sectors" ) ) );
+			// TODO: For now this is a hack, unify this code again with the file type in the future
+			// so it isn't as awkward
+			int dummyType = 0; // Data
+			const char* type = dirElement->Attribute( "type" );
+			if ( type != nullptr )
+			{
+				// TODO: Make reasonable
+				if ( compare(type, "2336") == 0 )
+				{
+					dummyType = 1; // XA
+				}
+			}
+
+
+			dirTree->AddDummyEntry( atoi( dirElement->Attribute( "sectors" ) ), dummyType );
         }
 		else if ( compare( "dir", dirElement->Name() ) == 0 )
 		{

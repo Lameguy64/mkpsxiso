@@ -177,8 +177,9 @@ namespace iso
 		 *	is not actually added to the directory record.
 		 *
 		 *	sectors	- The size of the dummy file in sector units (1 = 2048 bytes, 1024 = 2MB).
+		 *  type	- 0 for form1 (data) dummy, 1 for form2 (XA) dummy
 		 */
-		void AddDummyEntry(int sectors);
+		void AddDummyEntry(int sectors, int type);
 
 		/** Generates a path table of all directories and subdirectories within this class' directory record.
 		 *

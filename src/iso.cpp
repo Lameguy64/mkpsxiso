@@ -486,11 +486,12 @@ int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfil
 
 }
 
-void iso::DirTreeClass::AddDummyEntry(int sectors)
+void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
 {
 	DIRENTRY entry {};
 
-	entry.subdir	= nullptr;
+	// TODO: HUGE HACK, will be removed once EntryDummy is unified with EntryFile again
+	entry.perms	=	type;
 	entry.type		= EntryDummy;
 	entry.length	= 2048*sectors;
 
@@ -1198,13 +1199,25 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		{
 			char buff[2048] {};
 
-			writer->SetSubheader( 0u );
+			// TODO: HUGE HACK, will be removed once EntryDummy is unified with EntryFile again
+			const bool isForm2 = entries[i].perms != 0;
+			int eccEdcEncode;
+			if (isForm2)
+			{
+				writer->SetSubheader(0x00200000);
+				eccEdcEncode = cd::IsoWriter::EdcEccForm2;
+			}
+			else
+			{
+				writer->SetSubheader(0u);
+				eccEdcEncode = cd::IsoWriter::EdcEccForm1;
+			}
 
 			size_t totalBytesRead = 0;
 			while( totalBytesRead < entries[i].length )
 			{
 				totalBytesRead += 2048;
-				writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
+				writer->WriteBytes( buff, 2048, eccEdcEncode );
 			}
 		}
 	}
