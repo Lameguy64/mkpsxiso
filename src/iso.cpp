@@ -296,7 +296,7 @@ iso::DirTreeClass::~DirTreeClass()
 {
 }
 
-int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes)
+bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes)
 {
 	struct stat fileAttrib;
 

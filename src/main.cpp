@@ -32,7 +32,7 @@ namespace global
 };
 
 
-int ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da);
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const iso::EntryAttributes& parentAttribs, bool& found_da);
 int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement* trackElement);
 
 int PackWaveFile(cd::IsoWriter* writer, const char* wavFile);
@@ -1025,246 +1025,241 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	return true;
 }
 
-int ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
+static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
 {
-	std::string srcDir;
+	const char* nameElement = dirElement->Attribute("name");
+	const char* sourceElement = dirElement->Attribute("source");
+
+	if ( nameElement == nullptr && sourceElement == nullptr )
+	{
+		if ( !global::QuietMode )
+		{
+			printf("      ");
+		}
+
+		printf( "ERROR: Missing name and source attributes on "
+			"line %d.\n", dirElement->GetLineNum() );
+
+		return false;
+	}
+
 	std::string srcFile;
+	if ( sourceElement != nullptr )
+	{
+		srcFile = sourceElement;
+		// Replace all forward slashes with backslashes
+		for ( char& ch : srcFile )
+		{
+			if ( ch == '\\' )
+			{
+				ch = '/';
+			}
+		}
+	}
+
 	std::string name;
-
-	if ( dirElement->Attribute( "srcdir" ) != nullptr )
+	if ( nameElement != nullptr )
 	{
-		srcDir = dirElement->Attribute( "srcdir" );
+		name = nameElement;
 	}
-
-	if ( !srcDir.empty() )
+	else
 	{
-		while ( srcDir.rfind( "\\" ) != std::string::npos )
+		if ( !srcFile.empty() )
 		{
-			srcDir.replace( srcDir.rfind( "\\" ), 1, "/" );
-		}
-		if ( srcDir.back() != '/' )
-		{
-			srcDir += "/";
+			name = srcFile;
+			name.erase( 0, name.rfind( '/' )+1 );
 		}
 	}
 
-	dirElement = dirElement->FirstChildElement();
+	if ( srcFile.empty() )
+	{
+		srcFile = name;
+	}
 
-	while ( dirElement != nullptr )
+	if ( ( name.find( '\\' ) != std::string::npos )
+		|| ( name.find( '/' ) != std::string::npos ) )
+	{
+		if ( !global::QuietMode )
+		{
+			printf("      ");
+		}
+
+		printf( "ERROR: Name attribute for file entry '%s' cannot be "
+			"a path on line %d.\n", name.c_str(),
+			dirElement->GetLineNum() );
+
+		return false;
+	}
+
+	if ( name.size() > 12 )
+	{
+		if ( !global::QuietMode )
+		{
+			printf( "      " );
+		}
+
+		printf( "ERROR: Name entry for file '%s' is more than 12 "
+			"characters long on line %d.\n", name.c_str(),
+			dirElement->GetLineNum() );
+
+		return false;
+	}
+
+	int entry = iso::EntryFile;
+
+	const char* typeElement = dirElement->Attribute("type");
+	if ( typeElement != nullptr )
+	{
+		if ( compare( "data", typeElement ) == 0 )
+		{
+			entry = iso::EntryFile;
+		} else if ( compare( "mixed", typeElement ) == 0 ||
+                    compare( "xa", typeElement ) == 0 || //alias xa and str to mixed
+                    compare( "str", typeElement ) == 0 )
+		{
+			entry = iso::EntrySTR;
+		}
+		else if ( compare( "da", typeElement ) == 0 )
+		{
+			entry = iso::EntryDA;
+			if ( global::cuefile == nullptr )
+			{
+				if ( !global::QuietMode )
+				{
+					printf( "      " );
+				}
+				printf( "ERROR: DA audio file(s) specified but no CUE sheet specified.\n" );
+				return false;
+			}
+			found_da = true;
+		}
+		else
+		{
+			if ( !global::QuietMode )
+			{
+				printf( "      " );
+			}
+
+			printf( "ERROR: Unknown type %s on line %d\n",
+				dirElement->Attribute( "type" ),
+				dirElement->GetLineNum() );
+
+			return false;
+		}
+
+		if ( found_da && entry != iso::EntryDA )
+		{
+			if ( !global::QuietMode )
+			{
+				printf( "      " );
+			}
+
+			printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
+				dirElement->GetLineNum() );
+
+			return false;
+		}
+
+	}
+
+	return dirTree->AddFileEntry(name.c_str(), entry, srcFile.c_str(), iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)));
+}
+
+static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
+{
+	if ( found_da )
+	{
+		if ( !global::QuietMode )
+		{
+			printf( "      " );
+		}
+
+		printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
+			dirElement->GetLineNum() );
+
+		return false;
+	}
+
+	// TODO: For now this is a hack, unify this code again with the file type in the future
+	// so it isn't as awkward
+	int dummyType = 0; // Data
+	const char* type = dirElement->Attribute( "type" );
+	if ( type != nullptr )
+	{
+		// TODO: Make reasonable
+		if ( compare(type, "2336") == 0 )
+		{
+			dummyType = 1; // XA
+		}
+	}
+
+
+	dirTree->AddDummyEntry( atoi( dirElement->Attribute( "sectors" ) ), dummyType );
+	return true;
+}
+
+static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
+{
+	if ( found_da )
+	{
+		if ( !global::QuietMode )
+		{
+			printf( "      " );
+		}
+
+		printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
+			dirElement->GetLineNum() );
+
+		return false;
+	}
+
+	const char* nameElement = dirElement->Attribute( "name" );
+	if ( strlen( nameElement ) > 12 )
+	{
+		printf( "ERROR: Directory name %s on line %d is more than 12 "
+			"characters long.\n", nameElement,
+				dirElement->GetLineNum() );
+		return false;
+	}
+
+	const iso::EntryAttributes attribs = iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement));
+
+	iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
+		nameElement, dirElement->Attribute( "source" ), attribs );
+
+	if ( subdir == nullptr )
+	{
+		return false;
+	}
+
+	return ParseDirectory(subdir, dirElement, attribs, found_da);
+}
+
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
+{
+	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
         if ( compare( "file", dirElement->Name() ) == 0 )
 		{
-			if ( ( dirElement->Attribute("name") == nullptr ) &&
-				( dirElement->Attribute("source") == nullptr ) ) {
-
-				if ( !global::QuietMode )
-				{
-					printf("      ");
-				}
-
-				printf( "ERROR: Missing name and source attributes on "
-					"line %d.\n", dirElement->GetLineNum() );
-
-				return false;
-			}
-
-			srcFile = "";
-
-			if ( dirElement->Attribute("source") != nullptr )
-			{
-				srcFile = dirElement->Attribute("source");
-				while ( srcFile.rfind( "\\" ) != std::string::npos )
-				{
-					srcFile.replace( srcFile.rfind( "\\" ), 1, "/" );
-				}
-			}
-
-			if ( dirElement->Attribute("name") )
-			{
-				name = dirElement->Attribute("name");
-			}
-			else
-			{
-				if ( !srcFile.empty() )
-				{
-					name = srcFile;
-					name.erase( 0, name.rfind( '/' )+1 );
-				}
-			}
-
-			if ( srcFile.empty() ) {
-				srcFile = name;
-			}
-
-			if ( !srcDir.empty() )
-			{
-				srcFile = srcDir + srcFile;
-			}
-
-
-			if ( ( name.find( '\\', 0 ) != std::string::npos )
-				|| ( name.find( '/', 0 ) != std::string::npos ) )
-			{
-				if ( !global::QuietMode )
-				{
-					printf("      ");
-				}
-
-				printf( "ERROR: Name attribute for file entry '%s' cannot be "
-					"a path on line %d.\n", name.c_str(),
-					dirElement->GetLineNum() );
-
-				return false;
-			}
-
-			if ( name.size() > 12 )
-			{
-				if ( !global::QuietMode )
-				{
-					printf( "      " );
-				}
-
-				printf( "ERROR: Name entry for file '%s' is more than 12 "
-					"characters long on line %d.\n", name.c_str(),
-					dirElement->GetLineNum() );
-
-				return false;
-			}
-
-			int entry = iso::EntryFile;
-
-			if ( dirElement->Attribute( "type" ) != nullptr )
-			{
-				if ( compare( "data", dirElement->Attribute( "type" ) ) == 0 )
-				{
-					entry = iso::EntryFile;
-				} else if ( compare( "mixed", dirElement->Attribute( "type" ) ) == 0 ||
-                            compare( "xa", dirElement->Attribute( "type" ) ) == 0 || //alias xa and str to mixed
-                            compare( "str", dirElement->Attribute( "type" ) ) == 0 )
-				{
-					entry = iso::EntrySTR;
-				}
-				else if ( compare( "da", dirElement->Attribute( "type" ) ) == 0 )
-				{
-					entry = iso::EntryDA;
-					if ( global::cuefile == nullptr )
-					{
-						if ( !global::QuietMode )
-						{
-							printf( "      " );
-						}
-						printf( "ERROR: DA audio file(s) specified but no CUE sheet specified.\n" );
-						return false;
-					}
-					found_da = true;
-				}
-				else
-				{
-					if ( !global::QuietMode )
-					{
-						printf( "      " );
-					}
-
-					printf( "ERROR: Unknown type %s on line %d\n",
-						dirElement->Attribute( "type" ),
-						dirElement->GetLineNum() );
-
-					return false;
-				}
-
-				if ( ( found_da ) && ( entry != iso::EntryDA ) )
-				{
-					if ( !global::QuietMode )
-					{
-						printf( "      " );
-					}
-
-					printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
-						dirElement->GetLineNum() );
-
-					return false;
-				}
-
-			}
-
-			if ( !dirTree->AddFileEntry( name.c_str(), entry, srcFile.c_str(), iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)) ) )
+			if (!ParseFileEntry(dirTree, dirElement, parentAttribs, found_da))
 			{
 				return false;
 			}
-
 		}
 		else if ( compare( "dummy", dirElement->Name() ) == 0 )
 		{
-			if ( found_da )
+			if (!ParseDummyEntry(dirTree, dirElement, found_da))
 			{
-				if ( !global::QuietMode )
-				{
-					printf( "      " );
-				}
-
-				printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
-					dirElement->GetLineNum() );
-
 				return false;
 			}
-
-			// TODO: For now this is a hack, unify this code again with the file type in the future
-			// so it isn't as awkward
-			int dummyType = 0; // Data
-			const char* type = dirElement->Attribute( "type" );
-			if ( type != nullptr )
-			{
-				// TODO: Make reasonable
-				if ( compare(type, "2336") == 0 )
-				{
-					dummyType = 1; // XA
-				}
-			}
-
-
-			dirTree->AddDummyEntry( atoi( dirElement->Attribute( "sectors" ) ), dummyType );
         }
 		else if ( compare( "dir", dirElement->Name() ) == 0 )
 		{
-			if ( found_da )
-			{
-				if ( !global::QuietMode )
-				{
-					printf( "      " );
-				}
-
-				printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
-					dirElement->GetLineNum() );
-
-				return false;
-			}
-
-			if ( strlen( dirElement->Attribute( "name" ) ) > 12 )
-			{
-				printf( "ERROR: Directory name %s on line %d is more than 12 "
-					"characters long.\n", dirElement->Attribute( "source" ),
-						dirElement->GetLineNum() );
-				return false;
-			}
-
-			const iso::EntryAttributes attribs = iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement));
-
-			iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
-				dirElement->Attribute( "name" ), dirElement->Attribute( "source" ), attribs );
-
-			if ( subdir == nullptr )
-			{
-				return false;
-			}
-
-            if ( !ParseDirectory( subdir, dirElement, attribs, found_da ) )
+			if (!ParseDirEntry(dirTree, dirElement, parentAttribs, found_da))
 			{
 				return false;
 			}
         }
-
-		dirElement = dirElement->NextSiblingElement();
-
 	}
 
 	return true;

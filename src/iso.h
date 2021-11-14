@@ -173,7 +173,7 @@ namespace iso
 		 *	*srcfile	- Path and filename to the source file.
 		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 */
-		int	AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes);
+		bool AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes);
 
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.
