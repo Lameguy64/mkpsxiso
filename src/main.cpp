@@ -1014,7 +1014,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 			printf( "      Writing license data..." );
 		}
 
-		iso::WriteLicenseData( writer, (void*)buff );
+		iso::WriteLicenseData( writer, buff );
 
 		if ( !global::QuietMode )
 		{

@@ -287,25 +287,13 @@ int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const char* wavFile, 
 	return true;
 }
 
-iso::DirTreeClass::DirTreeClass()
+iso::DirTreeClass::DirTreeClass(DirTreeClass* parent)
+	: name(rootname), parent(parent)
 {
-	recordLBA = 0;
-	passedSector = false;
-	parent = nullptr;
-	first_track = false;
-
-	name = rootname;
 }
 
 iso::DirTreeClass::~DirTreeClass()
 {
-	for ( int i=0; i<entries.size(); i++ )
-	{
-		if (entries[i].subdir != nullptr)
-		{
-			delete (DirTreeClass*)entries[i].subdir;
-		}
-	}
 }
 
 int	iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes)
@@ -495,7 +483,7 @@ void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
 	entry.type		= EntryDummy;
 	entry.length	= 2048*sectors;
 
-	entries.push_back( entry );
+	entries.push_back( std::move(entry) );
 }
 
 iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes)
@@ -534,44 +522,32 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char*
 	DIRENTRY entry;
 
 	entry.id		= id;
-
-	for ( int i=0; i<entry.id.size(); i++ )
+	for ( char& ch : entry.id )
 	{
-		entry.id[i] = std::toupper( entry.id[i] );
+		ch = toupper( ch );
 	}
 
 	entry.type		= EntryDir;
-	entry.subdir	= (void*) new DirTreeClass; // TODO: when should this be freed?
+	entry.subdir	= std::make_unique<DirTreeClass>(this);
 	entry.perms		= attributes.XAPerm.value();
 	entry.GID		= attributes.GID.value();
 	entry.UID		= attributes.UID.value();
+	entry.length	= entry.subdir->CalculateDirEntryLen();
+	entry.date		= GetISODateStamp( dirTime, attributes.GMTOffs.value() );
 
-	entries.push_back( entry );
+	entries.emplace_back( std::move(entry) );
 
-	entries.back().length	= ((iso::DirTreeClass*)entries.back().subdir)->CalculateDirEntryLen();
-
-	((DirTreeClass*)entry.subdir)->parent = this;
-
-	entries.back().date = GetISODateStamp( dirTime, attributes.GMTOffs.value() );
-
-	for ( int i=0; entry.id[i] != 0x00; i++ )
-	{
-		entry.id[i] = toupper( entry.id[i] );
-	}
-
-	return (DirTreeClass*)entry.subdir;
+	return entries.back().subdir.get();
 }
 
 void iso::DirTreeClass::PrintRecordPath()
 {
-	DirTreeClass *p = (DirTreeClass*)parent;
-
-	if ( p == nullptr )
+	if ( parent == nullptr )
 	{
 		return;
 	}
 
-	p->PrintRecordPath();
+	parent->PrintRecordPath();
 	printf( "/%s", name.c_str() );
 }
 
@@ -588,7 +564,7 @@ int iso::DirTreeClass::CalculateFileSystemSize(int lba) {
 		if (entries[i].subdir != nullptr)
 		{
 			// Recursively calculate the LBA of subdirectories
-			lba = ((DirTreeClass*)entries[i].subdir)->CalculateFileSystemSize(lba);
+			lba = entries[i].subdir->CalculateFileSystemSize(lba);
 		}
 		else
 		{
@@ -640,12 +616,12 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 		// If it is a subdir
 		if (entries[i].subdir != nullptr)
 		{
-			((DirTreeClass*)entries[i].subdir)->name = entries[i].id;
+			entries[i].subdir->name = entries[i].id;
 
 			// Recursively calculate the LBA of subdirectories
-			lba = ((DirTreeClass*)entries[i].subdir)->CalculateTreeLBA(lba);
+			lba = entries[i].subdir->CalculateTreeLBA(lba);
 
-			entries[i].length = ((DirTreeClass*)entries[i].subdir)->CalculateDirEntryLen();
+			entries[i].length = entries[i].subdir->CalculateDirEntryLen();
 		}
 		else
 		{
@@ -725,7 +701,6 @@ int iso::DirTreeClass::CalculateDirEntryLen()
 
 void iso::DirTreeClass::SortDirEntries()
 {
-	iso::DIRENTRY temp;
 	int numdummies = 0;
 
 	if ( entries.size() < 2 )
@@ -741,7 +716,7 @@ void iso::DirTreeClass::SortDirEntries()
 			// Perform recursive call
             if ( entries[i].subdir != nullptr )
 			{
-				((iso::DirTreeClass*)entries[i].subdir)->SortDirEntries();
+				entries[i].subdir->SortDirEntries();
 			}
 		}
 		else
@@ -760,9 +735,7 @@ void iso::DirTreeClass::SortDirEntries()
 		{
 			if ( (entries[j-1].id.empty()) && (!entries[j].id.empty()) )
 			{
-				temp = entries[j];
-				entries[j] = entries[j-1];
-				entries[j-1] = temp;
+				std::swap(entries[j], entries[j-1]);
 			}
 		}
 	}
@@ -774,9 +747,7 @@ void iso::DirTreeClass::SortDirEntries()
 		{
 			if ( entries[j-1].id.compare( entries[j].id ) > 0 )
 			{
-				temp = entries[j-1];
-				entries[j-1] = entries[j];
-				entries[j] = temp;
+				std::swap(entries[j], entries[j-1]);
 			}
 		}
 	}
@@ -817,7 +788,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const
 		{
 			// Parent
 			if ( parent ) {
-				dirlen = ((DirTreeClass*)parent)->CalculateDirEntryLen();
+				dirlen = parent->CalculateDirEntryLen();
 			} else {
 				dirlen = CalculateDirEntryLen();
 			}
@@ -978,7 +949,7 @@ int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, int lastDirL
 	{
 		if ( entries[i].type == EntryDir )
 		{
-			if ( !((DirTreeClass*)entries[i].subdir)->WriteDirectoryRecords(
+			if ( !entries[i].subdir->WriteDirectoryRecords(
 				writer, recordLBA, entries[i].date ) )
 			{
 				return 0;
@@ -1201,7 +1172,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		}
 		else if ( entries[i].type == EntryDir )
 		{
-			((DirTreeClass*)entries[i].subdir)->WriteFiles( writer );
+			entries[i].subdir->WriteFiles( writer );
 		}
 		// Write dummies as gaps without data
 		else if ( entries[i].type == EntryDummy )
@@ -1284,7 +1255,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level)
 		if ( entries[i].type == EntryDir )
 		{
 			fprintf( fp, "\n" );
-			((DirTreeClass*)entries[i].subdir)->OutputHeaderListing( fp, level+1 );
+			entries[i].subdir->OutputHeaderListing( fp, level+1 );
 		}
 	}
 
@@ -1325,7 +1296,7 @@ int iso::DirTreeClass::WriteCueEntries(FILE* fp, int* trackNum)
 		}
 		else if ( entries[i].type == EntryDir )
 		{
-			((DirTreeClass*)entries[i].subdir)->WriteCueEntries( fp, trackNum );
+			entries[i].subdir->WriteCueEntries( fp, trackNum );
 		}
 
 	}
@@ -1421,7 +1392,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level)
 
 		if ( entries[i].type == EntryDir )
 		{
-			((DirTreeClass*)entries[i].subdir)->OutputLBAlisting( fp, level+1 );
+			entries[i].subdir->OutputLBAlisting( fp, level+1 );
 		}
 	}
 
@@ -1439,12 +1410,12 @@ int iso::DirTreeClass::CalculatePathTableLenSub(DIRENTRY* dirEntry)
 	// Put identifier (nullptr if first entry)
 	len += 2*((dirEntry->id.size()+1)/2);
 
-	for ( int i=0; i<((DirTreeClass*)dirEntry->subdir)->entries.size(); i++ )
+	for ( int i=0; i<dirEntry->subdir->entries.size(); i++ )
 	{
-		if ( ((DirTreeClass*)dirEntry->subdir)->entries[i].type == EntryDir )
+		if ( dirEntry->subdir->entries[i].type == EntryDir )
 		{
 			len += CalculatePathTableLenSub(
-				&((DirTreeClass*)dirEntry->subdir)->entries[i] );
+				&dirEntry->subdir->entries[i] );
 		}
 	}
 
@@ -1473,26 +1444,26 @@ void iso::DirTreeClass::GenPathTableSub(PathTableClass* table,
 	{
 		if ( dir->entries[i].type == EntryDir )
 		{
-			PathEntryClass* entry = new PathEntryClass;
+			auto entry = std::make_unique<PathEntryClass>();
 
 			dirIndex++;
 			entry->dir_id		= &dir->entries[i].id;
 			entry->dir_level	= parentIndex;
-			entry->dir_lba		= ((DirTreeClass*)dir->entries[i].subdir)->recordLBA;
-			entry->dir			= dir->entries[i].subdir;
+			entry->dir_lba		= dir->entries[i].subdir->recordLBA;
+			entry->dir			= dir->entries[i].subdir.get();
 			entry->next_parent	= dirIndex;
 
-			table->entries.push_back( entry );
+			table->entries.push_back( std::move(entry) );
 		}
 	}
 
 	for ( int i=0; i<table->entries.size(); i++ ) {
 
-		DirTreeClass* subdir = (DirTreeClass*)table->entries[i]->dir;
-		PathTableClass* sub = new PathTableClass;
+		DirTreeClass* subdir = table->entries[i]->dir;
+		auto sub = std::make_unique<PathTableClass>();
 
-		GenPathTableSub( sub, subdir, table->entries[i]->next_parent, msb );
-		table->entries[i]->sub = sub;
+		GenPathTableSub( sub.get(), subdir, table->entries[i]->next_parent, msb );
+		table->entries[i]->sub = std::move(sub);
 
 	}
 }
@@ -1507,26 +1478,26 @@ int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb)
 	{
 		if ( entries[i].type == EntryDir )
 		{
-			PathEntryClass* entry = new PathEntryClass;
+			auto entry = std::make_unique<PathEntryClass>();
 
 			dirIndex++;
 			entry->dir_id		= &entries[i].id;
 			entry->dir_level	= 1;
-			entry->dir_lba		= ((DirTreeClass*)entries[i].subdir)->recordLBA;
-			entry->dir			= entries[i].subdir;
+			entry->dir_lba		= entries[i].subdir->recordLBA;
+			entry->dir			= entries[i].subdir.get();
 			entry->next_parent	= dirIndex;
 
-			pathTable.entries.push_back(entry);
+			pathTable.entries.push_back(std::move(entry));
 		}
 	}
 
 	for ( int i=0; i<pathTable.entries.size(); i++ ) {
 
-		DirTreeClass* subdir = (DirTreeClass*)pathTable.entries[i]->dir;
-		PathTableClass* sub = new PathTableClass;
+		DirTreeClass* subdir = pathTable.entries[i]->dir;
+		auto sub = std::make_unique<PathTableClass>();
 
-		GenPathTableSub( sub, subdir, pathTable.entries[i]->next_parent, msb );
-		pathTable.entries[i]->sub = sub;
+		GenPathTableSub( sub.get(), subdir, pathTable.entries[i]->next_parent, msb );
+		pathTable.entries[i]->sub = std::move(sub);
 	}
 
 	*buff = 1;	// Directory identifier length
@@ -1572,7 +1543,7 @@ int iso::DirTreeClass::GetFileCountTotal()
 		}
 		else
 		{
-            numfiles += ((DirTreeClass*)entries[i].subdir)->GetFileCountTotal();
+            numfiles += entries[i].subdir->GetFileCountTotal();
 		}
     }
 
@@ -1588,7 +1559,7 @@ int iso::DirTreeClass::GetDirCountTotal()
         if ( entries[i].type == EntryDir )
 		{
 			numdirs++;
-            numdirs += ((DirTreeClass*)entries[i].subdir)->GetDirCountTotal();
+            numdirs += entries[i].subdir->GetDirCountTotal();
 		}
     }
 
@@ -1725,11 +1696,9 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 		cd::IsoWriter::EdcEccForm1 );
 
 	// Generate and write L-path table
-	//unsigned char sectorBuff[2048*pathTableSectors];
-	unsigned char *sectorBuff = new unsigned char[2048*pathTableSectors];
-	memset( sectorBuff, 0x00, 2048*pathTableSectors );
+	auto sectorBuff = std::make_unique<unsigned char[]>(static_cast<size_t>(2048)*pathTableSectors);
 
-	dirTree->GeneratePathTable( sectorBuff, false );
+	dirTree->GeneratePathTable( sectorBuff.get(), false );
 	writer->SetSubheader( cd::IsoWriter::SubData );
 
 	for ( int i=0; i<pathTableSectors; i++ )
@@ -1756,7 +1725,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 
 
 	// Generate and write M-path table
-	dirTree->GeneratePathTable( sectorBuff, true );
+	dirTree->GeneratePathTable( sectorBuff.get(), true );
 	writer->SetSubheader( cd::IsoWriter::SubData );
 
 	for ( int i=0; i<pathTableSectors; i++ )
@@ -1782,7 +1751,6 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	}
 
 	writer->SetSubheader( cd::IsoWriter::SubData );
-	delete[] sectorBuff;
 }
 
 iso::PathEntryClass::PathEntryClass() {
@@ -1797,12 +1765,6 @@ iso::PathEntryClass::PathEntryClass() {
 }
 
 iso::PathEntryClass::~PathEntryClass() {
-
-	if ( sub != nullptr )
-	{
-		delete (PathTableClass*)sub;
-	}
-
 }
 
 iso::PathTableClass::PathTableClass() {
@@ -1810,15 +1772,6 @@ iso::PathTableClass::PathTableClass() {
 }
 
 iso::PathTableClass::~PathTableClass() {
-
-	if ( entries.size() > 0 )
-	{
-		for ( int i=0; i<entries.size(); i++ )
-		{
-			delete entries[i];
-		}
-	}
-
 }
 
 unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, int msb) {
@@ -1860,7 +1813,7 @@ unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, int msb) {
 	{
 		if ( entries[i]->sub )
 		{
-			buff = ((PathTableClass*)entries[i]->sub)->GenTableData( buff, msb );
+			buff = entries[i]->sub->GenTableData( buff, msb );
 		}
 
 	}

@@ -11,6 +11,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <tinyxml2.h>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -42,7 +43,7 @@ namespace iso
 		const char* CreationDate;
 	} IDENTIFIERS;
 
-	typedef struct
+	struct DIRENTRY
 	{
 		std::string	id;			/// Entry identifier (empty if invisible dummy)
 		int			length;		/// Length of file in bytes
@@ -53,11 +54,11 @@ namespace iso
 		unsigned short perms;	/// XA permissions
 		unsigned short GID;		/// Owner group ID
 		unsigned short UID;		/// Owner user ID
-		void*		subdir;
+		std::unique_ptr<class DirTreeClass> subdir;
 
 		cd::ISO_DATESTAMP date;
 
-	} DIRENTRY;
+	};
 
 
 	// Inheritable attributes of files and/or directories
@@ -97,8 +98,8 @@ namespace iso
 		int dir_lba;
 		int next_parent;
 		
-		void* dir;
-		void* sub;
+		DirTreeClass* dir; // Non-owning
+		std::unique_ptr<class PathTableClass> sub; // Owning
 	};
 	
 	class PathTableClass {
@@ -108,18 +109,19 @@ namespace iso
 		virtual ~PathTableClass();
 		unsigned char* GenTableData(unsigned char* buff, int msb);
 		
-		std::vector<PathEntryClass*> entries;
+		std::vector<std::unique_ptr<PathEntryClass>> entries;
 	};
 
 	class DirTreeClass
 	{
+	private:
 		std::string name;
-		int			dirIndex;
-		int			recordLBA;
+		int			dirIndex = 0;
+		int			recordLBA = 0;
 
-		void		*parent;
+		DirTreeClass* parent = nullptr; // Non-owning
 
-		int			first_track;
+		int			first_track = 0;
 		
 		/// Internal function for generating and writing directory records
 		int	WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const cd::ISO_DATESTAMP& currentDirDate);
@@ -138,9 +140,9 @@ namespace iso
 		std::vector<DIRENTRY> entries;
 
 		// Flag to indicate if the directory record has exceeded a sector
-		int			passedSector;
+		bool		passedSector = false;
 
-		DirTreeClass();
+		DirTreeClass(DirTreeClass* parent = nullptr);
 		virtual ~DirTreeClass();
 
 		void PrintRecordPath();
