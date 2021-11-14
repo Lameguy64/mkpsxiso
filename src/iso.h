@@ -93,7 +93,7 @@ namespace iso
 		PathEntryClass();
 		virtual ~PathEntryClass();
 		
-		std::string* dir_id;
+		std::string dir_id;
 		int dir_level;
 		int dir_lba;
 		int next_parent;

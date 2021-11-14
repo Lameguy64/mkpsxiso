@@ -1447,7 +1447,7 @@ void iso::DirTreeClass::GenPathTableSub(PathTableClass* table,
 			auto entry = std::make_unique<PathEntryClass>();
 
 			dirIndex++;
-			entry->dir_id		= &dir->entries[i].id;
+			entry->dir_id		= dir->entries[i].id;
 			entry->dir_level	= parentIndex;
 			entry->dir_lba		= dir->entries[i].subdir->recordLBA;
 			entry->dir			= dir->entries[i].subdir.get();
@@ -1481,7 +1481,7 @@ int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb)
 			auto entry = std::make_unique<PathEntryClass>();
 
 			dirIndex++;
-			entry->dir_id		= &entries[i].id;
+			entry->dir_id		= entries[i].id;
 			entry->dir_level	= 1;
 			entry->dir_lba		= entries[i].subdir->recordLBA;
 			entry->dir			= entries[i].subdir.get();
@@ -1755,7 +1755,6 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 
 iso::PathEntryClass::PathEntryClass() {
 
-	dir_id = nullptr;
 	dir_level = 0;
 	dir_lba = 0;
 
@@ -1783,7 +1782,7 @@ unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, int msb) {
 
 	for ( int i=0; i<entries.size(); i++ )
 	{
-		*buff = entries[i]->dir_id->length();	// Directory identifier length
+		*buff = entries[i]->dir_id.length();	// Directory identifier length
 		buff++;
 		*buff = 0;								// Extended attribute record length (unused)
 		buff++;
@@ -1803,10 +1802,10 @@ unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, int msb) {
 		buff += 6;
 
 		// Put identifier (nullptr if first entry)
-		strncpy( (char*)buff, entries[i]->dir_id->c_str(),
-			entries[i]->dir_id->length() );
+		strncpy( (char*)buff, entries[i]->dir_id.c_str(),
+			entries[i]->dir_id.length() );
 
-		buff += 2*((entries[i]->dir_id->length()+1)/2);
+		buff += 2*((entries[i]->dir_id.length()+1)/2);
 	}
 
 	for ( int i=0; i<entries.size(); i++ )
