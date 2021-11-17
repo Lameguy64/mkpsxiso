@@ -51,6 +51,7 @@ namespace iso
 
 		std::string	srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		int			type;		/// File type (0 - file, 1 - directory)
+		unsigned char attribs;	/// XA attributes, 0xFF is not set
 		unsigned short perms;	/// XA permissions
 		unsigned short GID;		/// Owner group ID
 		unsigned short UID;		/// Owner user ID
@@ -73,11 +74,13 @@ namespace iso
 	{
 	private:
 		static constexpr signed char DEFAULT_GMFOFFS = 0;
+		static constexpr unsigned char DEFAULT_XAATRIB = 0xFF;
 		static constexpr unsigned short DEFAULT_XAPERM = 0x555; // rx
 		static constexpr unsigned short	DEFAULT_OWNER_ID = 0;
 
 	public:
 		std::optional<signed char> GMTOffs;
+		std::optional<unsigned char> XAAttrib;
 		std::optional<unsigned short> XAPerm;
 		std::optional<unsigned short> GID;
 		std::optional<unsigned short> UID;

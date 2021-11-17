@@ -625,6 +625,12 @@ iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement
 		result.GMTOffs = static_cast<signed char>(strtol(GMToffs, nullptr, 0));
 	}
 
+	const char* XAAttrib = dirElement->Attribute( "xa_attrib" );
+	if ( XAAttrib != nullptr )
+	{
+		result.XAAttrib = static_cast<unsigned char>(strtoul(XAAttrib, nullptr, 0));
+	}
+
 	const char* XAPerm = dirElement->Attribute( "xa_perm" );
 	if ( XAPerm != nullptr )
 	{

@@ -450,6 +450,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 	entry.id = std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
+	entry.attribs	= attributes.XAAttrib.value();
 	entry.perms		= attributes.XAPerm.value();
 	entry.GID		= attributes.GID.value();
 	entry.UID		= attributes.UID.value();
@@ -527,6 +528,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char*
 
 	entry.type		= EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries, this);
+	entry.attribs	= attributes.XAAttrib.value();
 	entry.perms		= attributes.XAPerm.value();
 	entry.GID		= attributes.GID.value();
 	entry.UID		= attributes.UID.value();
@@ -829,7 +831,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, int LBA, int paren
 			else if ( (entry.type == EntrySTR) ||
 				(entry.type == EntryXA) )
 			{
-				attributes |= 0x3800;
+				attributes |= entry.attribs != 0xFFu ? (entry.attribs << 8) : 0x3800;
 				xa->filenum = 1;
 			}
 			else if (entry.type == EntryDir)
@@ -1726,6 +1728,7 @@ iso::EntryAttributes iso::EntryAttributes::MakeDefault()
 	EntryAttributes result;
 
 	result.GMTOffs = DEFAULT_GMFOFFS;
+	result.XAAttrib = DEFAULT_XAATRIB;
 	result.XAPerm = DEFAULT_XAPERM;
 	result.GID = result.UID = DEFAULT_OWNER_ID;
 
@@ -1737,6 +1740,10 @@ iso::EntryAttributes iso::EntryAttributes::Overlay(EntryAttributes base, const E
 	if (derived.GMTOffs.has_value())
 	{
 		base.GMTOffs = derived.GMTOffs;
+	}
+	if (derived.XAAttrib.has_value())
+	{
+		base.XAAttrib = derived.XAAttrib;
 	}
 	if (derived.XAPerm.has_value())
 	{
