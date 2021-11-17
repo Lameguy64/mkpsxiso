@@ -814,7 +814,8 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		printf( "    Parsing directory tree...\n" );
 	}
 
-	iso::DirTreeClass dirTree;
+	iso::EntryList entries;
+	iso::DirTreeClass dirTree(entries);
 
 	if ( trackElement->FirstChildElement( "directory_tree" ) == nullptr )
 	{
@@ -839,11 +840,8 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	// Calculate directory tree LBAs and retrieve size of image
 	int pathTableLen = dirTree.CalculatePathTableLen();
 
-	int imageLen = dirTree.CalculateFileSystemSize(
-		16+(((pathTableLen+2047)/2048)*4) );
-
-	int totalLen = dirTree.CalculateTreeLBA(
-		18+(((pathTableLen+2047)/2048)*4) );
+	const int rootLBA = 18+(((pathTableLen+2047)/2048)*4);
+	int totalLen = dirTree.CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
 	{
@@ -989,8 +987,8 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	}
 
 	// Sort directory entries and write it
-	dirTree.SortDirEntries();
-	dirTree.WriteDirectoryRecords( writer, 0, volumeDate );
+	dirTree.SortDirectoryEntries();
+	dirTree.WriteDirectoryRecords( writer, rootLBA, rootLBA, volumeDate, volumeDate );
 
 	// Write file system descriptors to finish the image
 	iso::WriteDescriptor( writer, isoIdentifiers, &dirTree, volumeDate, totalLen );

@@ -60,6 +60,8 @@ namespace iso
 
 	};
 
+	using EntryList = std::vector<DIRENTRY>;
+
 
 	// Inheritable attributes of files and/or directories
 	// They are applied in the following order:
@@ -96,7 +98,6 @@ namespace iso
 		std::string dir_id;
 		int dir_level;
 		int dir_lba;
-		int next_parent;
 		
 		DirTreeClass* dir; // Non-owning
 		std::unique_ptr<class PathTableClass> sub; // Owning
@@ -107,7 +108,7 @@ namespace iso
 		
 		PathTableClass();
 		virtual ~PathTableClass();
-		unsigned char* GenTableData(unsigned char* buff, int msb);
+		unsigned char* GenTableData(unsigned char* buff, bool msb);
 		
 		std::vector<std::unique_ptr<PathEntryClass>> entries;
 	};
@@ -116,7 +117,6 @@ namespace iso
 	{
 	private:
 		std::string name;
-		int			dirIndex = 0;
 		int			recordLBA = 0;
 
 		DirTreeClass* parent = nullptr; // Non-owning
@@ -124,38 +124,36 @@ namespace iso
 		int			first_track = 0;
 		
 		/// Internal function for generating and writing directory records
-		int	WriteDirEntries(cd::IsoWriter* writer, int lastLBA, const cd::ISO_DATESTAMP& currentDirDate);
+		int	WriteDirEntries(cd::IsoWriter* writer, int LBA, int parentLBA, const cd::ISO_DATESTAMP& currentDirDate, const cd::ISO_DATESTAMP& parentDirDate) const;
 
 		/// Internal function for recursive path table length calculation
-		int CalculatePathTableLenSub(DIRENTRY* dirEntry);
+		int CalculatePathTableLenSub(const DIRENTRY& dirEntry) const;
 
 		/// Internal function for recursive path table generation
-		void GenPathTableSub(PathTableClass* table, DirTreeClass* dir, int parentIndex, int msb);
+		void GenPathTableSub(PathTableClass* table, DirTreeClass* dir, int parentIndex);
 
 		int GetWavSize(const char* wavFile);
 		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap);
 		
 	public:
 
-		std::vector<DIRENTRY> entries;
+		EntryList& entries; // List of all entries on the disc
+		std::vector<size_t> entriesInDir; // Indices of entries in this directory
 
-		// Flag to indicate if the directory record has exceeded a sector
-		bool		passedSector = false;
-
-		DirTreeClass(DirTreeClass* parent = nullptr);
-		virtual ~DirTreeClass();
+		DirTreeClass(EntryList& entries, DirTreeClass* parent = nullptr);
+		~DirTreeClass();
 
 		void PrintRecordPath();
 
 		void OutputHeaderListing(FILE* fp, int level);
-
-		int CalculateFileSystemSize(int lba);
 		
 		/** Calculates the length of the directory record to be produced by this class in bytes.
 		 *
 		 *  Returns: Length of directory record in bytes.
+		 * 
+		 * * *passedSector - Flag to indicate if the directory record has exceeded a sector
 		 */
-		int	CalculateDirEntryLen();
+		int	CalculateDirEntryLen(bool* passedSector = nullptr) const;
 
 		/** Calculates the LBA of all file and directory entries in the directory record and returns the next LBA
 		 *	address.
@@ -190,7 +188,7 @@ namespace iso
 		 *
 		 *	Returns: Length of path table in bytes.
 		 */
-		int GeneratePathTable(unsigned char* buff, int msb);
+		int GeneratePathTable(unsigned char* buff, bool msb);
 
 		/** Adds a subdirectory to the directory record.
 		 *
@@ -212,20 +210,22 @@ namespace iso
 		 *	have been written to the CD image.
 		 *
 		 *	*writer		   - Pointer to a cd::IsoWriter class that is ready for writing.
-		 *	lastDirLBA	   - Used for recursive calls, always set to 0.
+		 *	LBA			   - Current directory LBA
+		 *  parentLBA	   - Parent directory LBA
 		 *  currentDirDate - Timestamp to use for . and .. directories.
 		 */
-		int	WriteDirectoryRecords(cd::IsoWriter* writer, int lastDirLBA, const cd::ISO_DATESTAMP& currentDirDate);
+		// TODO: Pass DIRENTRY instead of LBA and timestamps
+		int	WriteDirectoryRecords(cd::IsoWriter* writer, int LBA, int parentLBA, const cd::ISO_DATESTAMP& currentDirDate, const cd::ISO_DATESTAMP& parentDirDate);
 
-		void SortDirEntries();
+		void SortDirectoryEntries();
 
-		int CalculatePathTableLen();
+		int CalculatePathTableLen() const;
 
-		int GetFileCountTotal();
-		int GetDirCountTotal();
+		int GetFileCountTotal() const;
+		int GetDirCountTotal() const;
 
-		void OutputLBAlisting(FILE* fp, int level);
-		int WriteCueEntries(FILE* fp, int* trackNum);
+		void OutputLBAlisting(FILE* fp, int level) const;
+		int WriteCueEntries(FILE* fp, int* trackNum) const;
 	};
 
 	void WriteLicenseData(cd::IsoWriter* writer, void* data);
