@@ -2,6 +2,7 @@
 #define _ISO_H
 
 #ifdef WIN32
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <sys/time.h>
@@ -11,9 +12,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <tinyxml2.h>
+#include <list>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 #include "cdwriter.h"
 
@@ -61,7 +64,8 @@ namespace iso
 
 	};
 
-	using EntryList = std::vector<DIRENTRY>;
+	// EntryList must have stable references!
+	using EntryList = std::list<DIRENTRY>;
 
 
 	// Inheritable attributes of files and/or directories
@@ -95,45 +99,36 @@ namespace iso
 	
 	class PathEntryClass {
 	public:
-		PathEntryClass();
-		virtual ~PathEntryClass();
-		
 		std::string dir_id;
-		int dir_level;
-		int dir_lba;
+		int dir_level = 0;
+		int dir_lba = 0;
 		
-		DirTreeClass* dir; // Non-owning
 		std::unique_ptr<class PathTableClass> sub; // Owning
 	};
 	
 	class PathTableClass {
 	public:
-		
-		PathTableClass();
-		virtual ~PathTableClass();
 		unsigned char* GenTableData(unsigned char* buff, bool msb);
 		
-		std::vector<std::unique_ptr<PathEntryClass>> entries;
+		std::vector<PathEntryClass> entries;
 	};
 
 	class DirTreeClass
 	{
 	private:
+		// TODO: Once DirTreeClass stores a reference to its own entry, this will be pointless
+		// Same for all 'dir' arguments to methods of this class
 		std::string name;
-		int			recordLBA = 0;
 
 		DirTreeClass* parent = nullptr; // Non-owning
 
 		int			first_track = 0;
 		
 		/// Internal function for generating and writing directory records
-		int	WriteDirEntries(cd::IsoWriter* writer, int LBA, int parentLBA, const cd::ISO_DATESTAMP& currentDirDate, const cd::ISO_DATESTAMP& parentDirDate) const;
-
-		/// Internal function for recursive path table length calculation
-		int CalculatePathTableLenSub(const DIRENTRY& dirEntry) const;
+		int	WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const;
 
 		/// Internal function for recursive path table generation
-		void GenPathTableSub(PathTableClass* table, DirTreeClass* dir, int parentIndex);
+		void GenPathTableSub(PathTableClass* table, const DIRENTRY& root, int parentIndex) const;
 
 		int GetWavSize(const char* wavFile);
 		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap);
@@ -141,10 +136,12 @@ namespace iso
 	public:
 
 		EntryList& entries; // List of all entries on the disc
-		std::vector<size_t> entriesInDir; // Indices of entries in this directory
+		std::vector<std::reference_wrapper<iso::DIRENTRY>> entriesInDir; // References to entries in this directory
 
 		DirTreeClass(EntryList& entries, DirTreeClass* parent = nullptr);
 		~DirTreeClass();
+
+		static DIRENTRY& CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate);
 
 		void PrintRecordPath();
 
@@ -186,12 +183,13 @@ namespace iso
 
 		/** Generates a path table of all directories and subdirectories within this class' directory record.
 		 *
+		 *  root	- Directory entry of this path
 		 *	*buff	- Pointer to a 2048 byte buffer to generate the path table to.
 		 *	msb		- If true, generates a path table encoded in big-endian format, little-endian otherwise.
 		 *
 		 *	Returns: Length of path table in bytes.
 		 */
-		int GeneratePathTable(unsigned char* buff, bool msb);
+		int GeneratePathTable(const DIRENTRY& root, unsigned char* buff, bool msb) const;
 
 		/** Adds a subdirectory to the directory record.
 		 *
@@ -218,11 +216,11 @@ namespace iso
 		 *  currentDirDate - Timestamp to use for . and .. directories.
 		 */
 		// TODO: Pass DIRENTRY instead of LBA and timestamps
-		int	WriteDirectoryRecords(cd::IsoWriter* writer, int LBA, int parentLBA, const cd::ISO_DATESTAMP& currentDirDate, const cd::ISO_DATESTAMP& parentDirDate);
+		int	WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir);
 
 		void SortDirectoryEntries();
 
-		int CalculatePathTableLen() const;
+		int CalculatePathTableLen(const DIRENTRY& dirEntry) const;
 
 		int GetFileCountTotal() const;
 		int GetDirCountTotal() const;
@@ -233,7 +231,7 @@ namespace iso
 
 	void WriteLicenseData(cd::IsoWriter* writer, void* data);
 
-	void WriteDescriptor(cd::IsoWriter* writer, IDENTIFIERS id, DirTreeClass* dirTree, const cd::ISO_DATESTAMP& volumeDate, int imageLen);
+	void WriteDescriptor(cd::IsoWriter* writer, const IDENTIFIERS& id, const DIRENTRY& root, int imageLen);
 
 };
 
