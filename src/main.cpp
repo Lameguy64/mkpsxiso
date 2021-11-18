@@ -897,15 +897,25 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	if ( !global::LBAheaderFile.empty() )
 	{
 		FILE* fp = fopen( global::LBAheaderFile.c_str(), "w" );
-
-		dirTree.OutputHeaderListing( fp, 0 );
-
-		fclose( fp );
-
-		if ( !global::QuietMode )
+		if (fp != nullptr)
 		{
-			printf( "    Wrote file LBA listing header %s.\n\n",
-				global::LBAheaderFile.c_str() );
+			dirTree.OutputHeaderListing( fp, 0 );
+
+			fclose( fp );
+
+			if ( !global::QuietMode )
+			{
+				printf( "    Wrote file LBA listing header %s.\n\n",
+					global::LBAheaderFile.c_str() );
+			}
+		}
+		else
+		{
+			if ( !global::QuietMode )
+			{
+				printf( "    Failed to write LBA listing header %s.\n\n",
+					global::LBAheaderFile.c_str() );
+			}
 		}
 	}
 

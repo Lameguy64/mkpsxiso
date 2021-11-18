@@ -1138,7 +1138,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 	return 1;
 }
 
-void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level)
+void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 {
 	if ( level == 0 )
 	{
@@ -1148,47 +1148,40 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level)
 
 	fprintf( fp, "/* %s */\n", name.c_str() );
 
-	for ( int i=0; i<entries.size(); i++ )
+	for ( size_t index : entriesInDir )
 	{
-		if ( ( !entries[i].id.empty() ) && ( entries[i].type != EntryDir ) )
+		const DIRENTRY& entry = entries[index];
+		if ( !entry.id.empty() && entry.type != EntryDir )
 		{
-			std::string temp_name;
+			std::string temp_name = "LBA_" + entry.id;
 
-			temp_name = "LBA_" + entries[i].id;
-
-			for ( int c=0; c<temp_name.length(); c++ )
+			for ( char& ch : temp_name )
 			{
-				temp_name[c] = std::toupper( temp_name[c] );
+				ch = std::toupper( ch );
 
-				if ( temp_name[c] == '.' )
+				if ( ch == '.' )
 				{
-					temp_name[c] = '_';
+					ch = '_';
 				}
 
-				if ( temp_name[c] == ';' )
+				if ( ch == ';' )
 				{
-					temp_name[c] = 0x00;
+					ch = '\0';
+					break;
 				}
 			}
 
-			fprintf( fp, "#define %s", temp_name.c_str() );
-
-			for( int s=0; s<17-(int)entries[i].id.size(); s++ )
-			{
-				fprintf( fp, " " );
-			}
-
-			fprintf( fp, "%d\n", entries[i].lba );
-
+			fprintf( fp, "#define %-17s %d\n", temp_name.c_str(), entry.lba );
 		}
 	}
 
-	for ( int i=0; i<entries.size(); i++ )
+	for ( size_t index : entriesInDir )
 	{
-		if ( entries[i].type == EntryDir )
+		const DIRENTRY& entry = entries[index];
+		if ( entry.type == EntryDir )
 		{
 			fprintf( fp, "\n" );
-			entries[i].subdir->OutputHeaderListing( fp, level+1 );
+			entry.subdir->OutputHeaderListing( fp, level+1 );
 		}
 	}
 

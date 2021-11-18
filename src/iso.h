@@ -148,7 +148,7 @@ namespace iso
 
 		void PrintRecordPath();
 
-		void OutputHeaderListing(FILE* fp, int level);
+		void OutputHeaderListing(FILE* fp, int level) const;
 		
 		/** Calculates the length of the directory record to be produced by this class in bytes.
 		 *
