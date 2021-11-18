@@ -1244,8 +1244,6 @@ void LBAtoTimecode(int lba, char* timecode)
 
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 {
-	char textbuff[10];
-
 	for ( size_t index : entriesInDir )
 	{
 		const DIRENTRY& entry = entries[index];
@@ -1276,11 +1274,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 				fprintf( fp, "CDDA  " );
 			}
 
-			fprintf( fp, "%s", entry.id.c_str() );
-			for ( int s=0; s<17-(int)strlen(entry.id.c_str()); s++ )
-			{
-				fprintf( fp, " " );
-			}
+			fprintf( fp, "%-17s", entry.id.c_str() );
 		} else {
 
 			fprintf( fp, "Dummy <DUMMY>          " );
@@ -1288,43 +1282,39 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		}
 
 		// Write size in sector units
-		// TODO: Don't write size for directories, like CDmage
-		sprintf( textbuff, "%d", ((entry.length+2047)/2048) );
-		fprintf( fp, "%s", textbuff );
-		for ( int s=0; s<10-(int)strlen(textbuff); s++ )
+		if (entry.type != EntryDir)
 		{
-			fprintf( fp, " " );
+			fprintf( fp, "%-10d", ((entry.length+2047)/2048) );
+		}
+		else
+		{
+			fprintf( fp, "%-10s", "" );
 		}
 
 		// Write LBA offset
-		sprintf( textbuff, "%d", entry.lba );
-		fprintf( fp, "%s", textbuff );
-		for ( int s=0; s<10-(int)strlen(textbuff); s++ )
-		{
-			fprintf( fp, " " );
-		}
+		fprintf( fp, "%-10d", entry.lba );
 
 		// Write Timecode
-		LBAtoTimecode( 150+entry.lba, textbuff );
-		fprintf( fp, "%s    ", textbuff );
+		char timecode[12];
+		LBAtoTimecode( 150+entry.lba, timecode );
+		fprintf( fp, "%-12s", timecode );
 
 		// Write size in byte units
-		sprintf( textbuff, "%d", entry.length );
-		fprintf( fp, "%s", textbuff );
-		for ( int s=0; s<10-(int)strlen(textbuff); s++ )
+		if (entry.type != EntryDir)
 		{
-			fprintf( fp, " " );
+			fprintf( fp, "%-10d", entry.length );
+		}
+		else
+		{
+			fprintf( fp, "%-10s", "" );
 		}
 
 		// Write source file path
 		if ( (!entry.id.empty()) && (entry.type != EntryDir) )
 		{
-			fprintf( fp, "%s\n", entry.srcfile.c_str() );
+			fprintf( fp, "%s", entry.srcfile.c_str() );
 		}
-		else
-		{
-			fprintf( fp, " \n" );
-		}
+		fprintf( fp, "\n" );
 
 		if ( entry.type == EntryDir )
 		{
