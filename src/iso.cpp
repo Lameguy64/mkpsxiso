@@ -435,18 +435,18 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 
 
 	std::string temp_name = id;
-
-	for ( int i=0; temp_name[i] != 0x00; i++ )
+	for ( char& ch : temp_name )
 	{
-		temp_name[i] = std::toupper( temp_name[i] );
+		ch = std::toupper( ch );
 	}
 
 	temp_name += ";1";
 
 
 	// Check if file entry already exists
-    for ( const DIRENTRY& entry : entries )
+    for ( const auto& e : entriesInDir )
 	{
+		const DIRENTRY& entry = e.get();
 		if ( !entry.id.empty() )
 		{
             if ( ( entry.type == EntryFile )
