@@ -528,15 +528,25 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char*
 		return currentSubdir->subdir.get();
 	}
 
-	time_t dirTime;
 	struct stat fileAttrib;
-    if ( srcDir != nullptr && stat( srcDir, &fileAttrib ) == 0 )
+	time_t dirTime;
+	if ( srcDir != nullptr && stat( srcDir, &fileAttrib ) == 0 )
 	{
 		dirTime = fileAttrib.st_mtime;
 	}
 	else
 	{
 		dirTime = global::BuildTime;
+
+		if ( id != nullptr )
+		{
+			if ( !global::QuietMode )
+			{
+				printf( "\n    " );
+			}
+
+			printf( "WARNING: 'source' attribute for subdirectory '%s' is invalid or empty.\n", id );
+		}
 	}
 
 	DIRENTRY entry {};
