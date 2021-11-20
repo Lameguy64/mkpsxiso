@@ -1222,19 +1222,6 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 
 static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
 {
-	if ( found_da )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "      " );
-		}
-
-		printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
-			dirElement->GetLineNum() );
-
-		return false;
-	}
-
 	const char* nameElement = dirElement->Attribute( "name" );
 	if ( strlen( nameElement ) > 12 )
 	{
@@ -1246,11 +1233,25 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 
 	const iso::EntryAttributes attribs = iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement));
 
+	bool alreadyExists = false;
 	iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
-		nameElement, dirElement->Attribute( "source" ), attribs );
+		nameElement, dirElement->Attribute( "source" ), attribs, alreadyExists );
 
 	if ( subdir == nullptr )
 	{
+		return false;
+	}
+
+	if ( found_da && !alreadyExists )
+	{
+		if ( !global::QuietMode )
+		{
+			printf( "      " );
+		}
+
+		printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
+			dirElement->GetLineNum() );
+
 		return false;
 	}
 

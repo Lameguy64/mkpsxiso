@@ -195,10 +195,11 @@ namespace iso
 		 *
 		 *	*id		- The name of the subdirectory to add. It will be converted to uppercase automatically.
 		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
+		 *  alreadyExists - set to true if a returned DirTreeClass already existed
 		 *
 		 *	Returns: Pointer to another DirTreeClass for accessing the directory record of the subdirectory.
 		 */
-		DirTreeClass* AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes);
+		DirTreeClass* AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes, bool& alreadyExists);
 
 		/**	Writes the source files assigned to the directory entries to a CD image. Its recommended to execute
 		 *	this first before writing the actual file system.

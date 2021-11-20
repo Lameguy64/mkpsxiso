@@ -512,7 +512,7 @@ void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
 	entriesInDir.emplace_back(entries.back());
 }
 
-iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes)
+iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes, bool& alreadyExists)
 {
 	// Duplicate directory entries are allowed, but the subsequent occurences will not add
 	// a new directory to 'entries'.
@@ -525,6 +525,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char*
 
 	if (currentSubdir != entries.end())
 	{
+		alreadyExists = true;
 		return currentSubdir->subdir.get();
 	}
 
