@@ -131,7 +131,7 @@ int iso::DirTreeClass::GetWavSize(const char* wavFile)
 	return 2352*((WAV_Subchunk2.len+2351)/2352);
 }
 
-int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap)
+int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const char* wavFile, bool pregap)
 {
 	FILE *fp;
 	int waveLen;
@@ -601,6 +601,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 		printf(" exceeds 2048 bytes.\n");
 	}
 
+	bool firstDAWritten = false;
 	for ( DIRENTRY& entry : entries )
 	{
 		// Set current LBA to directory record entry
@@ -629,14 +630,13 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			}
 			else if ( entry.type == EntryDA )
 			{
-				if ( !first_track )
+				lba += ((entry.length+2351)/2352);
+
+				// TODO: Configurable pregap
+				if (!firstDAWritten)
 				{
-					lba += ((entry.length+2351)/2352)+150;
-					first_track = true;
-				}
-				else
-				{
-					lba += ((entry.length+2351)/2352);
+					lba += 150;
+					firstDAWritten = true;
 				}
 			}
 		}
@@ -913,11 +913,12 @@ int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENT
 
 int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 {
-	first_track = false;
+	bool firstDAWritten = false;
 
 	for ( const DIRENTRY& entry : entries )
 	{
-		if ( ( entry.type == EntryDA ) && ( first_track ) )
+		// TODO: Configurable pregap
+		if ( ( entry.type == EntryDA ) && firstDAWritten )
 		{
 			writer->SeekToSector( entry.lba-150 );
 		}
@@ -1111,7 +1112,8 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 				printf( "      Packing DA %s... ", entry.srcfile.c_str() );
 			}
 
-			if ( PackWaveFile( writer, entry.srcfile.c_str(), first_track ) )
+			// TODO: Configurable pregap
+			if ( PackWaveFile( writer, entry.srcfile.c_str(), !firstDAWritten ) )
 			{
 				if (!global::QuietMode)
 				{
@@ -1119,7 +1121,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 				}
 			}
 
-			first_track = true;
+			firstDAWritten = true;
 		}
 		/*else if ( entry.type == EntryDir )
 		{
@@ -1219,13 +1221,14 @@ int iso::DirTreeClass::WriteCueEntries(FILE* fp, int* trackNum) const
 			*trackNum += 1;
 			fprintf( fp, "  TRACK %02d AUDIO\n", *trackNum );
 
-			int trackLBA = entry.lba-150;
+			int trackLBA = entry.lba;
 
-			if ( *trackNum == 2 )
+			// TODO: Configurable pregap?
+			/*if ( *trackNum == 2 )
 			{
 				fprintf( fp, "    PREGAP 00:02:00\n" );
 			}
-			else
+			else*/
 			{
 				fprintf( fp, "    INDEX 00 %02d:%02d:%02d\n",
 					(trackLBA/75)/60, (trackLBA/75)%60,

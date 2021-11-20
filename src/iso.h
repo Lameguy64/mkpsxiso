@@ -123,8 +123,6 @@ namespace iso
 		std::string name;
 
 		DirTreeClass* parent = nullptr; // Non-owning
-
-		int			first_track = 0;
 		
 		/// Internal function for generating and writing directory records
 		int	WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const;
@@ -133,7 +131,7 @@ namespace iso
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
 
 		int GetWavSize(const char* wavFile);
-		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap);
+		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, bool pregap);
 		
 	public:
 
