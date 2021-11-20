@@ -824,9 +824,9 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		const int argsRead = sscanf( isoIdentifiers.CreationDate, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%*02hhu%hhd",
 			&year, &volumeDate.month, &volumeDate.day,
 			&volumeDate.hour, &volumeDate.minute, &volumeDate.second, &volumeDate.GMToffs );
-		if ( argsRead == 7 )
+		if (argsRead == 7)
 		{
-			volumeDate.year = year - 1900;
+			volumeDate.year = year != 0 ? year - 1900 : 0;
 			gotDateFromXML = true;
 		}
 	}

@@ -24,7 +24,7 @@ ISO_LONG_DATESTAMP GetLongDateFromDate(const ISO_DATESTAMP& src)
 {
 	ISO_LONG_DATESTAMP result;
 
-	snprintfZeroPad(result.year, std::size(result.year), "%03d", 1900 + src.year);
+	snprintfZeroPad(result.year, std::size(result.year), "%04d", src.year != 0 ? 1900 + src.year : 0);
 	snprintfZeroPad(result.month, std::size(result.month), "%02d", src.month);
 	snprintfZeroPad(result.day, std::size(result.day), "%02d", src.day);
 	snprintfZeroPad(result.hour, std::size(result.hour), "%02d", src.hour);
