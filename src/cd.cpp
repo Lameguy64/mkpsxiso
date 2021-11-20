@@ -36,6 +36,34 @@ ISO_LONG_DATESTAMP GetLongDateFromDate(const ISO_DATESTAMP& src)
 	return result;
 }
 
+ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
+{
+	bool succeeded = false;
+
+	ISO_DATESTAMP result {};
+
+	short int year;
+	const int argsRead = sscanf( str, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%*02hhu%hhd",
+		&year, &result.month, &result.day,
+		&result.hour, &result.minute, &result.second, &result.GMToffs );
+	if (argsRead >= 6)
+	{
+		result.year = year != 0 ? year - 1900 : 0;
+		if (argsRead < 7)
+		{
+			// Consider GMToffs optional
+			result.GMToffs = 0;
+		}
+		succeeded = true;
+	}
+
+	if (success != nullptr)
+	{
+		*success = succeeded;
+	}
+	return result;
+}
+
 ISO_LONG_DATESTAMP GetUnspecifiedLongDate()
 {
 	ISO_LONG_DATESTAMP result;

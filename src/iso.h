@@ -44,6 +44,7 @@ namespace iso
 		const char*	Application;
 		const char* Copyright;
 		const char* CreationDate;
+		const char* ModificationDate;
 	} IDENTIFIERS;
 
 	struct DIRENTRY

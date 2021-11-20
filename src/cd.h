@@ -213,6 +213,8 @@ namespace cd {
 }
 
 // Helper functions for datestamp manipulation
+cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
+
 cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
 cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
 
