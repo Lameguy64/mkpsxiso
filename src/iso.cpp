@@ -637,7 +637,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 				if (!firstDAWritten)
 				{
 					lba += 150;
-					firstDAWritten = true;
+					//firstDAWritten = true;
 				}
 			}
 		}
@@ -1114,7 +1114,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			}
 
 			// TODO: Configurable pregap
-			if ( PackWaveFile( writer, entry.srcfile.c_str(), !firstDAWritten ) )
+			if ( PackWaveFile( writer, entry.srcfile.c_str(), true/*!firstDAWritten*/ ) )
 			{
 				if (!global::QuietMode)
 				{
@@ -1122,7 +1122,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 				}
 			}
 
-			firstDAWritten = true;
+			//firstDAWritten = true;
 		}
 		/*else if ( entry.type == EntryDir )
 		{
