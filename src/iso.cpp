@@ -1346,36 +1346,55 @@ int iso::DirTreeClass::CalculatePathTableLen(const DIRENTRY& dirEntry) const
 	return len;
 }
 
-void iso::DirTreeClass::GenPathTableSub(PathTableClass* table, const DIRENTRY& root, int parentIndex) const
+std::unique_ptr<iso::PathTableClass> iso::DirTreeClass::GenPathTableSub(unsigned short& index, const unsigned short parentIndex) const
 {
-	PathEntryClass pathEntry;
-
-	pathEntry.dir_id	= root.id;
-	pathEntry.dir_level	= std::max(1, parentIndex); // Root dir is technically at level 0, but must be placed at level 1...
-	pathEntry.dir_lba	= root.lba;
-
-	auto sub = std::make_unique<PathTableClass>();
+	auto table = std::make_unique<PathTableClass>();
 	for ( const auto& e : entriesInDir )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.type == EntryDir )
 		{
-			const DirTreeClass* subdir = entry.subdir.get();
-			subdir->GenPathTableSub( sub.get(), entry, parentIndex + 1 );
+			PathEntryClass pathEntry;
+
+			pathEntry.dir_id	= entry.id;
+			pathEntry.dir_index = index++;
+			pathEntry.dir_parent_index = parentIndex;
+			pathEntry.dir_lba	= entry.lba;
+			table->entries.emplace_back( std::move(pathEntry) );
 		}
 	}
 
-	if (!sub->entries.empty())
+	size_t entryID = 0;
+	for ( const auto& e : entriesInDir )
 	{
-		pathEntry.sub = std::move(sub);
+		const DIRENTRY& entry = e.get();
+		if ( entry.type == EntryDir )
+		{
+			auto& pathEntry = table->entries[entryID++];
+			auto sub = entry.subdir->GenPathTableSub(index, pathEntry.dir_index);
+			if (!sub->entries.empty())
+			{
+				pathEntry.sub = std::move(sub);
+			}
+		}
 	}
-	table->entries.push_back( std::move(pathEntry) );
+	return table;
 }
 
 int iso::DirTreeClass::GeneratePathTable(const DIRENTRY& root, unsigned char* buff, bool msb) const
 {
+	unsigned short index = 1;
+
+	// Write out root explicitly (since there is no DirTreeClass including it)
+	PathEntryClass rootEntry;
+	rootEntry.dir_id = root.id;
+	rootEntry.dir_parent_index = index;
+	rootEntry.dir_index = index++;
+	rootEntry.dir_lba = root.lba;
+	rootEntry.sub = GenPathTableSub(index, rootEntry.dir_parent_index);
+
 	PathTableClass pathTable;
-	GenPathTableSub(&pathTable, root, 0);
+	pathTable.entries.emplace_back(std::move(rootEntry));
 
 	unsigned char* newbuff = pathTable.GenTableData( buff, msb );
 
@@ -1619,15 +1638,15 @@ unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, bool msb)
 
 		// Write LBA and directory number index
 		unsigned int lba = entry.dir_lba;
-		unsigned short dirLevel = entry.dir_level;
+		unsigned short parentDirNumber = entry.dir_parent_index;
 
 		if ( msb )
 		{
 			lba = SwapBytes32( lba );
-			dirLevel = SwapBytes16( dirLevel );
+			parentDirNumber = SwapBytes16( parentDirNumber );
 		}
 		memcpy( buff, &lba, sizeof(lba) );
-		memcpy( buff+4, &dirLevel, sizeof(dirLevel) );
+		memcpy( buff+4, &parentDirNumber, sizeof(parentDirNumber) );
 
 		buff += 6;
 

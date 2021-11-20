@@ -100,10 +100,11 @@ namespace iso
 	class PathEntryClass {
 	public:
 		std::string dir_id;
-		int dir_level = 0;
+		unsigned short dir_index = 0;
+		unsigned short dir_parent_index = 0;
 		int dir_lba = 0;
 		
-		std::unique_ptr<class PathTableClass> sub; // Owning
+		std::unique_ptr<class PathTableClass> sub;
 	};
 	
 	class PathTableClass {
@@ -128,7 +129,7 @@ namespace iso
 		int	WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const;
 
 		/// Internal function for recursive path table generation
-		void GenPathTableSub(PathTableClass* table, const DIRENTRY& root, int parentIndex) const;
+		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
 
 		int GetWavSize(const char* wavFile);
 		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap);
