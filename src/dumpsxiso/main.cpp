@@ -312,8 +312,8 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				if (result) {
 					printf("WARNING: The CDDA file %s is out of the iso file bounds.\n", outputPath.c_str());
 					printf("This usually means that the game has audio tracks, and they are on separate files.\n");
-					printf("As isodump does not support dumping from a cue file, you should use an iso file containing all tracks.\n\n");
-					printf("isodump will write the file as a dummy (silent) cdda file.\n");
+					printf("As DUMPSXISO does not support dumping from a cue file, you should use an iso file containing all tracks.\n\n");
+					printf("DUMPSXISO will write the file as a dummy (silent) cdda file.\n");
 					printf("This is generally fine, when the real CDDA file is also a dummy file.\n");
 					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n");
 				}
@@ -533,13 +533,13 @@ void ParseISO(cd::IsoReader& reader) {
 int main(int argc, char *argv[]) {
 
 
-    printf("isodump v0.32 - PlayStation ISO dumping tool\n");
+    printf("DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n");
     printf("2017 Meido-Tek Productions (Lameguy64), 2020 Phoenix (SadNES cITy).\n\n");
 
 	if (argc == 1) {
 
 		printf("Usage:\n\n");
-		printf("   isodump <isofile> [-x <path>]\n\n");
+		printf("   dumpsxiso <isofile> [-x <path>]\n\n");
 		printf("   <isofile>   - File name of ISO file (supports any 2352 byte/sector images).\n");
 		printf("   [-x <path>] - Specified destination directory of extracted files.\n");
 		printf("   [-s <path>] - Outputs an MKPSXISO compatible XML script for later rebuilding.\n");
