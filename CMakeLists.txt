@@ -15,6 +15,10 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_C_STANDARD           17)
 set(CMAKE_CXX_STANDARD         17)
 
+# Useful paths
+set(mkpsxiso_dir "src/mkpsxiso")
+set(shared_dir "src/shared")
+
 ## External dependencies
 
 if(NOT EXISTS ${PROJECT_SOURCE_DIR}/tinyxml2/tinyxml2.cpp)
@@ -26,24 +30,21 @@ endif()
 add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
 target_include_directories(tinyxml2 PUBLIC tinyxml2)
 
-#add_subdirectory(tinyxml2)
+# Populate shared files
+add_library(iso_shared OBJECT
+	${shared_dir}/cd.cpp
+)
+target_include_directories(iso_shared PUBLIC ${shared_dir})
+target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
 
 ## Executables
-
-function(_add_target name source_dir)
-	file(
-		GLOB _sources
-		${source_dir}/*.c
-		${source_dir}/*.cpp
-	)
-
-	add_executable            (${name} ${_sources})
-	target_compile_definitions(${name} PUBLIC VERSION="${PROJECT_VERSION}")
-	target_link_libraries     (${name} tinyxml2)
-endfunction()
-
-_add_target(mkpsxiso src)
-#_add_target(mkisoxml mkisoxml/src)
+add_executable(mkpsxiso
+	${mkpsxiso_dir}/cdwriter.cpp
+	${mkpsxiso_dir}/edcecc.cpp
+	${mkpsxiso_dir}/iso.cpp
+	${mkpsxiso_dir}/main.cpp
+)
+target_link_libraries(mkpsxiso tinyxml2 iso_shared)
 
 install(TARGETS mkpsxiso)
 
