@@ -5,6 +5,7 @@
 #endif
 
 #include "cd.h"
+#include "xa.h"
 #include "cdreader.h"
 #include <string.h>
 #include <stdlib.h>
@@ -430,7 +431,7 @@ int cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sector
 		while(1)
 		{
 			cd::ISO_DIR_ENTRY dirEntry;
-			cd::ISO_XA_ATTRIB dirXAentry;
+			cdxa::ISO_XA_ATTRIB dirXAentry;
 
             //check if there is enough data to read in the current sector. In case there is not, we must move to next sector.
 			if (2048 - sectorBytesRead < 33)
@@ -476,8 +477,8 @@ int cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sector
 			}
 
 			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries] = dirEntry;
-			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = malloc(sizeof(cd::ISO_XA_ATTRIB));
-			memcpy(cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData, &dirXAentry, sizeof(cd::ISO_XA_ATTRIB));
+			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = malloc(sizeof(cdxa::ISO_XA_ATTRIB));
+			memcpy(cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData, &dirXAentry, sizeof(cdxa::ISO_XA_ATTRIB));
 			cd::IsoDirEntries::numDirEntries++;
 		}
     }

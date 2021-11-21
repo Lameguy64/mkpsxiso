@@ -12,6 +12,7 @@
 #include "tinyxml2.h"
 
 #include "cd.h"
+#include "xa.h"
 #include "cdreader.h"
 
 #include <time.h>
@@ -51,13 +52,8 @@ void PrintId(char* text) {
 
 }
 
-void PrintDate(char* text) {
-
-    for(int i=0; i<17; i++) {
-        printf("%c", text[i]);
-    }
-    printf("\n");
-
+void PrintDate(const cd::ISO_LONG_DATESTAMP& date) {
+    printf("%s\n", LongDateToString(date).c_str());
 }
 
 void BackDir(std::string& path) {
@@ -225,7 +221,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
             }
 
-			unsigned short xa_attr = ((cd::ISO_XA_ATTRIB*)dirEntries.dirEntryList[e].extData)->attributes;
+			unsigned short xa_attr = ((cdxa::ISO_XA_ATTRIB*)dirEntries.dirEntryList[e].extData)->attributes;
 
 			char type = -1;
 
@@ -498,7 +494,7 @@ void ParseISO(cd::IsoReader& reader) {
 		if (descriptor.dataPreparerIdentifier[0] != 0x20)
 			newElement->SetAttribute("data_preparer", CleanVolumeId(descriptor.dataPreparerIdentifier));
 
-		newElement->SetAttribute("creation_date", descriptor.volumeCreateDate);
+		newElement->SetAttribute("creation_date", LongDateToString(descriptor.volumeCreateDate).c_str());
 
 		trackElement->InsertEndChild(newElement);
 

@@ -2,6 +2,7 @@
 #define _CD_H
 
 #include <stdio.h>
+#include <string>
 
 #ifdef WIN32
 #define NOMINMAX
@@ -207,6 +208,30 @@ namespace cd {
 
 	} ISO_DESCRIPTOR;
 
+	// License data (just a sequence of 28032 bytes)
+	typedef struct {
+		char data[28032];
+	} ISO_LICENSE;
+
+	// RIFF+WAVE header
+	typedef struct {
+		char chunkID[4];
+		unsigned int chunkSize;
+		char format[4];
+
+		char subchunk1ID[4];
+		unsigned int subchunk1Size;
+		unsigned short audioFormat;
+		unsigned short numChannels;
+		unsigned int sampleRate;
+		unsigned int byteRate;
+		unsigned short blockAlign;
+		unsigned short bitsPerSample;
+
+		char subchunk2ID[4];
+		unsigned int subchunk2Size;
+	} RIFF_HEADER;
+
 	// Leave non-aligned structure packing
 	#pragma pack(pop)
 
@@ -217,6 +242,7 @@ cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
 
 cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
 cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
+std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src);
 
 // Endianness swap
 unsigned short SwapBytes16(unsigned short val);

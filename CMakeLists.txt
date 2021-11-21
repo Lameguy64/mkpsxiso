@@ -17,6 +17,7 @@ set(CMAKE_CXX_STANDARD         17)
 
 # Useful paths
 set(mkpsxiso_dir "src/mkpsxiso")
+set(dumpsxiso_dir "src/dumpsxiso")
 set(shared_dir "src/shared")
 
 ## External dependencies
@@ -46,6 +47,12 @@ add_executable(mkpsxiso
 )
 target_link_libraries(mkpsxiso tinyxml2 iso_shared)
 
-install(TARGETS mkpsxiso)
+add_executable(dumpsxiso
+	${dumpsxiso_dir}/cdreader.cpp
+	${dumpsxiso_dir}/main.cpp
+)
+target_link_libraries(dumpsxiso tinyxml2 iso_shared)
+
+install(TARGETS mkpsxiso dumpsxiso)
 
 include(InstallRequiredSystemLibraries)
