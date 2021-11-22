@@ -2,7 +2,6 @@
 #define _CDREADER_H
 
 #include "cd.h"
-#include "types.h"
 
 namespace cd {
 
@@ -13,7 +12,7 @@ namespace cd {
         // File pointer to opened ISO file
         FILE*		filePtr;
         // Sector buffer size
-        u_char		sectorBuff[CD_SECTOR_SIZE];
+        unsigned char sectorBuff[CD_SECTOR_SIZE];
         // Mode 2 Form 1 sector struct for simplified reading of sectors (usually points to sectorBuff[])
         SECTOR_M2F1* sectorM2F1;
         // Mode 2 Form 2 sector struct for simplified reading of sectors (usually points to sectorBuff[])
