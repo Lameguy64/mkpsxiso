@@ -687,21 +687,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 			isoIdentifiers.Application = "PLAYSTATION";
 		}
 
-		bool hasCopyright = true;
-		if ( isoIdentifiers.Copyright == nullptr )
-		{
-			hasCopyright = false;
-			isoIdentifiers.Copyright = "COPYLEFTED";
-		}
-
-		bool hasDataPreparer = true;
-		if ( isoIdentifiers.DataPreparer == nullptr )
-		{
-			hasDataPreparer = false;
-			isoIdentifiers.DataPreparer = "DISC IMAGE CREATED "
-				"WITH MKPSXISO BY LAMEGUY64 OF MEIDO-TEK PRODUCTIONS";
-		}
-
 		// Print out identifiers if present
 		if ( !global::QuietMode )
 		{
@@ -729,12 +714,12 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 				printf( "      Publisher    : %s\n",
 					isoIdentifiers.Publisher );
 			}
-			if ( hasDataPreparer )
+			if ( isoIdentifiers.DataPreparer != nullptr )
 			{
 				printf( "      Data Preparer: %s\n",
 					isoIdentifiers.DataPreparer );
 			}
-			if ( hasCopyright )
+			if ( isoIdentifiers.Copyright != nullptr )
 			{
 				printf( "      Copyright    : %s\n",
 					isoIdentifiers.Copyright );
