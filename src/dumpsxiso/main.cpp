@@ -9,6 +9,7 @@
 
 
 #include <string>
+#include <filesystem>
 
 #include "cd.h"
 #include "xa.h"
@@ -17,26 +18,44 @@
 
 #include <time.h>
 
-#if defined(_WIN32)
-    #include <direct.h>
-#else
+#if !defined(_WIN32)
 	#include <sys/stat.h>
-	int _mkdir(const char* dirname){ return mkdir(dirname, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); }
 #endif
+
+// Printf format for std::filesystem::path::c_str()
+// TODO: Move to some shared file
+#if defined(_WIN32)
+#define PRFILESYSTEM_PATH "ws"
+#else
+#define PRFILESYSTEM_PATH "s"
+#endif
+
+FILE* fopen(const std::filesystem::path& path, const char* mode)
+{
+#if defined(_WIN32)
+	const std::string_view mode_view(mode);
+	std::wstring wmode;
+	int count = MultiByteToWideChar(CP_UTF8, 0, mode_view.data(), mode_view.length(), nullptr, 0);
+	if (count != 0)
+	{
+		wmode.resize(count);
+		MultiByteToWideChar(CP_UTF8, 0, mode_view.data(), mode_view.length(), wmode.data(), count);
+	}
+	FILE* file = nullptr;
+	_wfopen_s(&file, path.c_str(), wmode.c_str());
+	return file;
+#else
+	return ::fopen(path.c_str(), mode);
+#endif
+}
 
 namespace param {
 
     char*	isoFile=NULL;
-    std::string	outPath;
-    std::string xmlFile;
+    std::filesystem::path outPath;
+    std::filesystem::path xmlFile;
 
     int		printOnly=false;
-
-}
-
-namespace global {
-
-    std::string isoPath;
 
 }
 
@@ -61,12 +80,6 @@ void PrintId(char (&id)[N])
 
 void PrintDate(const cd::ISO_LONG_DATESTAMP& date) {
     printf("%s\n", LongDateToString(date).c_str());
-}
-
-void BackDir(std::string& path) {
-
-    path.resize(path.rfind("/"));
-
 }
 
 template<size_t N>
@@ -130,20 +143,20 @@ time_t timegm(struct tm* tm)
 }
 #endif
 
-void UpdateTimestamps(const std::string& path, const cd::ISO_DATESTAMP* entryDate)
+void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP& entryDate)
 {
 // utime can't update timestamps of directories, so a platform-specific approach is needed
 #if defined(_WIN32)
-	HANDLE file = CreateFileA(path.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	HANDLE file = CreateFileW(path.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
 	if (file != INVALID_HANDLE_VALUE)
 	{
 		tm timeBuf {};
-		timeBuf.tm_year = entryDate->year;
-		timeBuf.tm_mon = entryDate->month - 1;
-		timeBuf.tm_mday = entryDate->day;
-		timeBuf.tm_hour = entryDate->hour;
-		timeBuf.tm_min = entryDate->minute - (15 * entryDate->GMToffs);
-		timeBuf.tm_sec = entryDate->second;
+		timeBuf.tm_year = entryDate.year;
+		timeBuf.tm_mon = entryDate.month - 1;
+		timeBuf.tm_mday = entryDate.day;
+		timeBuf.tm_hour = entryDate.hour;
+		timeBuf.tm_min = entryDate.minute - (15 * entryDate.GMToffs);
+		timeBuf.tm_sec = entryDate.second;
 
 		const FILETIME ft = TimetToFileTime(timegm(&timeBuf));
 		SetFileTime(file, &ft, nullptr, &ft);
@@ -156,13 +169,12 @@ void UpdateTimestamps(const std::string& path, const cd::ISO_DATESTAMP* entryDat
 }
 
 void SaveLicense(cd::ISO_LICENSE& license) {
-    std::string outputPath = param::outPath;
+    const std::filesystem::path outputPath = param::outPath / "license_data.dat";
 
-    outputPath = outputPath + "license_data.dat";
-    FILE* outFile = fopen(outputPath.c_str(), "wb");
+	FILE* outFile = fopen(outputPath.c_str(), "wb");
 
     if (outFile == NULL) {
-        printf("ERROR: Cannot create license file %s...", outputPath.c_str());
+		printf("ERROR: Cannot create license file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
         return;
     }
 
@@ -170,7 +182,7 @@ void SaveLicense(cd::ISO_LICENSE& license) {
     fclose(outFile);
 }
 
-void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element, int sectors=1) {
+void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element, int sectors, const std::filesystem::path& srcPath) {
 
     cd::IsoDirEntries dirEntries;
     tinyxml2::XMLElement* newelement = NULL;
@@ -181,20 +193,9 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
     for(int e=2; e<entriesFound; e++) {
 
-		std::string outputPath = global::isoPath;
-
-		if (!outputPath.empty()) {
-			outputPath.erase(0, 1);
-			outputPath += "/";
-		}
-
-		outputPath = param::outPath + outputPath + CleanIdentifier(dirEntries.dirEntryList[e].identifier);
-
-        if (dirEntries.dirEntryList[e].flags & 0x2) {
-
-            global::isoPath += "/";
-            global::isoPath += dirEntries.dirEntryList[e].identifier;
-
+		const std::filesystem::path outputPath = srcPath / CleanIdentifier(dirEntries.dirEntryList[e].identifier);
+        if (dirEntries.dirEntryList[e].flags & 0x2)
+		{
             if (element != NULL) {
 
                 newelement = doc->NewElement("dir");
@@ -203,21 +204,17 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
             }
 
-            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement, dirEntries.dirEntryList[e].entrySize.lsb/2048);
+            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement, dirEntries.dirEntryList[e].entrySize.lsb/2048, outputPath);
 
-            BackDir(global::isoPath);
-
-        } else {
-
-			printf("   Extracting %s...\n", dirEntries.dirEntryList[e].identifier);
-
-			printf("%s\n",outputPath.c_str());
+        } else
+		{
+			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", dirEntries.dirEntryList[e].identifier, outputPath.c_str());
 
             if (element != NULL) {
 
                 newelement = doc->NewElement("file");
                 newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(dirEntries.dirEntryList[e].identifier).c_str());
-                newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.c_str());
+                newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.generic_u8string().c_str());
 
             }
 
@@ -275,7 +272,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				outFile = fopen(outputPath.c_str(), "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %s...", outputPath.c_str());
+					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
 					return;
 				}
 
@@ -310,7 +307,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				int result = reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
 
 				if (result) {
-					printf("WARNING: The CDDA file %s is out of the iso file bounds.\n", outputPath.c_str());
+					printf("WARNING: The CDDA file %" PRFILESYSTEM_PATH " is out of the iso file bounds.\n", outputPath.c_str());
 					printf("This usually means that the game has audio tracks, and they are on separate files.\n");
 					printf("As DUMPSXISO does not support dumping from a cue file, you should use an iso file containing all tracks.\n\n");
 					printf("DUMPSXISO will write the file as a dummy (silent) cdda file.\n");
@@ -321,7 +318,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				outFile = fopen(outputPath.c_str(), "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %s...", outputPath.c_str());
+					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
 					return;
 				}
 
@@ -369,7 +366,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				outFile = fopen(outputPath.c_str(), "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %s...", outputPath.c_str());
+					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
 					return;
 				}
 
@@ -398,7 +395,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
         }
 
-		UpdateTimestamps(outputPath, &dirEntries.dirEntryList[e].entryDate);
+		UpdateTimestamps(outputPath, dirEntries.dirEntryList[e].entryDate);
     }
 }
 
@@ -446,24 +443,16 @@ void ParseISO(cd::IsoReader& reader) {
         return;
     }
 
-    if (!param::outPath.empty()) {
-
-        if (param::outPath.rfind("/") != param::outPath.length()-1)
-            param::outPath += "/";
-
-    }
-
 	// Prepare output directories
-	for(int i=1; i<numEntries; i++) {
+	for(int i=0; i<numEntries; i++) {
 
 		char pathBuff[256];
 		pathTable.GetFullDirPath(i, pathBuff, 256);
 
-		std::string dirPath = param::outPath;
+		const std::filesystem::path dirPath = param::outPath / pathBuff;
 
-		dirPath += pathBuff;
-		_mkdir(dirPath.c_str());
-
+		std::error_code ec;
+		std::filesystem::create_directories(dirPath, ec);
 	}
 
     printf("ISO contents:\n\n");
@@ -499,7 +488,7 @@ void ParseISO(cd::IsoReader& reader) {
 		trackElement->InsertEndChild(newElement);
 
 		newElement = xmldoc.NewElement(xml::elem::LICENSE);
-		newElement->SetAttribute(xml::attrib::LICENSE_FILE, (param::outPath+"license_data.dat").c_str());
+		newElement->SetAttribute(xml::attrib::LICENSE_FILE, (param::outPath / "license_data.dat").generic_u8string().c_str());
 
 		trackElement->InsertEndChild(newElement);
 
@@ -509,12 +498,18 @@ void ParseISO(cd::IsoReader& reader) {
 						descriptor.rootDirRecord.entryOffs.lsb,
 						&xmldoc,
 						newElement,
-						descriptor.rootDirRecord.entrySize.lsb/2048);
+						descriptor.rootDirRecord.entrySize.lsb/2048,
+						param::outPath);
 
 		trackElement->InsertEndChild(newElement);
 		baseElement->InsertEndChild(trackElement);
 		xmldoc.InsertEndChild(baseElement);
-		xmldoc.SaveFile(param::xmlFile.c_str());
+
+		if (FILE* file = fopen(param::xmlFile, "w"); file != nullptr)
+		{
+			xmldoc.SaveFile(file);
+			fclose(file);
+		}
 
     } else {
 
@@ -522,7 +517,8 @@ void ParseISO(cd::IsoReader& reader) {
 						descriptor.rootDirRecord.entryOffs.lsb,
 						&xmldoc,
 						NULL,
-						descriptor.rootDirRecord.entrySize.lsb/2048);
+						descriptor.rootDirRecord.entrySize.lsb/2048,
+						param::outPath);
 
     }
 
@@ -557,7 +553,7 @@ int main(int argc, char *argv[]) {
 			// Directory path
             if (strcmp("x", &argv[i][1]) == 0) {
 
-                param::outPath = argv[i+1];
+                param::outPath = std::filesystem::path(argv[i+1]).lexically_normal();
 
                 i++;
 
@@ -612,7 +608,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (!param::outPath.empty())
-		printf("Output directory : %s\n", param::outPath.c_str());
+	{
+		printf("Output directory : %" PRFILESYSTEM_PATH "\n", param::outPath.c_str());
+	}
 
     ParseISO(reader);
 
