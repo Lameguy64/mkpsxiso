@@ -11,7 +11,6 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <stdlib.h>
-#include <tinyxml2.h>
 #include <list>
 #include <memory>
 #include <optional>

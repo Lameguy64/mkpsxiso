@@ -5,10 +5,10 @@
 #endif
 
 #include <stdio.h>
-#include <tinyxml2.h>
 #include <string>
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
+#include "xml.h"
 
 
 namespace global
@@ -33,7 +33,7 @@ namespace global
 
 
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const iso::EntryAttributes& parentAttribs, bool& found_da);
-int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement* trackElement);
+int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement);
 
 int PackWaveFile(cd::IsoWriter* writer, const char* wavFile);
 int GetSize(const char* fileName);
@@ -171,8 +171,8 @@ int main(int argc, const char* argv[])
     }
 
 	// Check if there is an <iso_project> element
-    tinyxml2::XMLElement* projectElement =
-		xmlFile.FirstChildElement( "iso_project" );
+    const tinyxml2::XMLElement* projectElement =
+		xmlFile.FirstChildElement(xml::elem::ISO_PROJECT);
 
     if ( projectElement == nullptr )
 	{
@@ -200,18 +200,21 @@ int main(int argc, const char* argv[])
 		// Check if image_name attribute is specified
 		if ( global::ImageName.empty() )
 		{
-			if ( projectElement->Attribute( "image_name" ) == nullptr )
+			if ( const char* image_name = projectElement->Attribute(xml::attrib::IMAGE_NAME); image_name != nullptr )
 			{
-				printf( "ERROR: image_name attribute not specfied in "
-					"<iso_project> element.\n" );
+				global::ImageName = image_name;
+			}
+			else
+			{
+				printf( "ERROR: %s attribute not specfied in "
+					"<iso_project> element.\n", xml::attrib::IMAGE_NAME );
 				return EXIT_FAILURE;
 			}
-			global::ImageName = projectElement->Attribute( "image_name" );
 		}
 
-		if ( projectElement->Attribute( "cue_sheet" ) != nullptr )
+		if ( const char* cue_sheet = projectElement->Attribute(xml::attrib::CUE_SHEET); cue_sheet != nullptr )
 		{
-			global::cuefile = projectElement->Attribute( "cue_sheet" );
+			global::cuefile = cue_sheet;
 		}
 
 		if ( !global::QuietMode )
@@ -226,10 +229,7 @@ int main(int argc, const char* argv[])
 			printf( "\n" );
 		}
 
-		if ( projectElement->Attribute( "no_xa" ) != nullptr )
-		{
-			global::noXA = projectElement->IntAttribute( "no_xa", 0 );
-		}
+		global::noXA = projectElement->IntAttribute( xml::attrib::NO_XA, 0 );
 
 		if ( ( !global::Overwrite ) && ( !global::NoIsoGen ) )
 		{
@@ -260,8 +260,8 @@ int main(int argc, const char* argv[])
 
 
 		// Check if there is a track element specified
-		tinyxml2::XMLElement* trackElement =
-			projectElement->FirstChildElement( "track" );
+		const tinyxml2::XMLElement* trackElement =
+			projectElement->FirstChildElement(xml::elem::TRACK);
 
 		if ( trackElement == nullptr )
 		{
@@ -287,7 +287,7 @@ int main(int argc, const char* argv[])
 						printf( "  " );
 					}
 
-					printf( "ERROR: cue_sheet attribute is blank.\n" );
+					printf( "ERROR: %s attribute is blank.\n", xml::attrib::CUE_SHEET );
 
 					return EXIT_FAILURE;
 				}
@@ -354,21 +354,17 @@ int main(int argc, const char* argv[])
 		// Parse tracks
 		while ( trackElement != nullptr )
 		{
-			if ( !global::QuietMode )
-			{
-				printf( "  Track #%d %s:\n", global::trackNum,
-					trackElement->Attribute("type") );
-			}
+			const char* track_type = trackElement->Attribute(xml::attrib::TRACK_TYPE);
 
-			if ( trackElement->Attribute( "type" ) == nullptr )
+			if ( track_type == nullptr )
 			{
 				if ( !global::QuietMode )
 				{
 					printf( "  " );
 				}
 
-				printf( "ERROR: type attribute not specified in <track> "
-					"element on line %d.\n", trackElement->GetLineNum() );
+				printf( "ERROR: %s attribute not specified in <track> "
+					"element on line %d.\n", xml::attrib::TRACK_TYPE, trackElement->GetLineNum() );
 
 				if ( !global::NoIsoGen )
 				{
@@ -385,8 +381,14 @@ int main(int argc, const char* argv[])
 				return EXIT_FAILURE;
 			}
 
+			if ( !global::QuietMode )
+			{
+				printf( "  Track #%d %s:\n", global::trackNum,
+					track_type );
+			}
+
 			// Generate ISO file system for data track
-			if ( compare( "data", trackElement->Attribute( "type" ) ) == 0 )
+			if ( compare( "data", track_type ) == 0 )
 			{
 				if ( global::trackNum != 1 )
 				{
@@ -423,7 +425,7 @@ int main(int argc, const char* argv[])
 					if ( cuefp != nullptr )
 					{
 						fclose( cuefp );
-						unlink( projectElement->Attribute( "cue_sheet" ) );
+						unlink( projectElement->Attribute(xml::attrib::CUE_SHEET) );
 					}
 
 					return EXIT_FAILURE;
@@ -442,8 +444,7 @@ int main(int argc, const char* argv[])
 
 			// Add audio track
 			}
-			else if ( compare( "audio",
-				trackElement->Attribute( "type" ) ) == 0 )
+			else if ( compare( "audio", track_type ) == 0 )
 			{
 
 				// Only allow audio tracks if the cue_sheet attribute is specified
@@ -454,8 +455,8 @@ int main(int argc, const char* argv[])
 						printf( "    " );
 					}
 
-					printf( "ERROR: cue_sheet attribute must be specified "
-						"when using audio tracks.\n" );
+					printf( "ERROR: %s attribute must be specified "
+						"when using audio tracks.\n", xml::attrib::CUE_SHEET );
 
 					if ( !global::NoIsoGen )
 					{
@@ -466,15 +467,15 @@ int main(int argc, const char* argv[])
 				}
 
 				// Write track information to the CUE sheet
-				if ( trackElement->Attribute( "source" ) == nullptr )
+				if ( const char* track_source = trackElement->Attribute(xml::attrib::TRACK_SOURCE); track_source == nullptr )
 				{
 					if ( !global::QuietMode )
 					{
 						printf("    ");
 					}
 
-					printf( "ERROR: source attribute not specified "
-						"for track on line %d.\n", trackElement->GetLineNum() );
+					printf( "ERROR: %s attribute not specified "
+						"for track on line %d.\n", xml::attrib::TRACK_SOURCE, trackElement->GetLineNum() );
 
 					if ( !global::NoIsoGen )
 					{
@@ -527,12 +528,10 @@ int main(int argc, const char* argv[])
 						// Pack the audio file
 						if ( !global::QuietMode )
 						{
-							printf( "    Packing audio %s... ",
-								trackElement->Attribute( "source" ) );
+							printf( "    Packing audio %s... ", track_source );
 						}
 
-						if ( PackWaveFile( &writer,
-							trackElement->Attribute( "source" ) ) )
+						if ( PackWaveFile( &writer, track_source ) )
 						{
 							if ( !global::QuietMode )
 							{
@@ -582,7 +581,7 @@ int main(int argc, const char* argv[])
 				return EXIT_FAILURE;
 			}
 
-			trackElement = trackElement->NextSiblingElement( "track" );
+			trackElement = trackElement->NextSiblingElement(xml::elem::TRACK);
 			global::trackNum++;
 		}
 
@@ -608,7 +607,7 @@ int main(int argc, const char* argv[])
 		}
 
 		// Check for next <iso_project> element
-		projectElement = projectElement->NextSiblingElement( "iso_project" );
+		projectElement = projectElement->NextSiblingElement(xml::elem::ISO_PROJECT);
 
 	}
 
@@ -619,31 +618,31 @@ iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement
 {
 	iso::EntryAttributes result;
 
-	const char* GMToffs = dirElement->Attribute( "gmt_offs" );
+	const char* GMToffs = dirElement->Attribute(xml::attrib::GMT_OFFSET);
 	if ( GMToffs != nullptr )
 	{
 		result.GMTOffs = static_cast<signed char>(strtol(GMToffs, nullptr, 0));
 	}
 
-	const char* XAAttrib = dirElement->Attribute( "xa_attrib" );
+	const char* XAAttrib = dirElement->Attribute(xml::attrib::XA_ATTRIBUTES);
 	if ( XAAttrib != nullptr )
 	{
 		result.XAAttrib = static_cast<unsigned char>(strtoul(XAAttrib, nullptr, 0));
 	}
 
-	const char* XAPerm = dirElement->Attribute( "xa_perm" );
+	const char* XAPerm = dirElement->Attribute(xml::attrib::XA_PERMISSIONS);
 	if ( XAPerm != nullptr )
 	{
 		result.XAPerm = static_cast<unsigned short>(strtoul(XAPerm, nullptr, 0));
 	}
 
-	const char* GID = dirElement->Attribute( "xa_gid" );
+	const char* GID = dirElement->Attribute(xml::attrib::XA_GID);
 	if ( GID != nullptr )
 	{
 		result.GID = static_cast<unsigned short>(strtoul(GID, nullptr, 0));
 	}
 
-	const char* UID = dirElement->Attribute( "xa_uid" );
+	const char* UID = dirElement->Attribute(xml::attrib::XA_UID);
 	if ( UID != nullptr )
 	{
 		result.UID = static_cast<unsigned short>(strtoul(UID, nullptr, 0));
@@ -652,27 +651,27 @@ iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement
 	return result;
 };
 
-int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement* trackElement)
+int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement)
 {
-	tinyxml2::XMLElement* identifierElement =
-		trackElement->FirstChildElement("identifiers");
-	tinyxml2::XMLElement* licenseElement =
-		trackElement->FirstChildElement("license");
+	const tinyxml2::XMLElement* identifierElement =
+		trackElement->FirstChildElement(xml::elem::IDENTIFIERS);
+	const tinyxml2::XMLElement* licenseElement =
+		trackElement->FirstChildElement(xml::elem::LICENSE);
 
 	// Set file system identifiers
 	iso::IDENTIFIERS isoIdentifiers {};
 
 	if ( identifierElement != nullptr )
 	{
-		isoIdentifiers.SystemID		= identifierElement->Attribute( "system" );
-		isoIdentifiers.VolumeID		= identifierElement->Attribute( "volume" );
-		isoIdentifiers.VolumeSet	= identifierElement->Attribute( "volume_set" );
-		isoIdentifiers.Publisher	= identifierElement->Attribute( "publisher" );
-		isoIdentifiers.Application	= identifierElement->Attribute( "application" );
-		isoIdentifiers.DataPreparer	= identifierElement->Attribute( "data_preparer" );
-		isoIdentifiers.Copyright	= identifierElement->Attribute( "copyright" );
-		isoIdentifiers.CreationDate = identifierElement->Attribute( "creation_date" );
-		isoIdentifiers.ModificationDate = identifierElement->Attribute( "modification_date" );
+		isoIdentifiers.SystemID		= identifierElement->Attribute(xml::attrib::SYSTEM_ID);
+		isoIdentifiers.VolumeID		= identifierElement->Attribute(xml::attrib::VOLUME_ID);
+		isoIdentifiers.VolumeSet	= identifierElement->Attribute(xml::attrib::VOLUME_SET);
+		isoIdentifiers.Publisher	= identifierElement->Attribute(xml::attrib::PUBLISHER);
+		isoIdentifiers.Application	= identifierElement->Attribute(xml::attrib::APPLICATION);
+		isoIdentifiers.DataPreparer	= identifierElement->Attribute(xml::attrib::DATA_PREPARER);
+		isoIdentifiers.Copyright	= identifierElement->Attribute(xml::attrib::COPYRIGHT);
+		isoIdentifiers.CreationDate = identifierElement->Attribute(xml::attrib::CREATION_DATE);
+		isoIdentifiers.ModificationDate = identifierElement->Attribute(xml::attrib::MODIFICATION_DATE);
 
 		bool hasSystemID = true;
 		if ( isoIdentifiers.SystemID == nullptr )
@@ -756,9 +755,9 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 
 	if ( licenseElement != nullptr )
 	{
-		if ( licenseElement->Attribute( "file" ) != nullptr )
+		if ( const char* license_file = licenseElement->Attribute(xml::attrib::LICENSE_FILE); license_file != nullptr )
 		{
-			if ( strlen( licenseElement->Attribute( "file" ) ) == 0 )
+			if ( strlen( license_file ) == 0 )
 			{
 				if ( !global::QuietMode )
 				{
@@ -773,11 +772,10 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 
 			if ( !global::QuietMode )
 			{
-				printf( "    License file: %s\n\n",
-					licenseElement->Attribute( "file" ) );
+				printf( "    License file: %s\n\n", license_file );
 			}
 
-			int licenseSize = GetSize( licenseElement->Attribute( "file" ) );
+			int licenseSize = GetSize( license_file );
 
             if ( licenseSize < 0 )
 			{
@@ -861,15 +859,15 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate);
 	iso::DirTreeClass* dirTree = root.subdir.get();
 
-	const tinyxml2::XMLElement* directoryTree = trackElement->FirstChildElement( "directory_tree" );
-	if ( trackElement->FirstChildElement( "directory_tree" ) == nullptr )
+	const tinyxml2::XMLElement* directoryTree = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
+	if ( directoryTree == nullptr )
 	{
 		if ( !global::QuietMode )
 		{
 			printf( "      " );
 		}
-		printf( "ERROR: No directory_tree element specified for data track "
-			"on line %d.\n", trackElement->GetLineNum() );
+		printf( "ERROR: No %s element specified for data track "
+			"on line %d.\n", xml::elem::DIRECTORY_TREE, trackElement->GetLineNum() );
 		return false;
 	}
 
@@ -1027,7 +1025,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	{
 		char buff[28032];
 
-		FILE* fp = fopen( licenseElement->Attribute( "file" ), "rb" );
+		FILE* fp = fopen( licenseElement->Attribute(xml::attrib::LICENSE_FILE), "rb" );
 		fread( buff, 1, 28032, fp );
 		fclose( fp );
 
@@ -1049,8 +1047,8 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 
 static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
 {
-	const char* nameElement = dirElement->Attribute("name");
-	const char* sourceElement = dirElement->Attribute("source");
+	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
+	const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE);
 
 	if ( nameElement == nullptr && sourceElement == nullptr )
 	{
@@ -1129,7 +1127,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 
 	int entry = iso::EntryFile;
 
-	const char* typeElement = dirElement->Attribute("type");
+	const char* typeElement = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
 	if ( typeElement != nullptr )
 	{
 		if ( compare( "data", typeElement ) == 0 )
@@ -1163,7 +1161,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			}
 
 			printf( "ERROR: Unknown type %s on line %d\n",
-				dirElement->Attribute( "type" ),
+				dirElement->Attribute(xml::attrib::ENTRY_TYPE),
 				dirElement->GetLineNum() );
 
 			return false;
@@ -1205,7 +1203,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
 	int dummyType = 0; // Data
-	const char* type = dirElement->Attribute( "type" );
+	const char* type = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
 	if ( type != nullptr )
 	{
 		// TODO: Make reasonable
@@ -1222,7 +1220,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 
 static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
 {
-	const char* nameElement = dirElement->Attribute( "name" );
+	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
 	if ( strlen( nameElement ) > 12 )
 	{
 		printf( "ERROR: Directory name %s on line %d is more than 12 "
@@ -1235,7 +1233,7 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 
 	bool alreadyExists = false;
 	iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
-		nameElement, dirElement->Attribute( "source" ), attribs, alreadyExists );
+		nameElement, dirElement->Attribute(xml::attrib::ENTRY_SOURCE), attribs, alreadyExists );
 
 	if ( subdir == nullptr )
 	{

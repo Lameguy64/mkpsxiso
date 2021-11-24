@@ -9,11 +9,11 @@
 
 
 #include <string>
-#include "tinyxml2.h"
 
 #include "cd.h"
 #include "xa.h"
 #include "cdreader.h"
+#include "xml.h"
 
 #include <time.h>
 
@@ -198,7 +198,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
             if (element != NULL) {
 
                 newelement = doc->NewElement("dir");
-                newelement->SetAttribute("name", dirEntries.dirEntryList[e].identifier);
+                newelement->SetAttribute(xml::attrib::ENTRY_NAME, dirEntries.dirEntryList[e].identifier);
                 element->InsertEndChild(newelement);
 
             }
@@ -216,8 +216,8 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
             if (element != NULL) {
 
                 newelement = doc->NewElement("file");
-                newelement->SetAttribute("name", CleanIdentifier(dirEntries.dirEntryList[e].identifier));
-                newelement->SetAttribute("source", outputPath.c_str());
+                newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(dirEntries.dirEntryList[e].identifier));
+                newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.c_str());
 
             }
 
@@ -262,7 +262,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				// depending on the value of the sub-header (video or audio data).
 
 				if(element != NULL)
-					newelement->SetAttribute("type", "mixed");
+					newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "mixed");
 
 				// this is the data to be read 2336 bytes per sector, both if the file is an STR or XA,
 				// because the STR contains audio.
@@ -305,7 +305,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				// Extract CDDA file
 
 				if (element != NULL)
-					newelement->SetAttribute("type", "da");
+					newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "da");
 
 				int result = reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
 
@@ -362,7 +362,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				// Extract regular file
 
 				if (element != NULL)
-                    newelement->SetAttribute("type", "data");
+                    newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
 
 				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
 
@@ -472,38 +472,38 @@ void ParseISO(cd::IsoReader& reader) {
 
     if (!param::xmlFile.empty()) {
 
-		tinyxml2::XMLElement *baseElement = xmldoc.NewElement("iso_project");
-		baseElement->SetAttribute("image_name", "mkpsxiso.bin");
-		baseElement->SetAttribute("cue_sheet", "mkpsxiso.cue");
+		tinyxml2::XMLElement *baseElement = xmldoc.NewElement(xml::elem::ISO_PROJECT);
+		baseElement->SetAttribute(xml::attrib::IMAGE_NAME, "mkpsxiso.bin");
+		baseElement->SetAttribute(xml::attrib::CUE_SHEET, "mkpsxiso.cue");
 
-		tinyxml2::XMLElement *trackElement = xmldoc.NewElement("track");
-		trackElement->SetAttribute("type", "data");
+		tinyxml2::XMLElement *trackElement = xmldoc.NewElement(xml::elem::TRACK);
+		trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 
-		tinyxml2::XMLElement *newElement = xmldoc.NewElement("identifiers");
+		tinyxml2::XMLElement *newElement = xmldoc.NewElement(xml::elem::IDENTIFIERS);
 
 		if (descriptor.systemID[0] != 0x20)
-			newElement->SetAttribute("system", CleanVolumeId(descriptor.systemID));
+			newElement->SetAttribute(xml::attrib::SYSTEM_ID, CleanVolumeId(descriptor.systemID));
 		if (descriptor.applicationIdentifier[0] != 0x20)
-			newElement->SetAttribute("application", CleanVolumeId(descriptor.applicationIdentifier));
+			newElement->SetAttribute(xml::attrib::APPLICATION, CleanVolumeId(descriptor.applicationIdentifier));
 		if (descriptor.volumeID[0] != 0x20)
-			newElement->SetAttribute("volume", CleanVolumeId(descriptor.volumeID));
+			newElement->SetAttribute(xml::attrib::VOLUME_ID, CleanVolumeId(descriptor.volumeID));
 		if (descriptor.volumeSetIdentifier[0] != 0x20)
-			newElement->SetAttribute("volume_set", CleanVolumeId(descriptor.volumeSetIdentifier));
+			newElement->SetAttribute(xml::attrib::VOLUME_SET, CleanVolumeId(descriptor.volumeSetIdentifier));
 		if (descriptor.publisherIdentifier[0] != 0x20)
-			newElement->SetAttribute("publisher", CleanVolumeId(descriptor.publisherIdentifier));
+			newElement->SetAttribute(xml::attrib::PUBLISHER, CleanVolumeId(descriptor.publisherIdentifier));
 		if (descriptor.dataPreparerIdentifier[0] != 0x20)
-			newElement->SetAttribute("data_preparer", CleanVolumeId(descriptor.dataPreparerIdentifier));
+			newElement->SetAttribute(xml::attrib::DATA_PREPARER, CleanVolumeId(descriptor.dataPreparerIdentifier));
 
-		newElement->SetAttribute("creation_date", LongDateToString(descriptor.volumeCreateDate).c_str());
-
-		trackElement->InsertEndChild(newElement);
-
-		newElement = xmldoc.NewElement("license");
-		newElement->SetAttribute("file", (param::outPath+"license_data.dat").c_str());
+		newElement->SetAttribute(xml::attrib::CREATION_DATE, LongDateToString(descriptor.volumeCreateDate).c_str());
 
 		trackElement->InsertEndChild(newElement);
 
-		newElement = xmldoc.NewElement("directory_tree");
+		newElement = xmldoc.NewElement(xml::elem::LICENSE);
+		newElement->SetAttribute(xml::attrib::LICENSE_FILE, (param::outPath+"license_data.dat").c_str());
+
+		trackElement->InsertEndChild(newElement);
+
+		newElement = xmldoc.NewElement(xml::elem::DIRECTORY_TREE);
 
 		ParseDirectories(reader,
 						descriptor.rootDirRecord.entryOffs.lsb,
