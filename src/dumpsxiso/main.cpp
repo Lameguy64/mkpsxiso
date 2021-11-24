@@ -10,6 +10,7 @@
 
 #include <string>
 #include <filesystem>
+#include <memory>
 
 #include "cd.h"
 #include "xa.h"
@@ -120,9 +121,13 @@ void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
 	memcpy(header->subchunk2ID, "data", 4);
 	header->subchunk2Size = dataSize;
 }
-void ReadLicense(cd::IsoReader& reader, cd::ISO_LICENSE* license) {
+std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
+	auto license = std::make_unique<cd::ISO_LICENSE>();
+
 	reader.SeekToSector(0);
-	reader.ReadBytesXA(license->data, 28032);
+	reader.ReadBytesXA(license->data, sizeof(license->data));
+
+	return license;
 }
 
 #if defined(_WIN32)
@@ -168,7 +173,7 @@ void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP
 #endif
 }
 
-void SaveLicense(cd::ISO_LICENSE& license) {
+void SaveLicense(const cd::ISO_LICENSE& license) {
     const std::filesystem::path outputPath = param::outPath / "license_data.dat";
 
 	FILE* outFile = fopen(outputPath.c_str(), "wb");
@@ -178,7 +183,7 @@ void SaveLicense(cd::ISO_LICENSE& license) {
         return;
     }
 
-    fwrite(license.data, 1, 28032, outFile);
+    fwrite(license.data, 1, sizeof(license.data), outFile);
     fclose(outFile);
 }
 
@@ -401,10 +406,8 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 void ParseISO(cd::IsoReader& reader) {
 
-    cd::ISO_DESCRIPTOR	descriptor;
-	cd::ISO_LICENSE license;
-
-	ReadLicense(reader, &license);
+    cd::ISO_DESCRIPTOR descriptor;
+	auto license = ReadLicense(reader);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -523,7 +526,7 @@ void ParseISO(cd::IsoReader& reader) {
     }
 
     //Save license file anyway.
-    SaveLicense(license);
+    SaveLicense(*license);
 }
 
 int main(int argc, char *argv[]) {

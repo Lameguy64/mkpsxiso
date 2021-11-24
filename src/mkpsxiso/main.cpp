@@ -1008,22 +1008,25 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 	// Write license data
 	if ( licenseElement != nullptr )
 	{
-		char buff[28032];
-
 		FILE* fp = fopen( licenseElement->Attribute(xml::attrib::LICENSE_FILE), "rb" );
-		fread( buff, 1, 28032, fp );
-		fclose( fp );
-
-		if ( !global::QuietMode )
+		if (fp != nullptr)
 		{
-			printf( "      Writing license data..." );
-		}
+			auto license = std::make_unique<cd::ISO_LICENSE>();
+			if (fread( license->data, sizeof(license->data), 1, fp ) == 1)
+			{
+				if ( !global::QuietMode )
+				{
+					printf( "      Writing license data..." );
+				}
 
-		iso::WriteLicenseData( writer, buff );
+				iso::WriteLicenseData( writer, license->data );
 
-		if ( !global::QuietMode )
-		{
-			printf( "Ok.\n" );
+				if ( !global::QuietMode )
+				{
+					printf( "Ok.\n" );
+				}
+			}
+			fclose( fp );
 		}
 	}
 
