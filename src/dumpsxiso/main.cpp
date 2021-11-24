@@ -40,16 +40,23 @@ namespace global {
 
 }
 
-void PrintId(char* text) {
+template<size_t N>
+void PrintId(char (&id)[N])
+{
+	std::string_view view;
 
-    int i=0;
+	const std::string_view id_view(id, N);
+	const size_t last_char = id_view.find_last_not_of(' ');
+	if (last_char != std::string_view::npos)
+	{
+		view = id_view.substr(0, last_char+1);
+	}
 
-    while(text[i] != 32) {
-        printf("%c", text[i]);
-        i++;
-    }
-    printf("\n");
-
+	if (!view.empty())
+	{
+		printf("%.*s", static_cast<int>(view.length()), view.data());
+	}
+	printf("\n");
 }
 
 void PrintDate(const cd::ISO_LONG_DATESTAMP& date) {
@@ -62,32 +69,25 @@ void BackDir(std::string& path) {
 
 }
 
-const char* CleanVolumeId(const char* id) {
+template<size_t N>
+static std::string CleanDescElement(char (&id)[N])
+{
+	std::string result;
 
-    static char buff[38];
-    int i;
+	const std::string_view view(id, N);
+	const size_t last_char = view.find_last_not_of(' ');
+	if (last_char != std::string_view::npos)
+	{
+		result = view.substr(0, last_char+1);
+	}
 
-    for(i=0; (i<37)&&(id[i]!=0x20); i++) {
-        buff[i] = id[i];
-    }
-    buff[i] = 0x00;
-
-    return buff;
-
+    return result;
 }
 
-const char* CleanIdentifier(const char* id) {
-
-    static char buff[16];
-    int i;
-
-    for(i=0; (id[i]!=0x00)&&(id[i]!=';'); i++) {
-        buff[i] = id[i];
-    }
-    buff[i] = 0x00;
-
-    return buff;
-
+std::string CleanIdentifier(std::string_view id)
+{
+	std::string result(id.substr(0, id.find_last_of(';')));
+	return result;
 }
 
 void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
@@ -216,7 +216,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
             if (element != NULL) {
 
                 newelement = doc->NewElement("file");
-                newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(dirEntries.dirEntryList[e].identifier));
+                newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(dirEntries.dirEntryList[e].identifier).c_str());
                 newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.c_str());
 
             }
@@ -480,20 +480,20 @@ void ParseISO(cd::IsoReader& reader) {
 		trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 
 		tinyxml2::XMLElement *newElement = xmldoc.NewElement(xml::elem::IDENTIFIERS);
+		auto setAttributeIfNotEmpty = [newElement](const char* name, const std::string& value)
+		{
+			if (!value.empty())
+			{
+				newElement->SetAttribute(name, value.c_str());
+			}
+		};
 
-		if (descriptor.systemID[0] != 0x20)
-			newElement->SetAttribute(xml::attrib::SYSTEM_ID, CleanVolumeId(descriptor.systemID));
-		if (descriptor.applicationIdentifier[0] != 0x20)
-			newElement->SetAttribute(xml::attrib::APPLICATION, CleanVolumeId(descriptor.applicationIdentifier));
-		if (descriptor.volumeID[0] != 0x20)
-			newElement->SetAttribute(xml::attrib::VOLUME_ID, CleanVolumeId(descriptor.volumeID));
-		if (descriptor.volumeSetIdentifier[0] != 0x20)
-			newElement->SetAttribute(xml::attrib::VOLUME_SET, CleanVolumeId(descriptor.volumeSetIdentifier));
-		if (descriptor.publisherIdentifier[0] != 0x20)
-			newElement->SetAttribute(xml::attrib::PUBLISHER, CleanVolumeId(descriptor.publisherIdentifier));
-		if (descriptor.dataPreparerIdentifier[0] != 0x20)
-			newElement->SetAttribute(xml::attrib::DATA_PREPARER, CleanVolumeId(descriptor.dataPreparerIdentifier));
-
+		setAttributeIfNotEmpty(xml::attrib::SYSTEM_ID, CleanDescElement(descriptor.systemID));
+		setAttributeIfNotEmpty(xml::attrib::APPLICATION, CleanDescElement(descriptor.applicationIdentifier));
+		setAttributeIfNotEmpty(xml::attrib::VOLUME_ID, CleanDescElement(descriptor.volumeID));
+		setAttributeIfNotEmpty(xml::attrib::VOLUME_SET, CleanDescElement(descriptor.volumeSetIdentifier));
+		setAttributeIfNotEmpty(xml::attrib::PUBLISHER, CleanDescElement(descriptor.publisherIdentifier));
+		setAttributeIfNotEmpty(xml::attrib::DATA_PREPARER, CleanDescElement(descriptor.dataPreparerIdentifier));
 		newElement->SetAttribute(xml::attrib::CREATION_DATE, LongDateToString(descriptor.volumeCreateDate).c_str());
 
 		trackElement->InsertEndChild(newElement);
