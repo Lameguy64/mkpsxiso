@@ -6,9 +6,11 @@
 
 #include <stdio.h>
 #include <string>
+#include <filesystem>
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 #include "xml.h"
+#include "platform.h"
 
 
 namespace global
@@ -21,12 +23,12 @@ namespace global
 	int			trackNum	= 1;
 	int			noXA		= false;
 
-	std::string	XMLscript;
-	std::string LBAfile;
-	std::string LBAheaderFile;
-	std::string ImageName;
+	std::filesystem::path XMLscript;
+	std::filesystem::path LBAfile;
+	std::filesystem::path LBAheaderFile;
+	std::filesystem::path ImageName;
 
-	const char*	cuefile = nullptr;
+	std::optional<std::filesystem::path> cuefile;
 	int			OutputOverride = false;
 	int			NoIsoGen = false;
 };
@@ -35,13 +37,12 @@ namespace global
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const iso::EntryAttributes& parentAttribs, bool& found_da);
 int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement);
 
-int PackWaveFile(cd::IsoWriter* writer, const char* wavFile);
-int GetSize(const char* fileName);
+int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile);
 
 int compare( const char* a, const char* b );
 
 
-int main(int argc, const char* argv[])
+int Main(int argc, const char* argv[])
 {
 	// Parse arguments
 	for ( int i=1; i<argc; i++)
@@ -51,7 +52,7 @@ int main(int argc, const char* argv[])
 			if ( compare( "-lbahead", argv[i] ) == 0 )
 			{
 				i++;
-				global::LBAheaderFile = argv[i];
+				global::LBAheaderFile = std::filesystem::u8path(argv[i]);
 			}
 			else if ( compare( "-nolimit", argv[i] ) == 0 )
 			{
@@ -68,12 +69,12 @@ int main(int argc, const char* argv[])
 			else if ( compare( "-lba", argv[i] ) == 0 )
 			{
 				i++;
-				global::LBAfile	= argv[i];
+				global::LBAfile	= std::filesystem::u8path(argv[i]);
 			}
 			else if ( compare( "-o", argv[i] ) == 0 )
 			{
 				i++;
-				global::ImageName = argv[i];
+				global::ImageName = std::filesystem::u8path(argv[i]);
 				global::OutputOverride = true;
 			}
 			else if ( compare( "-y", argv[i] ) == 0 )
@@ -95,7 +96,7 @@ int main(int argc, const char* argv[])
 		{
 			if ( global::XMLscript.empty() )
 			{
-				global::XMLscript = argv[i];
+				global::XMLscript = std::filesystem::u8path(argv[i]);
 			}
 		}
 
@@ -146,28 +147,39 @@ int main(int argc, const char* argv[])
 
 	// Load XML file
 	tinyxml2::XMLDocument xmlFile;
-
-    if ( xmlFile.LoadFile( global::XMLscript.c_str() ) != tinyxml2::XML_SUCCESS )
 	{
-		printf("ERROR: ");
-		if ( xmlFile.ErrorID() == tinyxml2::XML_ERROR_FILE_NOT_FOUND )
+		tinyxml2::XMLError error;
+		if (FILE* file = OpenFile(global::XMLscript, "rb"); file != nullptr)
 		{
-			printf("File not found.\n");
-		}
-		else if ( xmlFile.ErrorID() == tinyxml2::XML_ERROR_FILE_COULD_NOT_BE_OPENED )
-		{
-			printf("File cannot be opened.\n");
-		}
-		else if ( xmlFile.ErrorID() == tinyxml2::XML_ERROR_FILE_READ_ERROR )
-		{
-			printf("Error reading file.\n");
+			error = xmlFile.LoadFile(file);
+			fclose(file);
 		}
 		else
 		{
-			printf("%s on line %d\n", xmlFile.ErrorName(), xmlFile.ErrorLineNum());
+			error = tinyxml2::XML_ERROR_FILE_NOT_FOUND;
 		}
 
-		return EXIT_FAILURE;
+		if ( error != tinyxml2::XML_SUCCESS )
+		{
+			printf("ERROR: ");
+			if ( error == tinyxml2::XML_ERROR_FILE_NOT_FOUND )
+			{
+				printf("File not found.\n");
+			}
+			else if ( error == tinyxml2::XML_ERROR_FILE_COULD_NOT_BE_OPENED )
+			{
+				printf("File cannot be opened.\n");
+			}
+			else if ( error == tinyxml2::XML_ERROR_FILE_READ_ERROR )
+			{
+				printf("Error reading file.\n");
+			}
+			else
+			{
+				printf("%s on line %d\n", xmlFile.ErrorName(), xmlFile.ErrorLineNum());
+			}
+			return EXIT_FAILURE;
+		}
     }
 
 	// Check if there is an <iso_project> element
@@ -202,7 +214,7 @@ int main(int argc, const char* argv[])
 		{
 			if ( const char* image_name = projectElement->Attribute(xml::attrib::IMAGE_NAME); image_name != nullptr )
 			{
-				global::ImageName = image_name;
+				global::ImageName = std::filesystem::u8path(image_name);
 			}
 			else
 			{
@@ -214,16 +226,16 @@ int main(int argc, const char* argv[])
 
 		if ( const char* cue_sheet = projectElement->Attribute(xml::attrib::CUE_SHEET); cue_sheet != nullptr )
 		{
-			global::cuefile = cue_sheet;
+			global::cuefile = std::filesystem::u8path(cue_sheet);
 		}
 
 		if ( !global::QuietMode )
 		{
-			printf( "Building ISO Image: %s", global::ImageName.c_str() );
+			printf( "Building ISO Image: %" PRFILESYSTEM_PATH, global::ImageName.c_str() );
 
 			if ( global::cuefile )
 			{
-				printf( " + %s", global::cuefile );
+				printf( " + %" PRFILESYSTEM_PATH, global::cuefile->c_str() );
 			}
 
 			printf( "\n" );
@@ -233,7 +245,7 @@ int main(int argc, const char* argv[])
 
 		if ( ( !global::Overwrite ) && ( !global::NoIsoGen ) )
 		{
-			if ( GetSize( global::ImageName.c_str() ) >= 0 )
+			if ( GetSize( global::ImageName ) >= 0 )
 			{
 				printf( "WARNING: ISO image already exists, overwrite? <y/n> " );
 				char key;
@@ -275,12 +287,9 @@ int main(int argc, const char* argv[])
 
 		if ( !global::NoIsoGen )
 		{
-			if ( global::cuefile != nullptr )
+			if ( global::cuefile )
 			{
-				std::string temp;
-				std::size_t pos;
-				
-				if ( strlen( global::cuefile ) == 0 )
+				if ( global::cuefile->empty() )
 				{
 					if ( !global::QuietMode )
 					{
@@ -292,7 +301,7 @@ int main(int argc, const char* argv[])
 					return EXIT_FAILURE;
 				}
 
-				cuefp = fopen( global::cuefile, "w" );
+				cuefp = OpenFile( global::cuefile.value(), "w" );
 
 				if ( cuefp == nullptr )
 				{
@@ -305,21 +314,8 @@ int main(int argc, const char* argv[])
 
 					return EXIT_FAILURE;
 				}
-				
-				// get file name with the path stripped
-				pos = global::ImageName.find_last_of("/\\");
-				
-				if( pos != std::string::npos )
-				{
-					temp = global::ImageName.substr(pos+1);
-				}
-				else
-				{
-					temp = global::ImageName;
-				}
-				
-				fprintf( cuefp, "FILE \"%s\" BINARY\n",
-					temp.c_str() );
+
+				fprintf(cuefp, "FILE \"%" PRFILESYSTEM_PATH "\" BINARY\n", global::ImageName.filename().c_str());
 			}
 		}
 
@@ -371,7 +367,8 @@ int main(int argc, const char* argv[])
 					writer.Close();
 				}
 
-				unlink( global::ImageName.c_str() );
+				std::error_code ec;
+				std::filesystem::remove(global::ImageName, ec);
 
 				if ( cuefp != nullptr )
 				{
@@ -420,12 +417,13 @@ int main(int argc, const char* argv[])
 						writer.Close();
 					}
 
-					unlink( global::ImageName.c_str() );
+					std::error_code ec;
+					std::filesystem::remove(global::ImageName, ec);
 
 					if ( cuefp != nullptr )
 					{
 						fclose( cuefp );
-						unlink( projectElement->Attribute(xml::attrib::CUE_SHEET) );
+						std::filesystem::remove(std::filesystem::u8path(projectElement->Attribute(xml::attrib::CUE_SHEET)), ec);
 					}
 
 					return EXIT_FAILURE;
@@ -740,9 +738,10 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 
 	if ( licenseElement != nullptr )
 	{
-		if ( const char* license_file = licenseElement->Attribute(xml::attrib::LICENSE_FILE); license_file != nullptr )
+		if ( const char* license_file_attrib = licenseElement->Attribute(xml::attrib::LICENSE_FILE); license_file_attrib != nullptr )
 		{
-			if ( strlen( license_file ) == 0 )
+			const std::filesystem::path license_file{std::filesystem::u8path(license_file_attrib)};
+			if ( license_file.empty() )
 			{
 				if ( !global::QuietMode )
 				{
@@ -757,10 +756,10 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 
 			if ( !global::QuietMode )
 			{
-				printf( "    License file: %s\n\n", license_file );
+				printf( "    License file: %" PRFILESYSTEM_PATH "\n\n", license_file.c_str() );
 			}
 
-			int licenseSize = GetSize( license_file );
+			int64_t licenseSize = GetSize( license_file );
 
             if ( licenseSize < 0 )
 			{
@@ -879,15 +878,15 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 
 	if ( !global::LBAfile.empty() )
 	{
-		FILE* fp = fopen( global::LBAfile.c_str(), "w" );
+		FILE* fp = OpenFile( global::LBAfile, "w" );
 		if (fp != nullptr)
 		{
 			fprintf( fp, "File LBA log generated by MKPSXISO v" VERSION "\n\n" );
-			fprintf( fp, "Image bin file: %s\n", global::ImageName.c_str() );
+			fprintf( fp, "Image bin file: %" PRFILESYSTEM_PATH "\n", global::ImageName.c_str() );
 
-			if ( global::cuefile != nullptr )
+			if ( global::cuefile )
 			{
-				fprintf( fp, "Image cue file: %s\n", global::cuefile );
+				fprintf( fp, "Image cue file: %" PRFILESYSTEM_PATH "\n", global::cuefile->c_str() );
 			}
 
 			fprintf( fp, "\nFile System:\n\n" );
@@ -900,7 +899,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 
 			if ( !global::QuietMode )
 			{
-				printf( "    Wrote file LBA log %s.\n\n",
+				printf( "    Wrote file LBA log %" PRFILESYSTEM_PATH ".\n\n",
 					global::LBAfile.c_str() );
 			}
 		}
@@ -908,7 +907,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 		{
 			if ( !global::QuietMode )
 			{
-				printf( "    Failed to write LBA log %s!\n\n",
+				printf( "    Failed to write LBA log %" PRFILESYSTEM_PATH "!\n\n",
 					global::LBAfile.c_str() );
 			}
 		}
@@ -916,7 +915,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 
 	if ( !global::LBAheaderFile.empty() )
 	{
-		FILE* fp = fopen( global::LBAheaderFile.c_str(), "w" );
+		FILE* fp = OpenFile( global::LBAheaderFile, "w" );
 		if (fp != nullptr)
 		{
 			dirTree->OutputHeaderListing( fp, 0 );
@@ -925,7 +924,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 
 			if ( !global::QuietMode )
 			{
-				printf( "    Wrote file LBA listing header %s.\n\n",
+				printf( "    Wrote file LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
 					global::LBAheaderFile.c_str() );
 			}
 		}
@@ -933,7 +932,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 		{
 			if ( !global::QuietMode )
 			{
-				printf( "    Failed to write LBA listing header %s.\n\n",
+				printf( "    Failed to write LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
 					global::LBAheaderFile.c_str() );
 			}
 		}
@@ -1008,7 +1007,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 	// Write license data
 	if ( licenseElement != nullptr )
 	{
-		FILE* fp = fopen( licenseElement->Attribute(xml::attrib::LICENSE_FILE), "rb" );
+		FILE* fp = OpenFile( std::filesystem::u8path(licenseElement->Attribute(xml::attrib::LICENSE_FILE)), "rb" );
 		if (fp != nullptr)
 		{
 			auto license = std::make_unique<cd::ISO_LICENSE>();
@@ -1051,18 +1050,10 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 		return false;
 	}
 
-	std::string srcFile;
+	std::filesystem::path srcFile;
 	if ( sourceElement != nullptr )
 	{
-		srcFile = sourceElement;
-		// Replace all forward slashes with backslashes
-		for ( char& ch : srcFile )
-		{
-			if ( ch == '\\' )
-			{
-				ch = '/';
-			}
-		}
+		srcFile = std::filesystem::u8path(sourceElement);
 	}
 
 	std::string name;
@@ -1072,11 +1063,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	}
 	else
 	{
-		if ( !srcFile.empty() )
-		{
-			name = srcFile;
-			name.erase( 0, name.rfind( '/' )+1 );
-		}
+		name = srcFile.filename().u8string();
 	}
 
 	if ( srcFile.empty() )
@@ -1084,8 +1071,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 		srcFile = name;
 	}
 
-	if ( ( name.find( '\\' ) != std::string::npos )
-		|| ( name.find( '/' ) != std::string::npos ) )
+	if ( name.find_first_of( "\\/" ) != std::string::npos )
 	{
 		if ( !global::QuietMode )
 		{
@@ -1130,7 +1116,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 		else if ( compare( "da", typeElement ) == 0 )
 		{
 			entry = iso::EntryDA;
-			if ( global::cuefile == nullptr )
+			if ( !global::cuefile )
 			{
 				if ( !global::QuietMode )
 				{
@@ -1170,7 +1156,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 
 	}
 
-	return dirTree->AddFileEntry(name.c_str(), entry, srcFile.c_str(), iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)));
+	return dirTree->AddFileEntry(name.c_str(), entry, srcFile, iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)));
 }
 
 static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
@@ -1219,9 +1205,15 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 
 	const iso::EntryAttributes attribs = iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement));
 
+	std::filesystem::path srcDir;
+	if (const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE); sourceElement != nullptr)
+	{
+		srcDir = std::filesystem::u8path(sourceElement);
+	}
+
 	bool alreadyExists = false;
 	iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
-		nameElement, dirElement->Attribute(xml::attrib::ENTRY_SOURCE), attribs, alreadyExists );
+		nameElement, srcDir, attribs, alreadyExists );
 
 	if ( subdir == nullptr )
 	{
@@ -1274,13 +1266,13 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 	return true;
 }
 
-int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
+int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile)
 {
 	FILE *fp;
 	int waveLen;
 	unsigned char buff[CD_SECTOR_SIZE];
 
-	if ( !( fp = fopen( wavFile, "rb" ) ) )
+	if ( !( fp = OpenFile( wavFile, "rb" ) ) )
 	{
 		printf("ERROR: File not found.\n");
 		return false;
@@ -1417,18 +1409,6 @@ int PackWaveFile(cd::IsoWriter* writer, const char* wavFile)
 	fclose( fp );
 
 	return true;
-}
-
-int GetSize(const char* fileName)
-{
-	struct stat fileAttrib;
-
-    if (stat(fileName, &fileAttrib) != 0)
-	{
-		return -1;
-	}
-
-	return fileAttrib.st_size;
 }
 
 int compare( const char* a, const char* b )

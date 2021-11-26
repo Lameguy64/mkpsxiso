@@ -2,6 +2,7 @@
 #include "iso.h"
 #include "cd.h"
 #include "xa.h"
+#include "platform.h"
 
 #include <algorithm>
 
@@ -51,11 +52,11 @@ static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 	return result;
 }
 
-int iso::DirTreeClass::GetWavSize(const char* wavFile)
+int iso::DirTreeClass::GetWavSize(const std::filesystem::path& wavFile)
 {
 	FILE *fp;
 
-	if ( !( fp = fopen( wavFile, "rb" ) ) )
+	if ( !( fp = OpenFile( wavFile, "rb" ) ) )
 	{
 		printf("ERROR: File not found.\n");
 		return false;
@@ -131,13 +132,13 @@ int iso::DirTreeClass::GetWavSize(const char* wavFile)
 	return 2352*((WAV_Subchunk2.len+2351)/2352);
 }
 
-int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const char* wavFile, bool pregap)
+int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile, bool pregap)
 {
 	FILE *fp;
 	int waveLen;
 	unsigned char buff[CD_SECTOR_SIZE];
 
-	if ( !( fp = fopen( wavFile, "rb" ) ) )
+	if ( !( fp = OpenFile( wavFile, "rb" ) ) )
 	{
 		printf("ERROR: File not found.\n");
 		return false;
@@ -319,18 +320,17 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	return entries.back();
 }
 
-bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes)
+bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesystem::path& srcfile, const EntryAttributes& attributes)
 {
-	struct stat fileAttrib;
-
-    if ( stat( srcfile, &fileAttrib ) != 0 )
+	auto fileAttrib = Stat(srcfile);
+    if ( !fileAttrib )
 	{
 		if ( !global::QuietMode )
 		{
 			printf("      ");
 		}
 
-		printf("ERROR: File not found: %s\n", srcfile);
+		printf("ERROR: File not found: %" PRFILESYSTEM_PATH "\n", srcfile.c_str());
 		return false;
     }
 
@@ -339,7 +339,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 	{
 		// Check header
 		char buff[4];
-		FILE* fp = fopen(srcfile, "rb");
+		FILE* fp = OpenFile(srcfile, "rb");
 		fread(buff, 1, 4, fp);
 		fclose(fp);
 
@@ -351,20 +351,20 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 				printf("      ");
 			}
 
-			printf("ERROR: %s is a WAV or is not properly ripped!\n", srcfile);
+			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped!\n", srcfile.c_str());
 
 			return false;
 		}
 
 		// Check if size is a multiple of 2336 bytes
-		if ( ( fileAttrib.st_size % 2336 ) != 0 )
+		if ( ( fileAttrib->st_size % 2336 ) != 0 )
 		{
 			if ( !global::QuietMode )
 			{
 				printf("      ");
 			}
 
-			printf("ERROR: %s is not a multiple of 2336 bytes.\n", srcfile);
+			printf("ERROR: %" PRFILESYSTEM_PATH " is not a multiple of 2336 bytes.\n", srcfile.c_str());
 
 			if ( !global::QuietMode )
 			{
@@ -385,7 +385,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 				printf("      ");
 			}
 
-			printf("WARNING: %s may not have a valid subheader. ", srcfile);
+			printf("WARNING: %" PRFILESYSTEM_PATH " may not have a valid subheader. ", srcfile.c_str());
 		}
 
 	// Check STR data
@@ -393,7 +393,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 
 		// Check header
 		char buff[4];
-		FILE* fp = fopen(srcfile, "rb");
+		FILE* fp = OpenFile(srcfile, "rb");
 		fread(buff, 1, 4, fp);
 		fclose(fp);
 
@@ -405,15 +405,15 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 				printf("      ");
 			}
 
-			printf("ERROR: %s is a WAV or is not properly ripped.\n", srcfile);
+			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped.\n", srcfile.c_str());
 
 			return false;
 		}
 
 		// Check if size is a multiple of 2336 bytes
-		if ( ( fileAttrib.st_size % 2336 ) != 0 )
+		if ( ( fileAttrib->st_size % 2336 ) != 0 )
 		{
-			if ( ( fileAttrib.st_size % 2048) == 0 )
+			if ( ( fileAttrib->st_size % 2048) == 0 )
 			{
 				type = EntrySTR_DO;
 			}
@@ -424,8 +424,8 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 					printf("      ");
 				}
 
-				printf("ERROR: %s is not a multiple of 2336 or 2048 bytes.\n",
-					srcfile);
+				printf("ERROR: %" PRFILESYSTEM_PATH " is not a multiple of 2336 or 2048 bytes.\n",
+					srcfile.c_str());
 
 				return false;
 			}
@@ -476,7 +476,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 	entry.GID		= attributes.GID.value();
 	entry.UID		= attributes.UID.value();
 
-	if ( srcfile != nullptr )
+	if ( !srcfile.empty() )
 	{
 		entry.srcfile = srcfile;
 	}
@@ -487,10 +487,10 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const char* srcfi
 	}
 	else if ( type != EntryDir )
 	{
-		entry.length = fileAttrib.st_size;
+		entry.length = fileAttrib->st_size;
 	}
 
-    entry.date = GetISODateStamp( fileAttrib.st_mtime, attributes.GMTOffs.value() );
+    entry.date = GetISODateStamp( fileAttrib->st_mtime, attributes.GMTOffs.value() );
 
 	entries.emplace_back(std::move(entry));
 	entriesInDir.emplace_back(entries.back());
@@ -512,7 +512,7 @@ void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
 	entriesInDir.emplace_back(entries.back());
 }
 
-iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes, bool& alreadyExists)
+iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::filesystem::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists)
 {
 	// Duplicate directory entries are allowed, but the subsequent occurences will not add
 	// a new directory to 'entries'.
@@ -529,11 +529,11 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const char*
 		return currentSubdir->subdir.get();
 	}
 
-	struct stat fileAttrib;
+	auto fileAttrib = Stat(srcDir);
 	time_t dirTime;
-	if ( srcDir != nullptr && stat( srcDir, &fileAttrib ) == 0 )
+	if ( fileAttrib )
 	{
-		dirTime = fileAttrib.st_mtime;
+		dirTime = fileAttrib->st_mtime;
 	}
 	else
 	{
@@ -937,10 +937,10 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing %s... ", entry.srcfile.c_str() );
+					printf( "      Packing %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
 				}
 
-				FILE *fp = fopen( entry.srcfile.c_str(), "rb" );
+				FILE *fp = OpenFile( entry.srcfile, "rb" );
 
 				writer->SetSubheader( cd::IsoWriter::SubData );
 
@@ -992,10 +992,10 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 
 			if (!global::QuietMode)
 			{
-				printf( "      Packing XA %s... ", entry.srcfile.c_str() );
+				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
 			}
 
-			FILE *fp = fopen( entry.srcfile.c_str(), "rb" );
+			FILE *fp = OpenFile( entry.srcfile, "rb" );
 
 			while( !feof( fp ) )
 			{
@@ -1019,10 +1019,10 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 
 			if ( !global::QuietMode )
 			{
-				printf( "      Packing STR %s... ", entry.srcfile.c_str() );
+				printf( "      Packing STR %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
 			}
 
-			FILE *fp = fopen( entry.srcfile.c_str(), "rb" );
+			FILE *fp = OpenFile( entry.srcfile, "rb" );
 
 			while ( !feof( fp ) )
 			{
@@ -1061,10 +1061,10 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing STR-DO %s... ", entry.srcfile.c_str() );
+					printf( "      Packing STR-DO %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
 				}
 
-				FILE *fp = fopen( entry.srcfile.c_str(), "rb" );
+				FILE *fp = OpenFile( entry.srcfile, "rb" );
 
 				writer->SetSubheader( cd::IsoWriter::SubSTR );
 
@@ -1110,11 +1110,11 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		{
 			if ( !global::QuietMode )
 			{
-				printf( "      Packing DA %s... ", entry.srcfile.c_str() );
+				printf( "      Packing DA %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
 			}
 
 			// TODO: Configurable pregap
-			if ( PackWaveFile( writer, entry.srcfile.c_str(), true/*!firstDAWritten*/ ) )
+			if ( PackWaveFile( writer, entry.srcfile, true/*!firstDAWritten*/ ) )
 			{
 				if (!global::QuietMode)
 				{
@@ -1298,7 +1298,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write size in sector units
 		if (entry.type != EntryDir)
 		{
-			fprintf( fp, "%-10d", ((entry.length+2047)/2048) );
+			fprintf( fp, "%-10lld", ((entry.length+2047)/2048) );
 		}
 		else
 		{
@@ -1316,7 +1316,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write size in byte units
 		if (entry.type != EntryDir)
 		{
-			fprintf( fp, "%-10d", entry.length );
+			fprintf( fp, "%-10lld", entry.length );
 		}
 		else
 		{
@@ -1326,7 +1326,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write source file path
 		if ( (!entry.id.empty()) && (entry.type != EntryDir) )
 		{
-			fprintf( fp, "%s", entry.srcfile.c_str() );
+			fprintf( fp, "%" PRFILESYSTEM_PATH, entry.srcfile.c_str() );
 		}
 		fprintf( fp, "\n" );
 

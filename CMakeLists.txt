@@ -34,6 +34,7 @@ target_include_directories(tinyxml2 PUBLIC tinyxml2)
 # Populate shared files
 add_library(iso_shared OBJECT
 	${shared_dir}/cd.cpp
+	${shared_dir}/platform.cpp
 )
 target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")

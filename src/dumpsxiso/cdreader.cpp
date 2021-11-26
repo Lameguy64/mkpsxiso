@@ -7,6 +7,7 @@
 #include "cd.h"
 #include "xa.h"
 #include "cdreader.h"
+#include "platform.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -27,11 +28,11 @@ cd::IsoReader::~IsoReader() {
 }
 
 
-bool cd::IsoReader::Open(const char* fileName) {
+bool cd::IsoReader::Open(const std::filesystem::path& fileName) {
 
 	cd::IsoReader::Close();
 
-    cd::IsoReader::filePtr = fopen(fileName, "rb");
+    cd::IsoReader::filePtr = OpenFile(fileName, "rb");
 
     if (cd::IsoReader::filePtr == NULL)
 		return(false);

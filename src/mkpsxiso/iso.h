@@ -17,6 +17,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <filesystem>
 #include "cdwriter.h"
 
 namespace iso
@@ -48,11 +49,11 @@ namespace iso
 
 	struct DIRENTRY
 	{
-		std::string	id;			/// Entry identifier (empty if invisible dummy)
-		int			length;		/// Length of file in bytes
-		int			lba;		/// File LBA (in sectors)
+		std::string	id;		/// Entry identifier (empty if invisible dummy)
+		int64_t length;		/// Length of file in bytes
+		int		lba;		/// File LBA (in sectors)
 
-		std::string	srcfile;	/// Filename with path to source file (empty if directory or dummy)
+		std::filesystem::path srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		int			type;		/// File type (0 - file, 1 - directory)
 		unsigned char attribs;	/// XA attributes, 0xFF is not set
 		unsigned short perms;	/// XA permissions
@@ -129,8 +130,8 @@ namespace iso
 		/// Internal function for recursive path table generation
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
 
-		int GetWavSize(const char* wavFile);
-		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, bool pregap);
+		int GetWavSize(const std::filesystem::path& wavFile);
+		int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile, bool pregap);
 		
 	public:
 
@@ -170,7 +171,7 @@ namespace iso
 		 *	*srcfile	- Path and filename to the source file.
 		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 */
-		bool AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes);
+		bool AddFileEntry(const char* id, int type, const std::filesystem::path& srcfile, const EntryAttributes& attributes);
 
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.
@@ -198,7 +199,7 @@ namespace iso
 		 *
 		 *	Returns: Pointer to another DirTreeClass for accessing the directory record of the subdirectory.
 		 */
-		DirTreeClass* AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes, bool& alreadyExists);
+		DirTreeClass* AddSubDirEntry(const char* id, const std::filesystem::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists);
 
 		/**	Writes the source files assigned to the directory entries to a CD image. Its recommended to execute
 		 *	this first before writing the actual file system.

@@ -3,6 +3,7 @@
 
 #include "cd.h"
 #include "edcecc.h"
+#include <filesystem>
 
 namespace cd {
 
@@ -42,7 +43,7 @@ class IsoWriter {
 		IsoWriter();
 		virtual	~IsoWriter();
 
-		bool	Create(const char* fileName);
+		bool	Create(const std::filesystem::path& fileName);
 
 		int		SeekToSector(int sector);
 

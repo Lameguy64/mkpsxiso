@@ -2,6 +2,7 @@
 #define _CDREADER_H
 
 #include "cd.h"
+#include <filesystem>
 
 namespace cd {
 
@@ -31,7 +32,7 @@ namespace cd {
         virtual ~IsoReader();
 
         // Open ISO image
-        bool Open(const char* fileName);
+        bool Open(const std::filesystem::path& fileName);
 
         // Read data sectors in bytes (supports sequential reading)
         size_t ReadBytes(void* ptr, size_t bytes);

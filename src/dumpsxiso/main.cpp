@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <memory>
 
+#include "platform.h"
 #include "cd.h"
 #include "xa.h"
 #include "cdreader.h"
@@ -23,36 +24,9 @@
 	#include <sys/stat.h>
 #endif
 
-// Printf format for std::filesystem::path::c_str()
-// TODO: Move to some shared file
-#if defined(_WIN32)
-#define PRFILESYSTEM_PATH "ws"
-#else
-#define PRFILESYSTEM_PATH "s"
-#endif
-
-FILE* fopen(const std::filesystem::path& path, const char* mode)
-{
-#if defined(_WIN32)
-	const std::string_view mode_view(mode);
-	std::wstring wmode;
-	int count = MultiByteToWideChar(CP_UTF8, 0, mode_view.data(), mode_view.length(), nullptr, 0);
-	if (count != 0)
-	{
-		wmode.resize(count);
-		MultiByteToWideChar(CP_UTF8, 0, mode_view.data(), mode_view.length(), wmode.data(), count);
-	}
-	FILE* file = nullptr;
-	_wfopen_s(&file, path.c_str(), wmode.c_str());
-	return file;
-#else
-	return ::fopen(path.c_str(), mode);
-#endif
-}
-
 namespace param {
 
-    char*	isoFile=NULL;
+    std::filesystem::path isoFile;
     std::filesystem::path outPath;
     std::filesystem::path xmlFile;
 
@@ -176,7 +150,7 @@ void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP
 void SaveLicense(const cd::ISO_LICENSE& license) {
     const std::filesystem::path outputPath = param::outPath / "license_data.dat";
 
-	FILE* outFile = fopen(outputPath.c_str(), "wb");
+	FILE* outFile = OpenFile(outputPath, "wb");
 
     if (outFile == NULL) {
 		printf("ERROR: Cannot create license file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
@@ -274,7 +248,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
 
-				outFile = fopen(outputPath.c_str(), "wb");
+				outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
 					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
@@ -320,7 +294,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n");
 				}
 
-				outFile = fopen(outputPath.c_str(), "wb");
+				outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
 					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
@@ -368,7 +342,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
 
-				outFile = fopen(outputPath.c_str(), "wb");
+				outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
 					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
@@ -508,7 +482,7 @@ void ParseISO(cd::IsoReader& reader) {
 		baseElement->InsertEndChild(trackElement);
 		xmldoc.InsertEndChild(baseElement);
 
-		if (FILE* file = fopen(param::xmlFile, "w"); file != nullptr)
+		if (FILE* file = OpenFile(param::xmlFile, "w"); file != nullptr)
 		{
 			xmldoc.SaveFile(file);
 			fclose(file);
@@ -529,9 +503,8 @@ void ParseISO(cd::IsoReader& reader) {
     SaveLicense(*license);
 }
 
-int main(int argc, char *argv[]) {
-
-
+int Main(int argc, const char *argv[])
+{
     printf("DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n");
     printf("2017 Meido-Tek Productions (Lameguy64), 2020 Phoenix (SadNES cITy).\n\n");
 
@@ -556,13 +529,13 @@ int main(int argc, char *argv[]) {
 			// Directory path
             if (strcmp("x", &argv[i][1]) == 0) {
 
-                param::outPath = std::filesystem::path(argv[i+1]).lexically_normal();
+                param::outPath = std::filesystem::u8path(argv[i+1]).lexically_normal();
 
                 i++;
 
             } else if (strcmp("s", &argv[i][1]) == 0) {
 
-                param::xmlFile = argv[i+1];
+                param::xmlFile = std::filesystem::u8path(argv[i+1]);
                 i++;
 
             } else if (strcmp("p", &argv[i][1]) == 0) {
@@ -578,9 +551,9 @@ int main(int argc, char *argv[]) {
 
         } else {
 
-			if (param::isoFile == NULL) {
+			if (param::isoFile.empty()) {
 
-				param::isoFile = argv[i];
+				param::isoFile = std::filesystem::u8path(argv[i]);
 
 			} else {
 
@@ -593,7 +566,7 @@ int main(int argc, char *argv[]) {
 
     }
 
-	if (param::isoFile == NULL) {
+	if (param::isoFile.empty()) {
 
 		printf("No iso file specified.\n");
 		return(EXIT_FAILURE);
@@ -605,14 +578,15 @@ int main(int argc, char *argv[]) {
 
 	if (!reader.Open(param::isoFile)) {
 
-		printf("ERROR: Cannot open file %s...\n", param::isoFile);
+		printf("ERROR: Cannot open file %" PRFILESYSTEM_PATH "...\n", param::isoFile.c_str());
 		return(EXIT_FAILURE);
 
 	}
 
 	if (!param::outPath.empty())
 	{
-		printf("Output directory : %" PRFILESYSTEM_PATH "\n", param::outPath.c_str());
+		auto path = param::outPath.c_str();
+		printf("Output directory : %" PRFILESYSTEM_PATH "\n", path);
 	}
 
     ParseISO(reader);
