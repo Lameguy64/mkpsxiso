@@ -153,7 +153,7 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
 	FILE* outFile = OpenFile(outputPath, "wb");
 
     if (outFile == NULL) {
-		printf("ERROR: Cannot create license file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
+		printf("ERROR: Cannot create license file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
         return;
     }
 
@@ -187,7 +187,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
         } else
 		{
-			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", dirEntries.dirEntryList[e].identifier, outputPath.c_str());
+			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", dirEntries.dirEntryList[e].identifier, outputPath.lexically_normal().c_str());
 
             if (element != NULL) {
 
@@ -251,7 +251,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
+					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -286,7 +286,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				int result = reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
 
 				if (result) {
-					printf("WARNING: The CDDA file %" PRFILESYSTEM_PATH " is out of the iso file bounds.\n", outputPath.c_str());
+					printf("WARNING: The CDDA file %" PRFILESYSTEM_PATH " is out of the iso file bounds.\n", outputPath.lexically_normal().c_str());
 					printf("This usually means that the game has audio tracks, and they are on separate files.\n");
 					printf("As DUMPSXISO does not support dumping from a cue file, you should use an iso file containing all tracks.\n\n");
 					printf("DUMPSXISO will write the file as a dummy (silent) cdda file.\n");
@@ -297,7 +297,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
+					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -345,7 +345,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.c_str());
+					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -578,15 +578,14 @@ int Main(int argc, const char *argv[])
 
 	if (!reader.Open(param::isoFile)) {
 
-		printf("ERROR: Cannot open file %" PRFILESYSTEM_PATH "...\n", param::isoFile.c_str());
+		printf("ERROR: Cannot open file %" PRFILESYSTEM_PATH "...\n", param::isoFile.lexically_normal().c_str());
 		return(EXIT_FAILURE);
 
 	}
 
 	if (!param::outPath.empty())
 	{
-		auto path = param::outPath.c_str();
-		printf("Output directory : %" PRFILESYSTEM_PATH "\n", path);
+		printf("Output directory : %" PRFILESYSTEM_PATH "\n", param::outPath.lexically_normal().c_str());
 	}
 
     ParseISO(reader);

@@ -330,7 +330,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 			printf("      ");
 		}
 
-		printf("ERROR: File not found: %" PRFILESYSTEM_PATH "\n", srcfile.c_str());
+		printf("ERROR: File not found: %" PRFILESYSTEM_PATH "\n", srcfile.lexically_normal().c_str());
 		return false;
     }
 
@@ -351,7 +351,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 				printf("      ");
 			}
 
-			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped!\n", srcfile.c_str());
+			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped!\n", srcfile.lexically_normal().c_str());
 
 			return false;
 		}
@@ -364,7 +364,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 				printf("      ");
 			}
 
-			printf("ERROR: %" PRFILESYSTEM_PATH " is not a multiple of 2336 bytes.\n", srcfile.c_str());
+			printf("ERROR: %" PRFILESYSTEM_PATH " is not a multiple of 2336 bytes.\n", srcfile.lexically_normal().c_str());
 
 			if ( !global::QuietMode )
 			{
@@ -385,7 +385,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 				printf("      ");
 			}
 
-			printf("WARNING: %" PRFILESYSTEM_PATH " may not have a valid subheader. ", srcfile.c_str());
+			printf("WARNING: %" PRFILESYSTEM_PATH " may not have a valid subheader. ", srcfile.lexically_normal().c_str());
 		}
 
 	// Check STR data
@@ -405,7 +405,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 				printf("      ");
 			}
 
-			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped.\n", srcfile.c_str());
+			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped.\n", srcfile.lexically_normal().c_str());
 
 			return false;
 		}
@@ -425,7 +425,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 				}
 
 				printf("ERROR: %" PRFILESYSTEM_PATH " is not a multiple of 2336 or 2048 bytes.\n",
-					srcfile.c_str());
+					srcfile.lexically_normal().c_str());
 
 				return false;
 			}
@@ -937,7 +937,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
+					printf( "      Packing %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -992,7 +992,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 
 			if (!global::QuietMode)
 			{
-				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
+				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 			}
 
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -1019,7 +1019,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 
 			if ( !global::QuietMode )
 			{
-				printf( "      Packing STR %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
+				printf( "      Packing STR %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 			}
 
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -1061,7 +1061,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing STR-DO %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
+					printf( "      Packing STR-DO %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -1110,7 +1110,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		{
 			if ( !global::QuietMode )
 			{
-				printf( "      Packing DA %" PRFILESYSTEM_PATH "... ", entry.srcfile.c_str() );
+				printf( "      Packing DA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 			}
 
 			// TODO: Configurable pregap
@@ -1326,7 +1326,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write source file path
 		if ( (!entry.id.empty()) && (entry.type != EntryDir) )
 		{
-			fprintf( fp, "%" PRFILESYSTEM_PATH, entry.srcfile.c_str() );
+			fprintf( fp, "%" PRFILESYSTEM_PATH, entry.srcfile.lexically_normal().c_str() );
 		}
 		fprintf( fp, "\n" );
 
