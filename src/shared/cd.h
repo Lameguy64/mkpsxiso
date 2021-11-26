@@ -79,7 +79,8 @@ namespace cd {
 	} ISO_DESCRIPTOR_HEADER;
 
 	/// Structure of a date stamp for ISO_DIR_ENTRY structure
-	typedef struct {
+	struct ISO_DATESTAMP
+	{
 		unsigned char	year;		/// number of years since 1900
 		unsigned char	month;		/// month, where 1=January, 2=February, etc.
 		unsigned char	day;		/// day of month, in the range from 1 to 31
@@ -87,10 +88,11 @@ namespace cd {
 		unsigned char	minute;		/// minute, in the range from 0 to 59
 		unsigned char	second;		/// Second, in the range from 0 to 59
 		signed char		GMToffs;	/// Greenwich Mean Time offset
-	} ISO_DATESTAMP;
+	};
 
 	/// Structure of a long date time format, specified in Section 8.4.26.1 of ECMA 119
-	typedef struct {
+	struct ISO_LONG_DATESTAMP
+	{
 		char		year[4];	/// year from I to 9999
 		char		month[2];	/// month of the year from 1 to 12
 		char		day[2];		/// day of the month from 1 to 31
@@ -99,7 +101,7 @@ namespace cd {
 		char		second[2];	/// second of the minute from 0 to 59
 		char		hsecond[2];	/// hundredths of a second
 		signed char	GMToffs;	/// Greenwich Mean Time offset
-	} ISO_LONG_DATESTAMP;
+	};
 
 	/// Structure of an ISO path table entry (specifically for the cd::IsoReader class)
 	typedef struct {

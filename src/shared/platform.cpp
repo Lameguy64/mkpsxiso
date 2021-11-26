@@ -1,4 +1,5 @@
 #include "platform.h"
+#include "cd.h"
 
 #if defined(_WIN32)
 #define NOMINMAX
@@ -36,6 +37,21 @@ static std::string UTF16ToUTF8(std::wstring_view str)
 	}
 	return result;
 }
+
+static FILETIME TimetToFileTime(time_t t)
+{
+	FILETIME ft;
+    LARGE_INTEGER ll;
+	ll.QuadPart = t * 10000000ll + 116444736000000000ll;
+    ft.dwLowDateTime = ll.LowPart;
+    ft.dwHighDateTime = ll.HighPart;
+	return ft;
+}
+
+time_t timegm(struct tm* tm)
+{
+	return _mkgmtime(tm);
+}
 #endif
 
 FILE* OpenFile(const std::filesystem::path& path, const char* mode)
@@ -68,6 +84,38 @@ int64_t GetSize(const std::filesystem::path& path)
 {
 	auto fileAttrib = Stat(path);
 	return fileAttrib.has_value() ? fileAttrib->st_size : -1;
+}
+
+
+void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP& entryDate)
+{
+	tm timeBuf {};
+	timeBuf.tm_year = entryDate.year;
+	timeBuf.tm_mon = entryDate.month - 1;
+	timeBuf.tm_mday = entryDate.day;
+	timeBuf.tm_hour = entryDate.hour;
+	timeBuf.tm_min = entryDate.minute - (15 * entryDate.GMToffs);
+	timeBuf.tm_sec = entryDate.second;
+	const time_t time = timegm(&timeBuf);
+
+// utime can't update timestamps of directories on Windows, so a platform-specific approach is needed
+#if defined(_WIN32)
+	HANDLE file = CreateFileW(path.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	if (file != INVALID_HANDLE_VALUE)
+	{
+		const FILETIME ft = TimetToFileTime(time);
+		SetFileTime(file, &ft, nullptr, &ft);
+
+		CloseHandle(file);
+	}
+#else
+	struct timespec times[2];
+	times[0].tv_nsec = UTIME_OMIT;
+
+	times[1].tv_sec = time;
+	times[1].tv_nsec = 0;
+	utimensat(AT_FDCWD, path.c_str(), times, 0);
+#endif
 }
 
 extern int Main(int argc, const char* argv[]);

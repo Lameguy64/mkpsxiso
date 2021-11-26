@@ -216,7 +216,6 @@ namespace iso
 		 *  parentLBA	   - Parent directory LBA
 		 *  currentDirDate - Timestamp to use for . and .. directories.
 		 */
-		// TODO: Pass DIRENTRY instead of LBA and timestamps
 		int	WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir);
 
 		void SortDirectoryEntries();

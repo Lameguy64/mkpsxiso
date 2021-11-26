@@ -104,49 +104,6 @@ std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
 	return license;
 }
 
-#if defined(_WIN32)
-static FILETIME TimetToFileTime(time_t t)
-{
-	FILETIME ft;
-    LARGE_INTEGER ll;
-	ll.QuadPart = t * 10000000ll + 116444736000000000ll;
-    ft.dwLowDateTime = ll.LowPart;
-    ft.dwHighDateTime = ll.HighPart;
-	return ft;
-}
-
-// TODO: Move to a header shared with mkpsxiso
-time_t timegm(struct tm* tm)
-{
-	return _mkgmtime(tm);
-}
-#endif
-
-void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP& entryDate)
-{
-// utime can't update timestamps of directories, so a platform-specific approach is needed
-#if defined(_WIN32)
-	HANDLE file = CreateFileW(path.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-	if (file != INVALID_HANDLE_VALUE)
-	{
-		tm timeBuf {};
-		timeBuf.tm_year = entryDate.year;
-		timeBuf.tm_mon = entryDate.month - 1;
-		timeBuf.tm_mday = entryDate.day;
-		timeBuf.tm_hour = entryDate.hour;
-		timeBuf.tm_min = entryDate.minute - (15 * entryDate.GMToffs);
-		timeBuf.tm_sec = entryDate.second;
-
-		const FILETIME ft = TimetToFileTime(timegm(&timeBuf));
-		SetFileTime(file, &ft, nullptr, &ft);
-
-		CloseHandle(file);
-	}
-#else
-	// TODO: Do
-#endif
-}
-
 void SaveLicense(const cd::ISO_LICENSE& license) {
     const std::filesystem::path outputPath = param::outPath / "license_data.dat";
 
