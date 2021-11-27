@@ -118,7 +118,8 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
     fclose(outFile);
 }
 
-void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element, int sectors, const std::filesystem::path& srcPath) {
+void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element, int sectors,
+	const std::filesystem::path& srcPath, const std::filesystem::path& xmlPath) {
 
     cd::IsoDirEntries dirEntries;
     tinyxml2::XMLElement* newelement = NULL;
@@ -140,18 +141,17 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
             }
 
-            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement, dirEntries.dirEntryList[e].entrySize.lsb/2048, outputPath);
+            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement, dirEntries.dirEntryList[e].entrySize.lsb/2048, outputPath, xmlPath);
 
         } else
 		{
 			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", dirEntries.dirEntryList[e].identifier, outputPath.lexically_normal().c_str());
 
-            if (element != NULL) {
-
+            if (element != NULL)
+			{
                 newelement = doc->NewElement("file");
                 newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(dirEntries.dirEntryList[e].identifier).c_str());
-                newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.generic_u8string().c_str());
-
+                newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_proximate(xmlPath).generic_u8string().c_str());
             }
 
 			unsigned short xa_attr = ((cdxa::ISO_XA_ATTRIB*)dirEntries.dirEntryList[e].extData)->attributes;
@@ -422,7 +422,8 @@ void ParseISO(cd::IsoReader& reader) {
 		trackElement->InsertEndChild(newElement);
 
 		newElement = xmldoc.NewElement(xml::elem::LICENSE);
-		newElement->SetAttribute(xml::attrib::LICENSE_FILE, (param::outPath / "license_data.dat").generic_u8string().c_str());
+		newElement->SetAttribute(xml::attrib::LICENSE_FILE,
+			(param::outPath / "license_data.dat").lexically_proximate(param::xmlFile.parent_path()).generic_u8string().c_str());
 
 		trackElement->InsertEndChild(newElement);
 
@@ -433,7 +434,7 @@ void ParseISO(cd::IsoReader& reader) {
 						&xmldoc,
 						newElement,
 						descriptor.rootDirRecord.entrySize.lsb/2048,
-						param::outPath);
+						param::outPath, param::xmlFile.parent_path());
 
 		trackElement->InsertEndChild(newElement);
 		baseElement->InsertEndChild(trackElement);
@@ -452,7 +453,7 @@ void ParseISO(cd::IsoReader& reader) {
 						&xmldoc,
 						NULL,
 						descriptor.rootDirRecord.entrySize.lsb/2048,
-						param::outPath);
+						param::outPath, std::filesystem::path());
 
     }
 
