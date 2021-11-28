@@ -6,6 +6,7 @@
 #endif
 
 #include <string.h>
+#include "common.h"
 #include "cdwriter.h"
 #include "edcecc.h"
 #include "platform.h"

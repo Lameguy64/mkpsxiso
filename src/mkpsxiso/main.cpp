@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string>
 #include <filesystem>
+#include "common.h"
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 #include "xml.h"

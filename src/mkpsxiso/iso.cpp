@@ -1,5 +1,6 @@
 #include "global.h"
 #include "iso.h"
+#include "common.h"
 #include "cd.h"
 #include "xa.h"
 #include "platform.h"

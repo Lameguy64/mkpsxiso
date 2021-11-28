@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "platform.h"
+#include "common.h"
 #include "cd.h"
 #include "xa.h"
 #include "cdreader.h"
