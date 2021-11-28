@@ -267,242 +267,124 @@ void cd::IsoReader::Close() {
 }
 
 
-cd::IsoPathTable::IsoPathTable() {
-
-	cd::IsoPathTable::numPathEntries = 0;
-	cd::IsoPathTable::pathTableList = NULL;
-
+void cd::IsoPathTable::FreePathTable()
+{
+	pathTableList.clear();
 }
 
-cd::IsoPathTable::~IsoPathTable() {
-
-	cd::IsoPathTable::FreePathTable();
-
-}
-
-void cd::IsoPathTable::FreePathTable() {
-
-	if (cd::IsoPathTable::pathTableList != NULL) {
-
-        for(int i = cd::IsoPathTable::numPathEntries-1; i>=0; i--) {
-            free(cd::IsoPathTable::pathTableList[i].name);
-        }
-
-        free(cd::IsoPathTable::pathTableList);
-
-	}
-
-	cd::IsoPathTable::numPathEntries = 0;
-
-}
-
-int cd::IsoPathTable::ReadPathTable(cd::IsoReader* reader, int lba) {
-
+size_t cd::IsoPathTable::ReadPathTable(cd::IsoReader* reader, int lba)
+{
 	if (lba >= 0)
 		reader->SeekToSector(lba);
 
-	if (cd::IsoPathTable::pathTableList != NULL)
-		cd::IsoPathTable::FreePathTable();
+	FreePathTable();
 
-	while(1) {
-
-		cd::ISO_PATHTABLE_ENTRY	pathTableEntry;
-		reader->ReadBytes(&pathTableEntry, 8);
+	while (true)
+	{
+		Entry pathTableEntry;
+		reader->ReadBytes(&pathTableEntry.entry, sizeof(pathTableEntry.entry));
 
 		// Its the end of the path table when its nothing but zeros
-		if (pathTableEntry.nameLength == 0)
+		if (pathTableEntry.entry.nameLength == 0)
 			break;
 
 
 		// Read entry name
-		if (pathTableEntry.nameLength) {
+		{
+			const size_t length = pathTableEntry.entry.nameLength;
+			pathTableEntry.name.resize(length);
+			reader->ReadBytes(pathTableEntry.name.data(), length);
 
-			pathTableEntry.name = (char*)calloc(1, pathTableEntry.nameLength+1);
-			reader->ReadBytes(pathTableEntry.name, 2*((pathTableEntry.nameLength+1)/2));
+			// ECMA-119 9.4.6 - 00 field present only if entry length is an odd number
+			if ((length % 2) != 0)
+			{
+				reader->SkipBytes(1);
+			}
 
+			// Strip trailing zeroes, if any
+			pathTableEntry.name.resize(strlen(pathTableEntry.name.c_str()));
 		}
 
-
-		// Allocate or reallocate path table list to make way for the next entry
-		if (cd::IsoPathTable::pathTableList == NULL) {
-
-			// Initial allocation
-			cd::IsoPathTable::pathTableList = (cd::ISO_PATHTABLE_ENTRY*)calloc(sizeof(cd::ISO_PATHTABLE_ENTRY), 1);
-
-		} else {
-
-			// Append
-			cd::IsoPathTable::pathTableList = (cd::ISO_PATHTABLE_ENTRY*)realloc(
-				cd::IsoPathTable::pathTableList, sizeof(cd::ISO_PATHTABLE_ENTRY)*(cd::IsoPathTable::numPathEntries+1)
-			);
-
-		}
-
-		// Transfer path table entry buffer to new path table entry in list
-		cd::IsoPathTable::pathTableList[cd::IsoPathTable::numPathEntries] = pathTableEntry;
-		cd::IsoPathTable::numPathEntries++;
-
+		pathTableList.emplace_back(std::move(pathTableEntry));
 	}
 
-	return(cd::IsoPathTable::numPathEntries);
+	return pathTableList.size();
 
 }
 
-int cd::IsoPathTable::GetFullDirPath(int dirEntry, char* pathBuff, int pathMaxLen) {
+std::filesystem::path cd::IsoPathTable::GetFullDirPath(int dirEntry) const
+{
+	std::filesystem::path path;
 
-	memset(pathBuff, 0x00, pathMaxLen);
-
-	int dirEntryOrderCount=0;
-    int dirEntryOrder[32];
-
-	int dirEntryNum = dirEntry;
-
-	while(1) {
-
-		if (cd::IsoPathTable::pathTableList[dirEntryNum].name[0] == 0x00)
+	while (true)
+	{
+		if (pathTableList[dirEntry].name.empty())
 			break;
 
-		dirEntryOrder[dirEntryOrderCount] = dirEntryNum;
-		dirEntryOrderCount++;
+		// Prepend!
+		path = pathTableList[dirEntry].name / path;
 
-        dirEntryNum = cd::IsoPathTable::pathTableList[dirEntryNum].dirLevel-1;
-
+        dirEntry = pathTableList[dirEntry].entry.parentDirIndex-1;
 	}
 
-    for(int i=dirEntryOrderCount-1; i>=0; i--) {
-
-		char* dirName = cd::IsoPathTable::pathTableList[dirEntryOrder[i]].name;
-
-        if ((strlen(pathBuff)+strlen(dirName)+1) > (unsigned int)pathMaxLen)
-			break;
-
-		strcat(pathBuff, dirName);
-
-		if (i > 0)
-			strcat(pathBuff, "/");
-
-    }
-
-	return(strlen(pathBuff));
-
+	return path;
 }
 
-cd::IsoDirEntries::IsoDirEntries() {
-
-	cd::IsoDirEntries::numDirEntries = 0;
-	cd::IsoDirEntries::dirEntryList = NULL;
-
+void cd::IsoDirEntries::FreeDirEntries()
+{
+	dirEntryList.clear();
 }
 
-cd::IsoDirEntries::~IsoDirEntries() {
+size_t cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors) {
 
-	cd::IsoDirEntries::FreeDirEntries();
+	FreeDirEntries();
 
-}
-
-void cd::IsoDirEntries::FreeDirEntries() {
-
-	if (cd::IsoDirEntries::dirEntryList != NULL) {
-
-        for(int i=cd::IsoDirEntries::numDirEntries-1; i>=0; i--) {
-
-            free(cd::IsoDirEntries::dirEntryList[i].identifier);
-
-            if (cd::IsoDirEntries::dirEntryList[i].extData != NULL)
-				free(cd::IsoDirEntries::dirEntryList[i].extData);
-
-        }
-
-        free(cd::IsoDirEntries::dirEntryList);
-
-        cd::IsoDirEntries::dirEntryList = NULL;
-        cd::IsoDirEntries::numDirEntries = 0;
-
-	}
-
-}
-
-int cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors) {
-
-	cd::IsoDirEntries::FreeDirEntries();
     for (int sec = 0; sec < sectors; sec++)
     {
         size_t sectorBytesRead = 0;
-        reader->SeekToSector(lba +sec);
-		while(1)
+        reader->SeekToSector(lba + sec);
+		while (true)
 		{
-			cd::ISO_DIR_ENTRY dirEntry;
-			cdxa::ISO_XA_ATTRIB dirXAentry;
+			Entry entry;
 
             //check if there is enough data to read in the current sector. In case there is not, we must move to next sector.
-			if (2048 - sectorBytesRead < 33)
+			if (2048 - sectorBytesRead < sizeof(entry.entry))
                 break;
 
 			// Read 33 byte directory entry
-			sectorBytesRead += reader->ReadBytes(&dirEntry, 33);
+			sectorBytesRead += reader->ReadBytes(&entry.entry, sizeof(entry.entry));
 
 			// The file entry table usually ends with null bytes so break if we reached that area
-			if (dirEntry.entryLength == 0)
+			if (entry.entry.entryLength == 0)
 				break;
 
 			// Read identifier string
-			dirEntry.identifier = (char*)calloc(dirEntry.identifierLen+1, 1);
-			sectorBytesRead += reader->ReadBytes(dirEntry.identifier, dirEntry.identifierLen);
+			entry.identifier.resize(entry.entry.identifierLen);
+			sectorBytesRead += reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen);
 
-			// Skip padding byte if identifier string length is even
-			if ((dirEntry.identifierLen%2) == 0)
+			// Strip trailing zeroes, if any
+			entry.identifier.resize(strlen(entry.identifier.c_str()));
+
+			// ECMA-119 9.1.12 - 00 field present only if file identifier length is an even number
+			if ((entry.entry.identifierLen % 2) == 0)
             {
                 reader->SkipBytes(1);
                 sectorBytesRead++;
             }
 
 			// Read XA attribute data
-			sectorBytesRead += reader->ReadBytes(&dirXAentry, 14);
+			sectorBytesRead += reader->ReadBytes(&entry.extData, sizeof(entry.extData));
 
-
-			// Allocate or reallocate directory entry list to make way for the next entry
-			if (cd::IsoDirEntries::dirEntryList == NULL) {
-
-				// Initial allocation
-				cd::IsoDirEntries::dirEntryList = (cd::ISO_DIR_ENTRY*)calloc(sizeof(cd::ISO_DIR_ENTRY), 1);
-
-			} else {
-
-				// Append
-				cd::IsoDirEntries::dirEntryList = (cd::ISO_DIR_ENTRY*)realloc(
-					cd::IsoDirEntries::dirEntryList, sizeof(cd::ISO_DIR_ENTRY)*(cd::IsoDirEntries::numDirEntries+1)
-				);
-
-				cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = NULL;
-
-			}
-
-			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries] = dirEntry;
-			cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData = malloc(sizeof(cdxa::ISO_XA_ATTRIB));
-			memcpy(cd::IsoDirEntries::dirEntryList[cd::IsoDirEntries::numDirEntries].extData, &dirXAentry, sizeof(cdxa::ISO_XA_ATTRIB));
-			cd::IsoDirEntries::numDirEntries++;
+			dirEntryList.emplace_back(std::move(entry));
 		}
     }
-	return(cd::IsoDirEntries::numDirEntries);
-
+	return dirEntryList.size();
 }
 
-void cd::IsoDirEntries::SortByLBA() {
-
-    ISO_DIR_ENTRY temp;
-
-    for(int i=2; i<numDirEntries; i++) {
-        for(int j=2; j<numDirEntries-1; j++) {
-
-            if (dirEntryList[j].entryOffs.lsb > dirEntryList[j+1].entryOffs.lsb) {
-
-                temp = dirEntryList[j];
-                dirEntryList[j] = dirEntryList[j+1];
-                dirEntryList[j+1] = temp;
-
-            }
-
-        }
-    }
-
+void cd::IsoDirEntries::SortByLBA()
+{
+	std::sort(dirEntryList.begin(), dirEntryList.end(), [](const auto& left, const auto& right)
+		{
+			return left.entry.entryOffs.lsb < right.entry.entryOffs.lsb;
+		});
 }

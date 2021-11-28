@@ -121,38 +121,46 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
     cd::IsoDirEntries dirEntries;
     tinyxml2::XMLElement* newelement = NULL;
-    FILE *outFile;
 
-    int entriesFound = dirEntries.ReadDirEntries(&reader, offs, sectors);
+    dirEntries.ReadDirEntries(&reader, offs, sectors);
     dirEntries.SortByLBA();
 
-    for(int e=2; e<entriesFound; e++) {
+	// Iterate through all entries, skipping the first two (. and ..)
+	if (dirEntries.dirEntryList.size() < 2)
+	{
+		// Empty directory
+		return;
+	}
 
-		const std::filesystem::path outputPath = srcPath / CleanIdentifier(dirEntries.dirEntryList[e].identifier);
-        if (dirEntries.dirEntryList[e].flags & 0x2)
+    for(auto it = std::next(dirEntries.dirEntryList.begin(), 2); it != dirEntries.dirEntryList.end(); ++it)
+	{
+		const auto& entry = *it;
+		const std::filesystem::path outputPath = srcPath / CleanIdentifier(entry.identifier);
+        if (entry.entry.flags & 0x2)
 		{
             if (element != NULL) {
 
                 newelement = doc->NewElement("dir");
-                newelement->SetAttribute(xml::attrib::ENTRY_NAME, dirEntries.dirEntryList[e].identifier);
+                newelement->SetAttribute(xml::attrib::ENTRY_NAME, entry.identifier.c_str());
                 element->InsertEndChild(newelement);
 
             }
 
-            ParseDirectories(reader, dirEntries.dirEntryList[e].entryOffs.lsb, doc, newelement, dirEntries.dirEntryList[e].entrySize.lsb/2048, outputPath, xmlPath);
+            ParseDirectories(reader, entry.entry.entryOffs.lsb, doc, newelement, entry.entry.entrySize.lsb/2048, outputPath, xmlPath);
 
-        } else
+        }
+		else
 		{
-			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", dirEntries.dirEntryList[e].identifier, outputPath.lexically_normal().c_str());
+			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", entry.identifier.c_str(), outputPath.lexically_normal().c_str());
 
             if (element != NULL)
 			{
                 newelement = doc->NewElement("file");
-                newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(dirEntries.dirEntryList[e].identifier).c_str());
+                newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(entry.identifier).c_str());
                 newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_proximate(xmlPath).generic_u8string().c_str());
             }
 
-			unsigned short xa_attr = ((cdxa::ISO_XA_ATTRIB*)dirEntries.dirEntryList[e].extData)->attributes;
+			const unsigned short xa_attr = entry.extData.attributes;
 
 			char type = -1;
 
@@ -197,13 +205,13 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 				// this is the data to be read 2336 bytes per sector, both if the file is an STR or XA,
 				// because the STR contains audio.
-				size_t sectorsToRead = (dirEntries.dirEntryList[e].entrySize.lsb+2047)/2048;
+				size_t sectorsToRead = (entry.entry.entrySize.lsb+2047)/2048;
 
 				int bytesLeft = 2336*sectorsToRead;
 
-				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
+				reader.SeekToSector(entry.entry.entryOffs.lsb);
 
-				outFile = OpenFile(outputPath, "wb");
+				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
 					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
@@ -238,7 +246,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				if (element != NULL)
 					newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "da");
 
-				int result = reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
+				int result = reader.SeekToSector(entry.entry.entryOffs.lsb);
 
 				if (result) {
 					printf("WARNING: The CDDA file %" PRFILESYSTEM_PATH " is out of the iso file bounds.\n", outputPath.lexically_normal().c_str());
@@ -249,14 +257,14 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n");
 				}
 
-				outFile = OpenFile(outputPath, "wb");
+				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
 					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
 					return;
 				}
 
-				size_t sectorsToRead = (dirEntries.dirEntryList[e].entrySize.lsb + 2047) / 2048;
+				size_t sectorsToRead = (entry.entry.entrySize.lsb + 2047) / 2048;
 
 				int cddaSize = 2352 * sectorsToRead;
 				int bytesLeft = cddaSize;
@@ -295,16 +303,16 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				if (element != NULL)
                     newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
 
-				reader.SeekToSector(dirEntries.dirEntryList[e].entryOffs.lsb);
+				reader.SeekToSector(entry.entry.entryOffs.lsb);
 
-				outFile = OpenFile(outputPath, "wb");
+				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
 					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
 					return;
 				}
 
-				int bytesLeft = dirEntries.dirEntryList[e].entrySize.lsb;
+				int bytesLeft = entry.entry.entrySize.lsb;
 				while(bytesLeft > 0) {
 
 					u_char copyBuff[2048];
@@ -329,7 +337,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
         }
 
-		UpdateTimestamps(outputPath, dirEntries.dirEntryList[e].entryDate);
+		UpdateTimestamps(outputPath, entry.entry.entryDate);
     }
 }
 
@@ -368,7 +376,7 @@ void ParseISO(cd::IsoReader& reader) {
 
     cd::IsoPathTable pathTable;
 
-    int numEntries = pathTable.ReadPathTable(&reader, descriptor.pathTable1Offs);
+    size_t numEntries = pathTable.ReadPathTable(&reader, descriptor.pathTable1Offs);
 
     if (numEntries == 0) {
         printf("   No files to find.\n");
@@ -376,12 +384,9 @@ void ParseISO(cd::IsoReader& reader) {
     }
 
 	// Prepare output directories
-	for(int i=0; i<numEntries; i++) {
-
-		char pathBuff[256];
-		pathTable.GetFullDirPath(i, pathBuff, 256);
-
-		const std::filesystem::path dirPath = param::outPath / pathBuff;
+	for(size_t i=0; i<numEntries; i++)
+	{
+		const std::filesystem::path dirPath = param::outPath / pathTable.GetFullDirPath(i);
 
 		std::error_code ec;
 		std::filesystem::create_directories(dirPath, ec);

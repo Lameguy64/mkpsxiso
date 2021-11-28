@@ -102,17 +102,18 @@ namespace cd {
 		signed char	GMToffs;	/// Greenwich Mean Time offset
 	};
 
-	/// Structure of an ISO path table entry (specifically for the cd::IsoReader class)
-	typedef struct {
+	/// Structure of an ISO path table entry
+	struct ISO_PATHTABLE_ENTRY
+	{
 		unsigned char nameLength;	/// Name length (or 1 for the root directory)
 		unsigned char extLength;	/// Number of sectors in extended attribute record
 		unsigned int dirOffs;		/// Number of the first sector in the directory, as a double word
-		short dirLevel;				/// Index of the directory record's parent directory
-		char* name;					/// Name (0 for the root directory)
-									/// If nameLength is odd numbered, a padding byte will be present after the identifier text.
-	} ISO_PATHTABLE_ENTRY;
+		short parentDirIndex;		/// Index of the directory record's parent directory
+		// If nameLength is even numbered, a padding byte will be present after the entry name.
+	};
 
-	typedef struct {
+	struct ISO_DIR_ENTRY
+	{
 		unsigned char entryLength;			// Directory entry length (variable, use for parsing through entries)
 		unsigned char extLength;			// Extended entry data length (always 0)
 		ISO_UINT_PAIR entryOffs;			// Points to the LBA of the file/directory entry
@@ -123,11 +124,8 @@ namespace cd {
 		unsigned char interleaveGapSize;	// Interleave gap size (usually 0 even with Form 2 files such as STR/XA)
 		ISO_USHORT_PAIR volSeqNum;			// Volume sequence number (always 1)
 		unsigned char identifierLen;		// Identifier (file/directory name) length in bytes
-		// Pointer to identifier (placed here for convenience)
 		// If identifierLen is even numbered, a padding byte will be present after the identifier text.
-		char* identifier;
-		void* extData;
-	} ISO_DIR_ENTRY;
+	};
 
 	typedef struct {
 		unsigned char entryLength;		// Always 34 bytes

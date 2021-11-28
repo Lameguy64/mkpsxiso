@@ -2,7 +2,10 @@
 #define _CDREADER_H
 
 #include "cd.h"
+#include "xa.h"
 #include <filesystem>
+#include <vector>
+#include <string>
 
 namespace cd {
 
@@ -58,34 +61,37 @@ namespace cd {
 
     };
 
-    class IsoPathTable {
+    class IsoPathTable
+    {
     public:
+        struct Entry
+        {
+            ISO_PATHTABLE_ENTRY entry;
+            std::string name;
+        };
 
-        int numPathEntries;
-        ISO_PATHTABLE_ENTRY* pathTableList;
-
-        IsoPathTable();
-        virtual ~IsoPathTable();
+        std::vector<Entry> pathTableList;
 
         void FreePathTable();
-        int ReadPathTable(cd::IsoReader* reader, int lba);
+        size_t ReadPathTable(cd::IsoReader* reader, int lba);
 
-        int GetFullDirPath(int dirEntry, char* pathBuff, int pathMaxLen);
-
+        std::filesystem::path GetFullDirPath(int dirEntry) const;
     };
 
 
-    class IsoDirEntries {
+    class IsoDirEntries
+    {
     public:
-
-        int numDirEntries;
-        ISO_DIR_ENTRY* dirEntryList;
-
-        IsoDirEntries();
-        virtual ~IsoDirEntries();
+        struct Entry
+        {
+            ISO_DIR_ENTRY entry;
+            cdxa::ISO_XA_ATTRIB extData;
+            std::string identifier;
+        };
+        std::vector<Entry> dirEntryList;
 
         void FreeDirEntries();
-        int ReadDirEntries(cd::IsoReader* reader, int lba, int sectors=1);
+        size_t ReadDirEntries(cd::IsoReader* reader, int lba, int sectors=1);
         void SortByLBA();
 
     };

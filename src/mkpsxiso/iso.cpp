@@ -666,7 +666,7 @@ int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
 			continue;
 		}
 
-		int dataLen = 33;
+		int dataLen = sizeof(cd::ISO_DIR_ENTRY);
 
 		dataLen += GetIDLength(entry.id);
 
@@ -730,6 +730,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		dirEntry->volSeqNum = cd::SetPair16( 1 );
 		dirEntry->identifierLen = 1;
 
+		// TODO: What is this? It's sizeof(*dirEntry) - 1
 		int dataLen = 32;
 
 		if (i == 0)
@@ -826,7 +827,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		dirEntry->identifierLen = entry.id.length();
 		dirEntry->entryDate = entry.date;
 
-		int dataLen = 33;
+		int dataLen = sizeof(*dirEntry);
 
 		strncpy( &entryBuff[dataLen], entry.id.c_str(), dirEntry->identifierLen );
 		dataLen += dirEntry->identifierLen;
