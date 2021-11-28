@@ -15,4 +15,7 @@ namespace cdxa {
 		unsigned char	reserved[5];
 	};
 
+	// Masks for ISO_XA_ATTRIB.attributes
+	constexpr unsigned short XA_PERMISSIONS_MASK = 0x7FF;
+	constexpr unsigned short XA_ATTRIBUTES_MASK = ~XA_PERMISSIONS_MASK;
 }

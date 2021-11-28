@@ -708,7 +708,7 @@ void iso::DirTreeClass::SortDirectoryEntries()
 		}
 	}
 
-	std::sort(entriesInDir.begin(), entriesInDir.end(), [this](const auto& left, const auto& right)
+	std::sort(entriesInDir.begin(), entriesInDir.end(), [](const auto& left, const auto& right)
 		{
 			return left.get().id < right.get().id;
 		});

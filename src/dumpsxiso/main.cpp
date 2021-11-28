@@ -116,11 +116,35 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
     fclose(outFile);
 }
 
-void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* doc, tinyxml2::XMLElement* element, int sectors,
+static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::IsoDirEntries::Entry& entry, const bool directory, const bool XA)
+{
+	if (element == nullptr)
+	{
+		return;
+	}
+
+	element->SetAttribute(xml::attrib::GMT_OFFSET, entry.entry.entryDate.GMToffs);
+
+	// Don't output XA attributes on directories yet
+	// TODO: Might need something to allow those to propagate upwards with a file/directory distinction
+	if (!directory)
+	{
+		// xa_attrib only makes sense on XA files
+		if (XA)
+		{
+			element->SetAttribute(xml::attrib::XA_ATTRIBUTES, (entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
+		}
+		element->SetAttribute(xml::attrib::XA_PERMISSIONS, entry.extData.attributes & cdxa::XA_PERMISSIONS_MASK);
+
+		element->SetAttribute(xml::attrib::XA_GID, entry.extData.ownergroupid);
+		element->SetAttribute(xml::attrib::XA_UID, entry.extData.owneruserid);
+	}
+}
+
+void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLElement* element, int sectors,
 	const std::filesystem::path& srcPath, const std::filesystem::path& xmlPath) {
 
     cd::IsoDirEntries dirEntries;
-    tinyxml2::XMLElement* newelement = NULL;
 
     dirEntries.ReadDirEntries(&reader, offs, sectors);
     dirEntries.SortByLBA();
@@ -132,48 +156,48 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 		return;
 	}
 
+	// Write out attributes of the current directory
+	WriteOptionalXMLAttribs(element, dirEntries.dirEntryList.front(), true, false);
+
     for(auto it = std::next(dirEntries.dirEntryList.begin(), 2); it != dirEntries.dirEntryList.end(); ++it)
 	{
 		const auto& entry = *it;
 		const std::filesystem::path outputPath = srcPath / CleanIdentifier(entry.identifier);
+
+		tinyxml2::XMLElement* newelement = nullptr;
         if (entry.entry.flags & 0x2)
 		{
-            if (element != NULL) {
+            newelement = element->InsertNewChildElement("dir");
+            newelement->SetAttribute(xml::attrib::ENTRY_NAME, entry.identifier.c_str());
 
-                newelement = doc->NewElement("dir");
-                newelement->SetAttribute(xml::attrib::ENTRY_NAME, entry.identifier.c_str());
-                element->InsertEndChild(newelement);
+			// TODO: Dump 'source' only on the first occurence of this directory
+			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_proximate(xmlPath).generic_u8string().c_str());
 
-            }
-
-            ParseDirectories(reader, entry.entry.entryOffs.lsb, doc, newelement, entry.entry.entrySize.lsb/2048, outputPath, xmlPath);
+            ParseDirectories(reader, entry.entry.entryOffs.lsb, newelement, entry.entry.entrySize.lsb/2048, outputPath, xmlPath);
 
         }
 		else
 		{
 			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", entry.identifier.c_str(), outputPath.lexically_normal().c_str());
 
-            if (element != NULL)
-			{
-                newelement = doc->NewElement("file");
-                newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(entry.identifier).c_str());
-                newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_proximate(xmlPath).generic_u8string().c_str());
-            }
+            newelement = element->InsertNewChildElement("file");
+            newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(entry.identifier).c_str());
+            newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_proximate(xmlPath).generic_u8string().c_str());		
 
-			const unsigned short xa_attr = entry.extData.attributes;
+			const unsigned short xa_attr = (entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8;
 
 			char type = -1;
 
 			// we try to guess the file type. Usually, the xa_attr should tell this, but there are many games
 			// that do not follow the standard, and sometime leave some or all the attributes unset.
 
-			if ((xa_attr & 0xff) & 0x40) {
+			if (xa_attr & 0x40) {
 				// if the cddata flag is set, we assume this is the case
 				type = 1;
-			} else if ( ((xa_attr & 0xff) & 0x08) && !((xa_attr & 0xff) & 0x10) ){
+			} else if ( (xa_attr & 0x08) && !(xa_attr & 0x10) ){
 				// if the mode 2 form 1 flag is set, and form 2 is not, we assume this is a regular file.
 				type = 0;
-			} else if ( ((xa_attr & 0xff) & 0x10) && !((xa_attr & 0xff) & 0x08) ) {
+			} else if ( (xa_attr & 0x10) && !(xa_attr & 0x08) ) {
 				// if the mode 2 form 2 flag is set, and form 1 is not, we assume this is a pure audio xa file.
 				type = 2;
 			}  else {
@@ -199,9 +223,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 				// the source file will anyway be stored on our hard drive in raw form.
 				// Here we mark the file as str, so that each sector will have the correct error codes regenerated by mkpsxiso,
 				// depending on the value of the sub-header (video or audio data).
-
-				if(element != NULL)
-					newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "mixed");
+				newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "mixed");
 
 				// this is the data to be read 2336 bytes per sector, both if the file is an STR or XA,
 				// because the STR contains audio.
@@ -242,9 +264,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 			else if (type == 1) {
 
 				// Extract CDDA file
-
-				if (element != NULL)
-					newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "da");
+				newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "da");
 
 				int result = reader.SeekToSector(entry.entry.entryOffs.lsb);
 
@@ -299,9 +319,7 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 			} else {
 
 				// Extract regular file
-
-				if (element != NULL)
-                    newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
+				newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
 
 				reader.SeekToSector(entry.entry.entryOffs.lsb);
 
@@ -332,11 +350,8 @@ void ParseDirectories(cd::IsoReader& reader, int offs, tinyxml2::XMLDocument* do
 
 			}
 
-			if (element != NULL)
-				element->InsertEndChild(newelement);
-
+			WriteOptionalXMLAttribs(newelement, entry, false, type == 2);
         }
-
 		UpdateTimestamps(outputPath, entry.entry.entryDate);
     }
 }
@@ -434,7 +449,6 @@ void ParseISO(cd::IsoReader& reader) {
 
 		ParseDirectories(reader,
 						descriptor.rootDirRecord.entryOffs.lsb,
-						&xmldoc,
 						newElement,
 						descriptor.rootDirRecord.entrySize.lsb/2048,
 						param::outPath, param::xmlFile.parent_path());
@@ -453,8 +467,7 @@ void ParseISO(cd::IsoReader& reader) {
 
     	ParseDirectories(reader,
 						descriptor.rootDirRecord.entryOffs.lsb,
-						&xmldoc,
-						NULL,
+						xmldoc.NewElement(""), // Dummy
 						descriptor.rootDirRecord.entrySize.lsb/2048,
 						param::outPath, std::filesystem::path());
 

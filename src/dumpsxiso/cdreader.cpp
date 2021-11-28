@@ -6,6 +6,7 @@
 
 #include "cd.h"
 #include "xa.h"
+#include "common.h"
 #include "cdreader.h"
 #include "platform.h"
 #include <string.h>
@@ -374,6 +375,11 @@ size_t cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sec
 
 			// Read XA attribute data
 			sectorBytesRead += reader->ReadBytes(&entry.extData, sizeof(entry.extData));
+
+			// XA attributes are big endian, swap them
+			entry.extData.attributes = SwapBytes16(entry.extData.attributes);
+			entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
+			entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
 
 			dirEntryList.emplace_back(std::move(entry));
 		}
