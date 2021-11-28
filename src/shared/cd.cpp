@@ -1,6 +1,8 @@
 #include "cd.h"
 #include <iterator>
 #include <memory>
+#include <cstring>
+#include <cstdarg>
 
 using namespace cd;
 

@@ -1,7 +1,7 @@
 #ifndef _EDC_ECC_H
 #define _EDC_ECC_H
 
-#ifdef WIN32
+#ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
 #else

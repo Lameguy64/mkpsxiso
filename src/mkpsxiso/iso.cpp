@@ -5,6 +5,8 @@
 #include "platform.h"
 
 #include <algorithm>
+#include <cstring>
+#include <cstdarg>
 
 char rootname[] = { "<root>" };
 
@@ -322,7 +324,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 
 bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesystem::path& srcfile, const EntryAttributes& attributes)
 {
-	auto fileAttrib = Stat(srcfile);
+    auto fileAttrib = Stat(srcfile);
     if ( !fileAttrib )
 	{
 		if ( !global::QuietMode )

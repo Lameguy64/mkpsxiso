@@ -1,4 +1,4 @@
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>
@@ -42,7 +42,7 @@ int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile);
 int compare( const char* a, const char* b );
 
 
-int Main(int argc, const char* argv[])
+int Main(int argc, char* argv[])
 {
 	// Parse arguments
 	for ( int i=1; i<argc; i++)
@@ -105,7 +105,8 @@ int Main(int argc, const char* argv[])
 	if ( (!global::QuietMode) || (argc == 1) )
 	{
 		printf( "MKPSXISO " VERSION " - PlayStation ISO Image Maker\n" );
-		printf( "2017-2018 Meido-Tek Productions (Lameguy64)\n\n" );
+		printf( "2017-2018 Meido-Tek Productions (Lameguy64)\n" );
+		printf( "2021 Silent and Chromaryu\n\n" );
 	}
 
 	if ( argc == 1 )

@@ -1,15 +1,7 @@
 #ifndef _ISO_H
 #define _ISO_H
 
-#ifdef WIN32
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <sys/time.h>
-#endif
-
-#include <sys/stat.h>
-#include <time.h>
+#include <ctime>
 #include <stdlib.h>
 #include <list>
 #include <memory>

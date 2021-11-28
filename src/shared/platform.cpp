@@ -1,19 +1,18 @@
 #include "platform.h"
 #include "cd.h"
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
 #include <io.h>
+#endif
+
 #include <fcntl.h>
 
 #include <string>
 #include <vector>
-#endif
 
-#include <sys/stat.h>
-
-#if defined(_WIN32)
+#ifdef _WIN32
 static std::wstring UTF8ToUTF16(std::string_view str)
 {
 	std::wstring result;
@@ -56,7 +55,7 @@ time_t timegm(struct tm* tm)
 
 FILE* OpenFile(const std::filesystem::path& path, const char* mode)
 {
-#if defined(_WIN32)
+#ifdef _WIN32
 	FILE* file = nullptr;
 	_wfopen_s(&file, path.c_str(), UTF8ToUTF16(mode).c_str());
 	return file;
@@ -65,13 +64,13 @@ FILE* OpenFile(const std::filesystem::path& path, const char* mode)
 #endif
 }
 
-std::optional<struct _stat64> Stat(const std::filesystem::path& path)
+std::optional<struct stat64> Stat(const std::filesystem::path& path)
 {
-	struct _stat64 fileAttrib;
-#if defined(_WIN32)
+	struct stat64 fileAttrib;
+#ifdef _WIN32
 	if (_wstat64(path.c_str(), &fileAttrib) != 0)
 #else
-    if (_stat64(path.c_str(), &fileAttrib) != 0)
+    if (stat64(path.c_str(), &fileAttrib) != 0)
 #endif
 	{
 		return std::nullopt;
@@ -99,7 +98,7 @@ void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP
 	const time_t time = timegm(&timeBuf);
 
 // utime can't update timestamps of directories on Windows, so a platform-specific approach is needed
-#if defined(_WIN32)
+#ifdef _WIN32
 	HANDLE file = CreateFileW(path.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
 	if (file != INVALID_HANDLE_VALUE)
 	{
@@ -118,9 +117,9 @@ void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP
 #endif
 }
 
-extern int Main(int argc, const char* argv[]);
+extern int Main(int argc, char* argv[]);
 
-#if defined(_WIN32)
+#ifdef _WIN32
 int wmain(int argc, wchar_t* argv[])
 {
 	std::vector<std::string> u8Arguments;
@@ -130,11 +129,11 @@ int wmain(int argc, wchar_t* argv[])
 		u8Arguments.emplace_back(UTF16ToUTF8(argv[i]));
 	}
 
-	std::vector<const char*> u8argv;
+	std::vector<char*> u8argv;
 	u8Arguments.reserve(argc + 1);
 	for (std::string& str : u8Arguments)
 	{
-		u8argv.emplace_back(str.c_str());
+		u8argv.emplace_back(str.data());
 	}
 	u8argv.emplace_back(nullptr);
 
