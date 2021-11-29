@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
 #else
@@ -78,7 +78,8 @@ namespace cd {
 	} ISO_DESCRIPTOR_HEADER;
 
 	/// Structure of a date stamp for ISO_DIR_ENTRY structure
-	typedef struct {
+	struct ISO_DATESTAMP
+	{
 		unsigned char	year;		/// number of years since 1900
 		unsigned char	month;		/// month, where 1=January, 2=February, etc.
 		unsigned char	day;		/// day of month, in the range from 1 to 31
@@ -86,10 +87,11 @@ namespace cd {
 		unsigned char	minute;		/// minute, in the range from 0 to 59
 		unsigned char	second;		/// Second, in the range from 0 to 59
 		signed char		GMToffs;	/// Greenwich Mean Time offset
-	} ISO_DATESTAMP;
+	};
 
 	/// Structure of a long date time format, specified in Section 8.4.26.1 of ECMA 119
-	typedef struct {
+	struct ISO_LONG_DATESTAMP
+	{
 		char		year[4];	/// year from I to 9999
 		char		month[2];	/// month of the year from 1 to 12
 		char		day[2];		/// day of the month from 1 to 31
@@ -98,19 +100,20 @@ namespace cd {
 		char		second[2];	/// second of the minute from 0 to 59
 		char		hsecond[2];	/// hundredths of a second
 		signed char	GMToffs;	/// Greenwich Mean Time offset
-	} ISO_LONG_DATESTAMP;
+	};
 
-	/// Structure of an ISO path table entry (specifically for the cd::IsoReader class)
-	typedef struct {
+	/// Structure of an ISO path table entry
+	struct ISO_PATHTABLE_ENTRY
+	{
 		unsigned char nameLength;	/// Name length (or 1 for the root directory)
 		unsigned char extLength;	/// Number of sectors in extended attribute record
 		unsigned int dirOffs;		/// Number of the first sector in the directory, as a double word
-		short dirLevel;				/// Index of the directory record's parent directory
-		char* name;					/// Name (0 for the root directory)
-									/// If nameLength is odd numbered, a padding byte will be present after the identifier text.
-	} ISO_PATHTABLE_ENTRY;
+		short parentDirIndex;		/// Index of the directory record's parent directory
+		// If nameLength is even numbered, a padding byte will be present after the entry name.
+	};
 
-	typedef struct {
+	struct ISO_DIR_ENTRY
+	{
 		unsigned char entryLength;			// Directory entry length (variable, use for parsing through entries)
 		unsigned char extLength;			// Extended entry data length (always 0)
 		ISO_UINT_PAIR entryOffs;			// Points to the LBA of the file/directory entry
@@ -121,11 +124,8 @@ namespace cd {
 		unsigned char interleaveGapSize;	// Interleave gap size (usually 0 even with Form 2 files such as STR/XA)
 		ISO_USHORT_PAIR volSeqNum;			// Volume sequence number (always 1)
 		unsigned char identifierLen;		// Identifier (file/directory name) length in bytes
-		// Pointer to identifier (placed here for convenience)
 		// If identifierLen is even numbered, a padding byte will be present after the identifier text.
-		char* identifier;
-		void* extData;
-	} ISO_DIR_ENTRY;
+	};
 
 	typedef struct {
 		unsigned char entryLength;		// Always 34 bytes
@@ -207,19 +207,33 @@ namespace cd {
 
 	} ISO_DESCRIPTOR;
 
+	// License data (just a sequence of 28032 bytes)
+	typedef struct {
+		char data[28032];
+	} ISO_LICENSE;
+
+	// RIFF+WAVE header
+	typedef struct {
+		char chunkID[4];
+		unsigned int chunkSize;
+		char format[4];
+
+		char subchunk1ID[4];
+		unsigned int subchunk1Size;
+		unsigned short audioFormat;
+		unsigned short numChannels;
+		unsigned int sampleRate;
+		unsigned int byteRate;
+		unsigned short blockAlign;
+		unsigned short bitsPerSample;
+
+		char subchunk2ID[4];
+		unsigned int subchunk2Size;
+	} RIFF_HEADER;
+
 	// Leave non-aligned structure packing
 	#pragma pack(pop)
 
 }
-
-// Helper functions for datestamp manipulation
-cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
-
-cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
-cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
-
-// Endianness swap
-unsigned short SwapBytes16(unsigned short val);
-unsigned int SwapBytes32(unsigned int val);
 
 #endif // _CD_H

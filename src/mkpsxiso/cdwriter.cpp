@@ -1,4 +1,4 @@
-#ifdef WIN32
+#ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
 #else
@@ -6,8 +6,10 @@
 #endif
 
 #include <string.h>
+#include "common.h"
 #include "cdwriter.h"
 #include "edcecc.h"
+#include "platform.h"
 
 
 cd::ISO_USHORT_PAIR cd::SetPair16(unsigned short val) {
@@ -90,9 +92,9 @@ size_t cd::IsoWriter::WriteSectorToDisc()
 	return bytesRead;
 }
 
-bool cd::IsoWriter::Create(const char* fileName) {
+bool cd::IsoWriter::Create(const std::filesystem::path& fileName) {
 
-	cd::IsoWriter::filePtr	= fopen(fileName, "wb");
+	cd::IsoWriter::filePtr = OpenFile(fileName, "wb");
 
 	if (cd::IsoWriter::filePtr == nullptr)
 		return(false);

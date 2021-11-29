@@ -1,12 +1,7 @@
 #ifndef _GLOBAL_H
 #define _GLOBAL_H
 
-#ifdef WIN32
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <sys/time.h>
-#endif
+#include <ctime>
 
 namespace global {
 

@@ -1,6 +1,8 @@
-#include "cd.h"
+#include "common.h"
 #include <iterator>
 #include <memory>
+#include <cstring>
+#include <cstdarg>
 
 using namespace cd;
 
@@ -76,6 +78,20 @@ ISO_LONG_DATESTAMP GetUnspecifiedLongDate()
 	strncpy(result.second, "00", std::size(result.second));
 	strncpy(result.hsecond, "00", std::size(result.hsecond));
 	result.GMToffs = 0;
+
+	return result;
+}
+
+std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src)
+{
+	// Interpret ISO_LONG_DATESTAMP as 16 characters, manually write out GMT offset
+	const char* srcStr = reinterpret_cast<const char*>(&src);
+
+	std::string result(srcStr, srcStr+16);
+
+	char GMTbuf[8];
+	sprintf(GMTbuf, "%+hhd", src.GMToffs);
+	result.append(GMTbuf);
 
 	return result;
 }
