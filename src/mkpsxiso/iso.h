@@ -10,7 +10,9 @@
 #include <utility>
 #include <vector>
 #include <filesystem>
+
 #include "cdwriter.h"
+#include "listview.h"
 
 namespace iso
 {
@@ -109,6 +111,9 @@ namespace iso
 
 	class DirTreeClass
 	{
+	public:
+		using DirView = ListView<DIRENTRY>;
+
 	private:
 		// TODO: Once DirTreeClass stores a reference to its own entry, this will be pointless
 		// Same for all 'dir' arguments to methods of this class
@@ -126,11 +131,10 @@ namespace iso
 		int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile, bool pregap);
 		
 	public:
+		DirView entriesInDir; // References to entries in this directory
 
-		EntryList& entries; // List of all entries on the disc
-		std::vector<std::reference_wrapper<iso::DIRENTRY>> entriesInDir; // References to entries in this directory
-
-		DirTreeClass(EntryList& entries, DirTreeClass* parent = nullptr);
+		DirTreeClass(EntryList& entries); // Root
+		DirTreeClass(const DirView& viewToClone, DirTreeClass* parent); // Subdirs
 		~DirTreeClass();
 
 		static DIRENTRY& CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate);

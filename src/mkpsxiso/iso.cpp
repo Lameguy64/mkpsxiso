@@ -300,8 +300,13 @@ int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem
 	return true;
 }
 
-iso::DirTreeClass::DirTreeClass(EntryList& entries, DirTreeClass* parent)
-	: name(rootname), entries(entries), parent(parent)
+iso::DirTreeClass::DirTreeClass(EntryList& entries)
+	: name(rootname), entriesInDir(entries)
+{
+}
+
+iso::DirTreeClass::DirTreeClass(const DirView& viewToClone, DirTreeClass* parent)
+	: name(rootname), entriesInDir(viewToClone.NewView()), parent(parent)
 {
 }
 
@@ -447,7 +452,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 
 
 	// Check if file entry already exists
-    for ( const auto& e : entriesInDir )
+    for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( !entry.id.empty() )
@@ -495,8 +500,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 
     entry.date = GetISODateStamp( fileAttrib->st_mtime, attributes.GMTOffs.value() );
 
-	entries.emplace_back(std::move(entry));
-	entriesInDir.emplace_back(entries.back());
+	entriesInDir.emplace(std::move(entry));
 
 	return true;
 
@@ -511,8 +515,7 @@ void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
 	entry.type		= EntryDummy;
 	entry.length	= 2048*sectors;
 
-	entries.emplace_back(std::move(entry));
-	entriesInDir.emplace_back(entries.back());
+	entriesInDir.emplace(std::move(entry));
 }
 
 iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::filesystem::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists)
@@ -521,12 +524,13 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::
 	// a new directory to 'entries'.
 	// TODO: It's not possible now, but a warning should be issued if entry attributes are specified for the subsequent occurences
 	// of the directory. This check probably needs to be moved outside of the function.
-	auto currentSubdir = std::find_if(entries.begin(), entries.end(), [id](const auto& e)
+	const auto& list = entriesInDir.GetUnderlyingList();
+	auto currentSubdir = std::find_if(list.begin(), list.end(), [id](const auto& e)
 		{
 			return e.type == EntryDir && e.id == id;
 		});
 
-	if (currentSubdir != entries.end())
+	if (currentSubdir != list.end())
 	{
 		alreadyExists = true;
 		return currentSubdir->subdir.get();
@@ -565,7 +569,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::
 	}
 
 	entry.type		= EntryDir;
-	entry.subdir	= std::make_unique<DirTreeClass>(entries, this);
+	entry.subdir	= std::make_unique<DirTreeClass>(entriesInDir, this);
 	entry.attribs	= attributes.XAAttrib.value();
 	entry.perms		= attributes.XAPerm.value();
 	entry.GID		= attributes.GID.value();
@@ -573,10 +577,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::
 	entry.date		= GetISODateStamp( dirTime, attributes.GMTOffs.value() );
 	entry.length = entry.subdir->CalculateDirEntryLen();
 
-	entries.emplace_back(std::move(entry));
-	entriesInDir.emplace_back(entries.back());
-
-	return entries.back().subdir.get();
+	return entriesInDir.emplace(std::move(entry)).subdir.get();
 }
 
 void iso::DirTreeClass::PrintRecordPath()
@@ -606,7 +607,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 	}
 
 	bool firstDAWritten = false;
-	for ( DIRENTRY& entry : entries )
+	for ( DIRENTRY& entry : entriesInDir.GetUnderlyingList() )
 	{
 		// Set current LBA to directory record entry
 		entry.lba = lba;
@@ -658,7 +659,7 @@ int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
 		dirEntryLen += 28;
 	}
 
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.id.empty() )
@@ -695,7 +696,7 @@ int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
 void iso::DirTreeClass::SortDirectoryEntries()
 {
 	// Search for directories
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.type == EntryDir )
@@ -708,7 +709,7 @@ void iso::DirTreeClass::SortDirectoryEntries()
 		}
 	}
 
-	std::sort(entriesInDir.begin(), entriesInDir.end(), [](const auto& left, const auto& right)
+	entriesInDir.SortView([](const auto& left, const auto& right)
 		{
 			return left.get().id < right.get().id;
 		});
@@ -778,7 +779,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		dataBuffPtr += dataLen;
 	}
 
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.id.empty() )
@@ -901,7 +902,7 @@ int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENT
 {
 	WriteDirEntries( writer, dir, parentDir );
 
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.type == EntryDir )
@@ -920,7 +921,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 {
 	bool firstDAWritten = false;
 
-	for ( const DIRENTRY& entry : entries )
+	for ( const DIRENTRY& entry : entriesInDir.GetUnderlyingList() )
 	{
 		// TODO: Configurable pregap
 		if ( ( entry.type == EntryDA ) && firstDAWritten )
@@ -1173,7 +1174,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 
 	fprintf( fp, "/* %s */\n", name.c_str() );
 
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( !entry.id.empty() && entry.type != EntryDir )
@@ -1200,7 +1201,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 		}
 	}
 
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.type == EntryDir )
@@ -1218,7 +1219,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 
 int iso::DirTreeClass::WriteCueEntries(FILE* fp, int* trackNum) const
 {
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.type == EntryDA )
@@ -1263,7 +1264,7 @@ void LBAtoTimecode(int lba, char* timecode)
 
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 {
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		fprintf( fp, "    " );
@@ -1352,7 +1353,7 @@ int iso::DirTreeClass::CalculatePathTableLen(const DIRENTRY& dirEntry) const
 	// Put identifier (empty if first entry)
 	int len = 8 + GetIDLength(dirEntry.id);
 
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.type == EntryDir )
@@ -1367,7 +1368,7 @@ int iso::DirTreeClass::CalculatePathTableLen(const DIRENTRY& dirEntry) const
 std::unique_ptr<iso::PathTableClass> iso::DirTreeClass::GenPathTableSub(unsigned short& index, const unsigned short parentIndex) const
 {
 	auto table = std::make_unique<PathTableClass>();
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.type == EntryDir )
@@ -1383,7 +1384,7 @@ std::unique_ptr<iso::PathTableClass> iso::DirTreeClass::GenPathTableSub(unsigned
 	}
 
 	size_t entryID = 0;
-	for ( const auto& e : entriesInDir )
+	for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( entry.type == EntryDir )
@@ -1424,7 +1425,7 @@ int iso::DirTreeClass::GetFileCountTotal() const
 {
     int numfiles = 0;
 
-    for ( const auto& e : entriesInDir )
+    for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
         if ( entry.type != EntryDir )
@@ -1447,7 +1448,7 @@ int iso::DirTreeClass::GetDirCountTotal() const
 {
 	int numdirs = 0;
 
-   for ( const auto& e : entriesInDir )
+   for ( const auto& e : entriesInDir.GetView() )
 	{
 		const DIRENTRY& entry = e.get();
         if ( entry.type == EntryDir )
