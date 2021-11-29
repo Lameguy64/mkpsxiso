@@ -41,7 +41,7 @@ namespace global
 bool ParseDirectory(iso::DirTreeClass *dirTree, const tinyxml2::XMLElement *parentElement, const std::filesystem::path &xmlPath, const iso::EntryAttributes &parentAttribs, bool &found_da);
 int ParseISOfileSystem(cd::IsoWriter *writer, FILE *cue_fp, const tinyxml2::XMLElement *trackElement, const std::filesystem::path &xmlPath);
 
-int PackWaveFile(cd::IsoWriter *writer, const std::filesystem::path &wavFile);
+int PackFileAsCDDA(cd::IsoWriter *writer, const std::filesystem::path &audioFile);
 
 int compare(const char *a, const char *b);
 
@@ -532,7 +532,7 @@ int Main(int argc, char *argv[])
 							printf("    Packing audio %s... ", track_source);
 						}
 
-						if (PackWaveFile(&writer, track_source))
+						if (PackFileAsCDDA(&writer, track_source))
 						{
 							if (!global::QuietMode)
 							{
@@ -1273,7 +1273,7 @@ typedef enum
 	DAF_PCM
 } DecoderAudioFormats;
 
-int PackWaveFile(cd::IsoWriter *writer, const std::filesystem::path &wavFile)
+int PackFileAsCDDA(cd::IsoWriter *writer, const std::filesystem::path &audioFile)
 {
 	// open the decoder
 	ma_decoder decoder;
@@ -1284,7 +1284,7 @@ int PackWaveFile(cd::IsoWriter *writer, const std::filesystem::path &wavFile)
 	FILE *pcmFp;
 	// determine which format to try based on file extension
 	DecoderAudioFormats tryorder[4] = {DAF_WAV, DAF_FLAC, DAF_MP3, DAF_PCM};
-	const auto &extension = wavFile.extension().string();
+	const auto &extension = audioFile.extension().string();
 	if (extension.size() >= 4)
 	{
 		//nothing to change if wav
@@ -1314,19 +1314,19 @@ int PackWaveFile(cd::IsoWriter *writer, const std::filesystem::path &wavFile)
 		if (tryorder[i] == DAF_WAV)
 		{
 			decoderConfig.encodingFormat = ma_encoding_format_wav;
-			if (MA_SUCCESS == ma_decoder_init_file(wavFile.c_str(), &decoderConfig, &decoder))
+			if (MA_SUCCESS == ma_decoder_init_file(audioFile.c_str(), &decoderConfig, &decoder))
 				break;
 		}
 		else if (tryorder[i] == DAF_FLAC)
 		{
 			decoderConfig.encodingFormat = ma_encoding_format_flac;
-			if (MA_SUCCESS == ma_decoder_init_file(wavFile.c_str(), &decoderConfig, &decoder))
+			if (MA_SUCCESS == ma_decoder_init_file(audioFile.c_str(), &decoderConfig, &decoder))
 				break;
 		}
 		else if (tryorder[i] == DAF_MP3)
 		{
 			decoderConfig.encodingFormat = ma_encoding_format_mp3;
-			if (MA_SUCCESS == ma_decoder_init_file(wavFile.c_str(), &decoderConfig, &decoder))
+			if (MA_SUCCESS == ma_decoder_init_file(audioFile.c_str(), &decoderConfig, &decoder))
 			{
 				isLossy = true;
 				break;
@@ -1335,7 +1335,7 @@ int PackWaveFile(cd::IsoWriter *writer, const std::filesystem::path &wavFile)
 		else if (tryorder[i] == DAF_PCM)
 		{
 			printf("\n    WARN: Guessing it's just signed 16 bit stereo @ 44100 kHz pcm audio\n");
-			if ((pcmFp = fopen(wavFile.c_str(), "rb")) != NULL)
+			if ((pcmFp = fopen(audioFile.c_str(), "rb")) != NULL)
 			{
 				do
 				{
@@ -1415,7 +1415,7 @@ int PackWaveFile(cd::IsoWriter *writer, const std::filesystem::path &wavFile)
 	ma_uint32 internalSampleRate;
 	if (MA_SUCCESS != ma_data_source_get_data_format(decoder.pBackend, &internalFormat, &internalChannels, &internalSampleRate))
 	{
-		printf("\n    ERROR: unable to get internal metadata for %s\n", wavFile.c_str());
+		printf("\n    ERROR: unable to get internal metadata for %s\n", audioFile.c_str());
 		ma_decoder_uninit(&decoder);
 		return false;
 	}
