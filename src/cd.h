@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #ifdef WIN32
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <unistd.h>
@@ -84,8 +85,20 @@ namespace cd {
 		unsigned char	hour;		/// hour, in the range from 0 to 23
 		unsigned char	minute;		/// minute, in the range from 0 to 59
 		unsigned char	second;		/// Second, in the range from 0 to 59
-		unsigned char	GMToffs;	/// Greenwich Mean Time offset
+		signed char		GMToffs;	/// Greenwich Mean Time offset
 	} ISO_DATESTAMP;
+
+	/// Structure of a long date time format, specified in Section 8.4.26.1 of ECMA 119
+	typedef struct {
+		char		year[4];	/// year from I to 9999
+		char		month[2];	/// month of the year from 1 to 12
+		char		day[2];		/// day of the month from 1 to 31
+		char		hour[2];	/// hour of the day from 0 to 23
+		char		minute[2];	/// minute of the hour from 0 to 59
+		char		second[2];	/// second of the minute from 0 to 59
+		char		hsecond[2];	/// hundredths of a second
+		signed char	GMToffs;	/// Greenwich Mean Time offset
+	} ISO_LONG_DATESTAMP;
 
 	/// Structure of an ISO path table entry (specifically for the cd::IsoReader class)
 	typedef struct {
@@ -113,16 +126,6 @@ namespace cd {
 		char* identifier;
 		void* extData;
 	} ISO_DIR_ENTRY;
-
-	// XA attribute struct (located right after the identifier string)
-	typedef struct {
-		unsigned short	ownergroupid;	// Usually 0x0000
-		unsigned short	owneruserid;	// Usually 0x0000
-		unsigned short	attributes;
-		char id[2];
-		unsigned char	filenum;		// Usually 0x00
-		unsigned char	reserved[5];
-	} ISO_XA_ATTRIB;
 
 	typedef struct {
 		unsigned char entryLength;		// Always 34 bytes
@@ -185,14 +188,14 @@ namespace cd {
 		char	abstractFileIdentifier[37];
 		// Bibliographical file identifier in the file system (can be blank or anything)
 		char	bibliographicFilelIdentifier[37];
-		// Volume create date (in text format YYYYMMDDHHMMSSMMGG)
-		char	volumeCreateDate[17];
-		// Volume modify date (in text format YYYYMMDDHHMMSSMMGG)
-		char	volumeModifyDate[17];
-		// Volume expiry date (in text format YYYYMMDDHHMMSSMMGG)
-		char	volumeExpiryDate[17];
-		// Volume effective date (in text format YYYYMMDDHHMMSSMMGG)
-		char	volumeEffeciveDate[17];
+		// Volume create date
+		ISO_LONG_DATESTAMP volumeCreateDate;
+		// Volume modify date
+		ISO_LONG_DATESTAMP volumeModifyDate;
+		// Volume expiry date
+		ISO_LONG_DATESTAMP volumeExpiryDate;
+		// Volume effective date
+		ISO_LONG_DATESTAMP volumeEffectiveDate;
 		// File structure version (always 1)
 		unsigned char	fileStructVersion;
 		// Padding
@@ -208,5 +211,15 @@ namespace cd {
 	#pragma pack(pop)
 
 }
+
+// Helper functions for datestamp manipulation
+cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
+
+cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
+cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
+
+// Endianness swap
+unsigned short SwapBytes16(unsigned short val);
+unsigned int SwapBytes32(unsigned int val);
 
 #endif // _CD_H

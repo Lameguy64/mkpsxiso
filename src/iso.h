@@ -2,6 +2,7 @@
 #define _ISO_H
 
 #ifdef WIN32
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <sys/time.h>
@@ -11,7 +12,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <tinyxml2.h>
+#include <list>
+#include <memory>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 #include "cdwriter.h"
 
@@ -25,7 +30,8 @@ namespace iso
 		EntryXA,
 		EntrySTR,
 		EntrySTR_DO,
-		EntryDA
+		EntryDA,
+		EntryDummy
 	};
 
 	typedef struct
@@ -37,9 +43,11 @@ namespace iso
 		const char*	DataPreparer;
 		const char*	Application;
 		const char* Copyright;
+		const char* CreationDate;
+		const char* ModificationDate;
 	} IDENTIFIERS;
 
-	typedef struct
+	struct DIRENTRY
 	{
 		std::string	id;			/// Entry identifier (empty if invisible dummy)
 		int			length;		/// Length of file in bytes
@@ -47,79 +55,105 @@ namespace iso
 
 		std::string	srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		int			type;		/// File type (0 - file, 1 - directory)
-		void*		subdir;
+		unsigned char attribs;	/// XA attributes, 0xFF is not set
+		unsigned short perms;	/// XA permissions
+		unsigned short GID;		/// Owner group ID
+		unsigned short UID;		/// Owner user ID
+		std::unique_ptr<class DirTreeClass> subdir;
 
 		cd::ISO_DATESTAMP date;
 
-	} DIRENTRY;
+	};
+
+	// EntryList must have stable references!
+	using EntryList = std::list<DIRENTRY>;
+
+
+	// Inheritable attributes of files and/or directories
+	// They are applied in the following order:
+	// 1. mkpsxiso defaults
+	// 2. directory_tree attributes
+	// 3. dir attributes
+	// 4. file attributes
+	class EntryAttributes
+	{
+	private:
+		static constexpr signed char DEFAULT_GMFOFFS = 0;
+		static constexpr unsigned char DEFAULT_XAATRIB = 0xFF;
+		static constexpr unsigned short DEFAULT_XAPERM = 0x555; // rx
+		static constexpr unsigned short	DEFAULT_OWNER_ID = 0;
+
+	public:
+		std::optional<signed char> GMTOffs;
+		std::optional<unsigned char> XAAttrib;
+		std::optional<unsigned short> XAPerm;
+		std::optional<unsigned short> GID;
+		std::optional<unsigned short> UID;
+
+	public:
+		// Default attributes, specified above
+		static EntryAttributes MakeDefault();
+
+		// "Overlay" the derived attributes (if they exist) on the base ones
+		static EntryAttributes Overlay(EntryAttributes base, const EntryAttributes& derived);
+	};
 	
 	class PathEntryClass {
 	public:
-		PathEntryClass();
-		virtual ~PathEntryClass();
+		std::string dir_id;
+		unsigned short dir_index = 0;
+		unsigned short dir_parent_index = 0;
+		int dir_lba = 0;
 		
-		std::string* dir_id;
-		int dir_level;
-		int dir_lba;
-		int next_parent;
-		
-		void* dir;
-		void* sub;
+		std::unique_ptr<class PathTableClass> sub;
 	};
 	
 	class PathTableClass {
 	public:
+		unsigned char* GenTableData(unsigned char* buff, bool msb);
 		
-		PathTableClass();
-		virtual ~PathTableClass();
-		unsigned char* GenTableData(unsigned char* buff, int msb);
-		
-		std::vector<PathEntryClass*> entries;
+		std::vector<PathEntryClass> entries;
 	};
 
 	class DirTreeClass
 	{
+	private:
+		// TODO: Once DirTreeClass stores a reference to its own entry, this will be pointless
+		// Same for all 'dir' arguments to methods of this class
 		std::string name;
-		int			dirIndex;
-		int			recordLBA;
 
-		void		*parent;
-
-		int			first_track;
+		DirTreeClass* parent = nullptr; // Non-owning
 		
 		/// Internal function for generating and writing directory records
-		int	WriteDirEntries(cd::IsoWriter* writer, int lastLBA);
-
-		/// Internal function for recursive path table length calculation
-		int CalculatePathTableLenSub(DIRENTRY* dirEntry);
+		int	WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const;
 
 		/// Internal function for recursive path table generation
-		void GenPathTableSub(PathTableClass* table, DirTreeClass* dir, int parentIndex, int msb);
+		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
 
 		int GetWavSize(const char* wavFile);
-		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, int pregap);
+		int PackWaveFile(cd::IsoWriter* writer, const char* wavFile, bool pregap);
 		
 	public:
 
-		std::vector<DIRENTRY> entries;
+		EntryList& entries; // List of all entries on the disc
+		std::vector<std::reference_wrapper<iso::DIRENTRY>> entriesInDir; // References to entries in this directory
 
-		// Flag to indicate if the directory record has exceeded a sector
-		int			passedSector;
+		DirTreeClass(EntryList& entries, DirTreeClass* parent = nullptr);
+		~DirTreeClass();
 
-		DirTreeClass();
-		virtual ~DirTreeClass();
+		static DIRENTRY& CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate);
 
 		void PrintRecordPath();
 
-		void OutputHeaderListing(FILE* fp, int level);
-
-		int CalculateFileSystemSize(int lba);
+		void OutputHeaderListing(FILE* fp, int level) const;
 		
 		/** Calculates the length of the directory record to be produced by this class in bytes.
 		 *
 		 *  Returns: Length of directory record in bytes.
+		 * 
+		 * * *passedSector - Flag to indicate if the directory record has exceeded a sector
 		 */
-		int	CalculateDirEntryLen();
+		int	CalculateDirEntryLen(bool* passedSector = nullptr) const;
 
 		/** Calculates the LBA of all file and directory entries in the directory record and returns the next LBA
 		 *	address.
@@ -135,32 +169,37 @@ namespace iso
 		 *	type		- The type of file to add, EntryFile is for standard files, EntryXA is for XA streams and
 		 *				EntryStr is for STR streams. To add directories, use AddDirEntry().
 		 *	*srcfile	- Path and filename to the source file.
+		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 */
-		int	AddFileEntry(const char* id, int type, const char* srcfile);
+		bool AddFileEntry(const char* id, int type, const char* srcfile, const EntryAttributes& attributes);
 
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.
 		 *
 		 *	sectors	- The size of the dummy file in sector units (1 = 2048 bytes, 1024 = 2MB).
+		 *  type	- 0 for form1 (data) dummy, 1 for form2 (XA) dummy
 		 */
-		void AddDummyEntry(int sectors);
+		void AddDummyEntry(int sectors, int type);
 
 		/** Generates a path table of all directories and subdirectories within this class' directory record.
 		 *
+		 *  root	- Directory entry of this path
 		 *	*buff	- Pointer to a 2048 byte buffer to generate the path table to.
 		 *	msb		- If true, generates a path table encoded in big-endian format, little-endian otherwise.
 		 *
 		 *	Returns: Length of path table in bytes.
 		 */
-		int GeneratePathTable(unsigned char* buff, int msb);
+		int GeneratePathTable(const DIRENTRY& root, unsigned char* buff, bool msb) const;
 
 		/** Adds a subdirectory to the directory record.
 		 *
 		 *	*id		- The name of the subdirectory to add. It will be converted to uppercase automatically.
+		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
+		 *  alreadyExists - set to true if a returned DirTreeClass already existed
 		 *
 		 *	Returns: Pointer to another DirTreeClass for accessing the directory record of the subdirectory.
 		 */
-		DirTreeClass* AddSubDirEntry(const char* id);
+		DirTreeClass* AddSubDirEntry(const char* id, const char* srcDir, const EntryAttributes& attributes, bool& alreadyExists);
 
 		/**	Writes the source files assigned to the directory entries to a CD image. Its recommended to execute
 		 *	this first before writing the actual file system.
@@ -172,25 +211,28 @@ namespace iso
 		/**	Writes the file system of the directory records to a CD image. Execute this after the source files
 		 *	have been written to the CD image.
 		 *
-		 *	*writer		- Pointer to a cd::IsoWriter class that is ready for writing.
-		 *	lastDirLBA	- Used for recursive calls, always set to 0.
+		 *	*writer		   - Pointer to a cd::IsoWriter class that is ready for writing.
+		 *	LBA			   - Current directory LBA
+		 *  parentLBA	   - Parent directory LBA
+		 *  currentDirDate - Timestamp to use for . and .. directories.
 		 */
-		int	WriteDirectoryRecords(cd::IsoWriter* writer, int lastDirLBA);
+		// TODO: Pass DIRENTRY instead of LBA and timestamps
+		int	WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir);
 
-		void SortDirEntries();
+		void SortDirectoryEntries();
 
-		int CalculatePathTableLen();
+		int CalculatePathTableLen(const DIRENTRY& dirEntry) const;
 
-		int GetFileCountTotal();
-		int GetDirCountTotal();
+		int GetFileCountTotal() const;
+		int GetDirCountTotal() const;
 
-		void OutputLBAlisting(FILE* fp, int level);
-		int WriteCueEntries(FILE* fp, int* trackNum);
+		void OutputLBAlisting(FILE* fp, int level) const;
+		int WriteCueEntries(FILE* fp, int* trackNum) const;
 	};
 
 	void WriteLicenseData(cd::IsoWriter* writer, void* data);
 
-	void WriteDescriptor(cd::IsoWriter* writer, IDENTIFIERS id, DirTreeClass* dirTree, int imageLen);
+	void WriteDescriptor(cd::IsoWriter* writer, const IDENTIFIERS& id, const DIRENTRY& root, int imageLen);
 
 };
 

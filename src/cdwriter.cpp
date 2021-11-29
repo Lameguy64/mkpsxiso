@@ -1,4 +1,5 @@
 #ifdef WIN32
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <unistd.h>
@@ -9,35 +10,12 @@
 #include "edcecc.h"
 
 
-void cd::SwapBytes(void *var, int size) {
-
-	//unsigned char temp[size];
-	unsigned char *temp = new unsigned char[size];
-
-	memcpy(temp, var, size);
-	for(short i=0; i<size; i++) {
-		((unsigned char*)var)[i] = temp[(size-1)-i];
-	}
-
-	delete[] temp;
+cd::ISO_USHORT_PAIR cd::SetPair16(unsigned short val) {
+    return { val, SwapBytes16(val) };
 }
 
-void cd::SetPair16(cd::ISO_USHORT_PAIR* pair, unsigned short val) {
-
-    pair->lsb = val;
-    pair->msb = val;
-
-    SwapBytes(&pair->msb, 2);
-
-}
-
-void cd::SetPair32(cd::ISO_UINT_PAIR* pair, unsigned int val) {
-
-    pair->lsb = val;
-    pair->msb = val;
-
-    SwapBytes(&pair->msb, 4);
-
+cd::ISO_UINT_PAIR cd::SetPair32(unsigned int val) {
+	return { val, SwapBytes32(val) };
 }
 
 
@@ -89,25 +67,12 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 		edcEccGen.ComputeEdcBlock(cd::IsoWriter::sectorM2F1->subHead, 0x808, cd::IsoWriter::sectorM2F1->edc);
 
 		// Encode ECC data
-		unsigned char tempAddr[4];
-
-		for(int i=0; i<3; i++) {
-
-			tempAddr[i] = cd::IsoWriter::sectorM2F1->addr[i];
-			cd::IsoWriter::sectorM2F1->addr[i] = 0x00;
-
-		}
 
 		// Compute ECC P code
-		edcEccGen.ComputeEccBlock(cd::IsoWriter::sectorBuff+0xC, 86, 24, 2, 86, cd::IsoWriter::sectorBuff+0x81C);
+		static const unsigned char zeroaddress[4] = { 0, 0, 0, 0 };
+		edcEccGen.ComputeEccBlock(zeroaddress, cd::IsoWriter::sectorBuff+0x10, 86, 24, 2, 86, cd::IsoWriter::sectorBuff+0x81C);
 		// Compute ECC Q code
-		edcEccGen.ComputeEccBlock(cd::IsoWriter::sectorBuff+0xC, 52, 43, 86, 88, cd::IsoWriter::sectorBuff+0x8C8);
-
-		for(int i=0; i<3; i++) {
-
-			cd::IsoWriter::sectorM2F1->addr[i] = tempAddr[i];
-
-		}
+		edcEccGen.ComputeEccBlock(zeroaddress, cd::IsoWriter::sectorBuff+0x10, 52, 43, 86, 88, cd::IsoWriter::sectorBuff+0x8C8);
 
 	} else if (edcEccMode == cd::IsoWriter::EdcEccForm2) {
 
@@ -115,6 +80,14 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 
 	}
 
+}
+
+size_t cd::IsoWriter::WriteSectorToDisc()
+{
+	const size_t bytesRead = fwrite(sectorBuff, CD_SECTOR_SIZE, 1, filePtr);
+	currentByte = 0;
+	memset(sectorBuff, 0, CD_SECTOR_SIZE);
+	return bytesRead;
 }
 
 bool cd::IsoWriter::Create(const char* fileName) {
@@ -143,8 +116,7 @@ int cd::IsoWriter::SeekToSector(int sector) {
 	if (cd::IsoWriter::currentByte) {
 
 		cd::IsoWriter::PrepSector(cd::IsoWriter::lastSectorType);
-		fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr);
-
+		WriteSectorToDisc();
 	}
 
 	fseek(cd::IsoWriter::filePtr, CD_SECTOR_SIZE*sector, SEEK_SET);
@@ -164,8 +136,7 @@ int cd::IsoWriter::SeekToEnd() {
 	if (cd::IsoWriter::currentByte) {
 
 		cd::IsoWriter::PrepSector(cd::IsoWriter::lastSectorType);
-		fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr);
-
+		WriteSectorToDisc();
 	}
 
 	fseek(cd::IsoWriter::filePtr, 0, SEEK_END);
@@ -211,7 +182,7 @@ size_t cd::IsoWriter::WriteBytes(void* data, size_t bytes, int edcEccEncode) {
 
 			cd::IsoWriter::PrepSector(edcEccEncode);
 
-            if (fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr) == 0) {
+            if (WriteSectorToDisc() == 0) {
 
 				cd::IsoWriter::currentByte = 0;
 				return(writeBytes);
@@ -261,7 +232,7 @@ size_t cd::IsoWriter::WriteBytesXA(void* data, size_t bytes, int edcEccEncode) {
 
 			cd::IsoWriter::PrepSector(edcEccEncode);
 
-            if (fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr) == 0) {
+            if (WriteSectorToDisc() == 0) {
 
 				cd::IsoWriter::currentByte = 0;
 				return(writeBytes);
@@ -309,7 +280,7 @@ size_t cd::IsoWriter::WriteBytesRaw(void* data, size_t bytes) {
 
 		if (cd::IsoWriter::currentByte >= 2352) {
 
-            if (fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr) == 0) {
+            if (WriteSectorToDisc() == 0) {
 
 				cd::IsoWriter::currentByte = 0;
 				return(writeBytes);
@@ -358,7 +329,7 @@ void cd::IsoWriter::Close() {
 
 		if (cd::IsoWriter::currentByte > 0) {
 			cd::IsoWriter::PrepSector(cd::IsoWriter::lastSectorType);
-			fwrite(sectorBuff, CD_SECTOR_SIZE, 1, cd::IsoWriter::filePtr);
+			WriteSectorToDisc();
 		}
 
 		fclose(cd::IsoWriter::filePtr);

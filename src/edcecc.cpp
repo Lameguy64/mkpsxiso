@@ -45,7 +45,7 @@ void EDCECC::ComputeEdcBlock(const unsigned char *src, int len, unsigned char *d
 
 }
 
-void EDCECC::ComputeEccBlock(unsigned char *src, unsigned int major_count, unsigned int minor_count, unsigned int major_mult, unsigned int minor_inc, unsigned char *dest) {
+void EDCECC::ComputeEccBlock(const unsigned char *address, const unsigned char *src, unsigned int major_count, unsigned int minor_count, unsigned int major_mult, unsigned int minor_inc, unsigned char *dest) {
 
 	unsigned int len = major_count*minor_count;
 	unsigned int major,minor;
@@ -58,7 +58,12 @@ void EDCECC::ComputeEccBlock(unsigned char *src, unsigned int major_count, unsig
 
 		for(minor = 0; minor < minor_count; minor++) {
 
-			unsigned char temp = src[index];
+			unsigned char temp;
+			if (index < 4) {
+				temp = address[index];
+			} else {
+				temp = src[index - 4];
+			}
 
 			index += minor_inc;
 

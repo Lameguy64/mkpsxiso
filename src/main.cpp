@@ -37,7 +37,7 @@ namespace global
 };
 
 
-int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement);
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const iso::EntryAttributes& parentAttribs, bool& found_da);
 int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement* trackElement);
 
 bool PackFileAsCDDA(cd::IsoWriter* writer, const char* audioFile);
@@ -620,6 +620,42 @@ int main(int argc, const char* argv[])
     return 0;
 }
 
+iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement )
+{
+	iso::EntryAttributes result;
+
+	const char* GMToffs = dirElement->Attribute( "gmt_offs" );
+	if ( GMToffs != nullptr )
+	{
+		result.GMTOffs = static_cast<signed char>(strtol(GMToffs, nullptr, 0));
+	}
+
+	const char* XAAttrib = dirElement->Attribute( "xa_attrib" );
+	if ( XAAttrib != nullptr )
+	{
+		result.XAAttrib = static_cast<unsigned char>(strtoul(XAAttrib, nullptr, 0));
+	}
+
+	const char* XAPerm = dirElement->Attribute( "xa_perm" );
+	if ( XAPerm != nullptr )
+	{
+		result.XAPerm = static_cast<unsigned short>(strtoul(XAPerm, nullptr, 0));
+	}
+
+	const char* GID = dirElement->Attribute( "xa_gid" );
+	if ( GID != nullptr )
+	{
+		result.GID = static_cast<unsigned short>(strtoul(GID, nullptr, 0));
+	}
+
+	const char* UID = dirElement->Attribute( "xa_uid" );
+	if ( UID != nullptr )
+	{
+		result.UID = static_cast<unsigned short>(strtoul(UID, nullptr, 0));
+	}
+
+	return result;
+};
 
 int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement* trackElement)
 {
@@ -628,61 +664,99 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	tinyxml2::XMLElement* licenseElement =
 		trackElement->FirstChildElement("license");
 
-	// Print out identifiers if present
-	if ( !global::QuietMode )
+	// Set file system identifiers
+	iso::IDENTIFIERS isoIdentifiers {};
+
+	if ( identifierElement != nullptr )
 	{
-		if ( identifierElement != nullptr )
+		isoIdentifiers.SystemID		= identifierElement->Attribute( "system" );
+		isoIdentifiers.VolumeID		= identifierElement->Attribute( "volume" );
+		isoIdentifiers.VolumeSet	= identifierElement->Attribute( "volume_set" );
+		isoIdentifiers.Publisher	= identifierElement->Attribute( "publisher" );
+		isoIdentifiers.Application	= identifierElement->Attribute( "application" );
+		isoIdentifiers.DataPreparer	= identifierElement->Attribute( "data_preparer" );
+		isoIdentifiers.Copyright	= identifierElement->Attribute( "copyright" );
+		isoIdentifiers.CreationDate = identifierElement->Attribute( "creation_date" );
+		isoIdentifiers.ModificationDate = identifierElement->Attribute( "modification_date" );
+
+		bool hasSystemID = true;
+		if ( isoIdentifiers.SystemID == nullptr )
 		{
-			printf("    Identifiers:\n");
-			if ( identifierElement->Attribute( "system" ) != nullptr )
-			{
-				printf( "      System       : %s\n",
-					identifierElement->Attribute( "system" ) );
-			}
-			else
-			{
-				printf( "      System       : PLAYSTATION (default)\n" );
-			}
-
-			if ( identifierElement->Attribute( "application" ) != nullptr )
-			{
-				printf( "      Application  : %s\n",
-					identifierElement->Attribute( "application" ) );
-			}
-			else
-			{
-				printf( "      Application  : PLAYSTATION (default)\n" );
-			}
-
-			if ( identifierElement->Attribute( "volume" ) != nullptr )
-			{
-				printf( "      Volume       : %s\n",
-					identifierElement->Attribute( "volume" ) );
-			}
-			if ( identifierElement->Attribute( "volumeset" ) != nullptr )
-			{
-				printf( "      Volume Set   : %s\n",
-					identifierElement->Attribute( "volumeset" ) );
-			}
-			if ( identifierElement->Attribute( "publisher" ) != nullptr )
-			{
-				printf( "      Publisher    : %s\n",
-					identifierElement->Attribute( "publisher" ) );
-			}
-			if ( identifierElement->Attribute( "datapreparer" ) != nullptr )
-			{
-				printf( "      Data Preparer: %s\n",
-					identifierElement->Attribute( "datapreparer" ) );
-			}
-			if ( identifierElement->Attribute( "copyright" ) != nullptr )
-			{
-				printf( "      Copyright    : %s\n",
-					identifierElement->Attribute( "copyright" ) );
-			}
-			printf( "\n" );
-
+			hasSystemID = false;
+			isoIdentifiers.SystemID = "PLAYSTATION";
 		}
 
+		bool hasApplication = true;
+		if ( isoIdentifiers.Application == nullptr )
+		{
+			hasApplication = false;
+			isoIdentifiers.Application = "PLAYSTATION";
+		}
+
+		bool hasCopyright = true;
+		if ( isoIdentifiers.Copyright == nullptr )
+		{
+			hasCopyright = false;
+			isoIdentifiers.Copyright = "COPYLEFTED";
+		}
+
+		bool hasDataPreparer = true;
+		if ( isoIdentifiers.DataPreparer == nullptr )
+		{
+			hasDataPreparer = false;
+			isoIdentifiers.DataPreparer = "DISC IMAGE CREATED "
+				"WITH MKPSXISO BY LAMEGUY64 OF MEIDO-TEK PRODUCTIONS";
+		}
+
+		// Print out identifiers if present
+		if ( !global::QuietMode )
+		{
+			printf("    Identifiers:\n");
+			printf( "      System       : %s%s\n",
+				isoIdentifiers.SystemID,
+				hasSystemID ? "" : " (default)" );
+
+			printf( "      Application  : %s%s\n",
+				isoIdentifiers.Application,
+				hasApplication ? "" : " (default)" );
+
+			if ( isoIdentifiers.VolumeID != nullptr )
+			{
+				printf( "      Volume       : %s\n",
+					isoIdentifiers.VolumeID );
+			}
+			if ( isoIdentifiers.VolumeSet != nullptr )
+			{
+				printf( "      Volume Set   : %s\n",
+					isoIdentifiers.VolumeSet );
+			}
+			if ( isoIdentifiers.Publisher != nullptr )
+			{
+				printf( "      Publisher    : %s\n",
+					isoIdentifiers.Publisher );
+			}
+			if ( hasDataPreparer )
+			{
+				printf( "      Data Preparer: %s\n",
+					isoIdentifiers.DataPreparer );
+			}
+			if ( hasCopyright )
+			{
+				printf( "      Copyright    : %s\n",
+					isoIdentifiers.Copyright );
+			}
+			if ( isoIdentifiers.CreationDate != nullptr )
+			{
+				printf( "      Creation Date : %s\n",
+					isoIdentifiers.CreationDate );
+			}
+			if ( isoIdentifiers.ModificationDate != nullptr )
+			{
+				printf( "      Modification Date : %s\n",
+					isoIdentifiers.ModificationDate );
+			}
+			printf( "\n" );
+		}
 	}
 
 	if ( licenseElement != nullptr )
@@ -751,14 +825,48 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 
 	}
 
+	// Establish the volume timestamp to either the current local time or isoIdentifiers.CreationDate (if specified)
+	cd::ISO_DATESTAMP volumeDate;
+	bool gotDateFromXML = false;
+	if ( isoIdentifiers.CreationDate != nullptr )
+	{
+		// Try to use time from XML. If it's malformed, fall back to local time.
+		volumeDate = GetDateFromString(isoIdentifiers.CreationDate, &gotDateFromXML);
+	}
+
+	if ( !gotDateFromXML )
+	{
+		// Use local time
+		const tm imageTime = *gmtime( &global::BuildTime );
+
+		volumeDate.year = imageTime.tm_year;
+		volumeDate.month = imageTime.tm_mon + 1;
+		volumeDate.day = imageTime.tm_mday;
+		volumeDate.hour = imageTime.tm_hour;
+		volumeDate.minute = imageTime.tm_min;
+		volumeDate.second = imageTime.tm_sec;
+
+		// Calculate the GMT offset. It doesn't have to be perfect, but this should cover most/all normal cases.
+		const time_t timeUTC = global::BuildTime;
+
+		tm localTime = imageTime;
+		const time_t timeLocal = mktime(&localTime);
+
+		const double diff = difftime(timeUTC, timeLocal);
+		volumeDate.GMToffs = static_cast<signed char>(diff / 60.0 / 15.0); // Seconds to 15-minute units
+	}
+
 	// Parse directory entries in the directory_tree element
 	if ( !global::QuietMode )
 	{
 		printf( "    Parsing directory tree...\n" );
 	}
 
-	iso::DirTreeClass dirTree;
+	iso::EntryList entries;
+	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate);
+	iso::DirTreeClass* dirTree = root.subdir.get();
 
+	const tinyxml2::XMLElement* directoryTree = trackElement->FirstChildElement( "directory_tree" );
 	if ( trackElement->FirstChildElement( "directory_tree" ) == nullptr )
 	{
 		if ( !global::QuietMode )
@@ -770,26 +878,23 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		return false;
 	}
 
-	if ( !ParseDirectory( &dirTree, trackElement->FirstChildElement(
-		"directory_tree" ) ) )
+	bool found_da = false;	
+	const iso::EntryAttributes rootAttributes = iso::EntryAttributes::Overlay(iso::EntryAttributes::MakeDefault(), ReadEntryAttributes(directoryTree));
+	if ( !ParseDirectory(dirTree, directoryTree, rootAttributes, found_da) )
 	{
 		return false;
 	}
 
-
 	// Calculate directory tree LBAs and retrieve size of image
-	int pathTableLen = dirTree.CalculatePathTableLen();
+	int pathTableLen = dirTree->CalculatePathTableLen(root);
 
-	int imageLen = dirTree.CalculateFileSystemSize(
-		16+(((pathTableLen+2047)/2048)*4) );
-
-	int totalLen = dirTree.CalculateTreeLBA(
-		18+(((pathTableLen+2047)/2048)*4) );
+	const int rootLBA = 17+(((pathTableLen+2047)/2048)*4);
+	int totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
 	{
-		printf( "      Files Total: %d\n", dirTree.GetFileCountTotal() );
-		printf( "      Directories: %d\n", dirTree.GetDirCountTotal() );
+		printf( "      Files Total: %d\n", dirTree->GetFileCountTotal() );
+		printf( "      Directories: %d\n", dirTree->GetDirCountTotal() );
 		printf( "      Total file system size: %d bytes (%d sectors)\n\n",
 			2352*totalLen, totalLen);
 	}
@@ -797,42 +902,62 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	if ( !global::LBAfile.empty() )
 	{
 		FILE* fp = fopen( global::LBAfile.c_str(), "w" );
-
-		fprintf( fp, "File LBA log generated by MKPSXISO v" VERSION "\n\n" );
-		fprintf( fp, "Image bin file: %s\n", global::ImageName.c_str() );
-
-		if ( global::cuefile != nullptr )
+		if (fp != nullptr)
 		{
-			fprintf( fp, "Image cue file: %s\n", global::cuefile );
+			fprintf( fp, "File LBA log generated by MKPSXISO v" VERSION "\n\n" );
+			fprintf( fp, "Image bin file: %s\n", global::ImageName.c_str() );
+
+			if ( global::cuefile != nullptr )
+			{
+				fprintf( fp, "Image cue file: %s\n", global::cuefile );
+			}
+
+			fprintf( fp, "\nFile System:\n\n" );
+			fprintf( fp, "    Type  Name             Length    LBA       "
+				"Timecode    Bytes     Source File\n\n" );
+
+			dirTree->OutputLBAlisting( fp, 0 );
+
+			fclose( fp );
+
+			if ( !global::QuietMode )
+			{
+				printf( "    Wrote file LBA log %s.\n\n",
+					global::LBAfile.c_str() );
+			}
 		}
-
-		fprintf( fp, "\nFile System:\n\n" );
-		fprintf( fp, "    Type  Name             Length    LBA       "
-			"Timecode    Bytes     Source File\n\n" );
-
-		dirTree.OutputLBAlisting( fp, 0 );
-
-		fclose( fp );
-
-		if ( !global::QuietMode )
+		else
 		{
-			printf( "    Wrote file LBA log %s.\n\n",
-				global::LBAfile.c_str() );
+			if ( !global::QuietMode )
+			{
+				printf( "    Failed to write LBA log %s!\n\n",
+					global::LBAfile.c_str() );
+			}
 		}
 	}
 
 	if ( !global::LBAheaderFile.empty() )
 	{
 		FILE* fp = fopen( global::LBAheaderFile.c_str(), "w" );
-
-		dirTree.OutputHeaderListing( fp, 0 );
-
-		fclose( fp );
-
-		if ( !global::QuietMode )
+		if (fp != nullptr)
 		{
-			printf( "    Wrote file LBA listing header %s.\n\n",
-				global::LBAheaderFile.c_str() );
+			dirTree->OutputHeaderListing( fp, 0 );
+
+			fclose( fp );
+
+			if ( !global::QuietMode )
+			{
+				printf( "    Wrote file LBA listing header %s.\n\n",
+					global::LBAheaderFile.c_str() );
+			}
+		}
+		else
+		{
+			if ( !global::QuietMode )
+			{
+				printf( "    Failed to write LBA listing header %s.\n\n",
+					global::LBAheaderFile.c_str() );
+			}
 		}
 	}
 
@@ -841,7 +966,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 		fprintf( cue_fp, "  TRACK 01 MODE2/2352\n" );
 		fprintf( cue_fp, "    INDEX 01 00:00:00\n" );
 
-		dirTree.WriteCueEntries( cue_fp, &global::trackNum );
+		dirTree->WriteCueEntries( cue_fp, &global::trackNum );
 	}
 
 	if ( global::NoIsoGen )
@@ -859,7 +984,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	writer->SetSubheader( cd::IsoWriter::SubData );
 
 	if ( (global::NoLimit == false) &&
-		(dirTree.CalculatePathTableLen() > 2048) )
+		(dirTree->CalculatePathTableLen(root) > 2048) )
 	{
 		if ( !global::QuietMode )
 		{
@@ -874,7 +999,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	}
 
 	// Write padding which will be written with proper data later on
-	for ( int i=0; i<18+(((dirTree.CalculatePathTableLen()+2047)/2048)*4); i++ )
+	for ( int i=0; i<18+(((dirTree->CalculatePathTableLen(root)+2047)/2048)*4); i++ )
 	{
 		char buff[2048];
 		memset( buff, 0x00, 2048 );
@@ -882,7 +1007,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	}
 
 	// Copy the files into the disc image
-	dirTree.WriteFiles( writer );
+	dirTree->WriteFiles( writer );
 
 	// Write file system
 	if ( !global::QuietMode )
@@ -891,41 +1016,11 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	}
 
 	// Sort directory entries and write it
-	dirTree.SortDirEntries();
-	dirTree.WriteDirectoryRecords( writer, 0 );
-
-	// Set file system identifiers
-	iso::IDENTIFIERS isoIdentifiers;
-	memset( &isoIdentifiers, 0x00, sizeof(iso::IDENTIFIERS) );
-
-	if ( identifierElement != nullptr )
-	{
-		isoIdentifiers.SystemID		= identifierElement->Attribute( "system" );
-		isoIdentifiers.VolumeID		= identifierElement->Attribute( "volume" );
-		isoIdentifiers.VolumeSet	= identifierElement->Attribute( "volumeset" );
-		isoIdentifiers.Publisher	= identifierElement->Attribute( "publisher" );
-		isoIdentifiers.Application	= identifierElement->Attribute( "application" );
-		isoIdentifiers.DataPreparer	= identifierElement->Attribute( "datapreparer" );
-		isoIdentifiers.Copyright	= identifierElement->Attribute( "copyright" );
-
-		if ( isoIdentifiers.SystemID == nullptr )
-		{
-			isoIdentifiers.SystemID = "PLAYSTATION";
-		}
-
-		if ( isoIdentifiers.Application == nullptr )
-		{
-			isoIdentifiers.Application = "PLAYSTATION";
-		}
-
-		if ( isoIdentifiers.Copyright == nullptr )
-		{
-			isoIdentifiers.Copyright = "COPYLEFTED";
-		}
-	}
+	dirTree->SortDirectoryEntries();
+	dirTree->WriteDirectoryRecords( writer, root, root );
 
 	// Write file system descriptors to finish the image
-	iso::WriteDescriptor( writer, isoIdentifiers, &dirTree, imageLen );
+	iso::WriteDescriptor( writer, isoIdentifiers, root, totalLen );
 
 	if ( !global::QuietMode )
 	{
@@ -946,7 +1041,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 			printf( "      Writing license data..." );
 		}
 
-		iso::WriteLicenseData( writer, (void*)buff );
+		iso::WriteLicenseData( writer, buff );
 
 		if ( !global::QuietMode )
 		{
@@ -957,231 +1052,242 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, tinyxml2::XMLElement
 	return true;
 }
 
-int ParseDirectory(iso::DirTreeClass* dirTree, tinyxml2::XMLElement* dirElement)
+static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
 {
-	std::string srcDir;
+	const char* nameElement = dirElement->Attribute("name");
+	const char* sourceElement = dirElement->Attribute("source");
+
+	if ( nameElement == nullptr && sourceElement == nullptr )
+	{
+		if ( !global::QuietMode )
+		{
+			printf("      ");
+		}
+
+		printf( "ERROR: Missing name and source attributes on "
+			"line %d.\n", dirElement->GetLineNum() );
+
+		return false;
+	}
+
 	std::string srcFile;
+	if ( sourceElement != nullptr )
+	{
+		srcFile = sourceElement;
+		// Replace all forward slashes with backslashes
+		for ( char& ch : srcFile )
+		{
+			if ( ch == '\\' )
+			{
+				ch = '/';
+			}
+		}
+	}
+
 	std::string name;
-	int found_da = false;
-
-	if ( dirElement->Attribute( "srcdir" ) != nullptr )
+	if ( nameElement != nullptr )
 	{
-		srcDir = dirElement->Attribute( "srcdir" );
+		name = nameElement;
 	}
-
-	if ( !srcDir.empty() )
+	else
 	{
-		while ( srcDir.rfind( "\\" ) != std::string::npos )
+		if ( !srcFile.empty() )
 		{
-			srcDir.replace( srcDir.rfind( "\\" ), 1, "/" );
-		}
-		if ( srcDir.back() != '/' )
-		{
-			srcDir += "/";
+			name = srcFile;
+			name.erase( 0, name.rfind( '/' )+1 );
 		}
 	}
 
-	dirElement = dirElement->FirstChildElement();
+	if ( srcFile.empty() )
+	{
+		srcFile = name;
+	}
 
-	while ( dirElement != nullptr )
+	if ( ( name.find( '\\' ) != std::string::npos )
+		|| ( name.find( '/' ) != std::string::npos ) )
+	{
+		if ( !global::QuietMode )
+		{
+			printf("      ");
+		}
+
+		printf( "ERROR: Name attribute for file entry '%s' cannot be "
+			"a path on line %d.\n", name.c_str(),
+			dirElement->GetLineNum() );
+
+		return false;
+	}
+
+	if ( name.size() > 12 )
+	{
+		if ( !global::QuietMode )
+		{
+			printf( "      " );
+		}
+
+		printf( "ERROR: Name entry for file '%s' is more than 12 "
+			"characters long on line %d.\n", name.c_str(),
+			dirElement->GetLineNum() );
+
+		return false;
+	}
+
+	int entry = iso::EntryFile;
+
+	const char* typeElement = dirElement->Attribute("type");
+	if ( typeElement != nullptr )
+	{
+		if ( compare( "data", typeElement ) == 0 )
+		{
+			entry = iso::EntryFile;
+		} else if ( compare( "mixed", typeElement ) == 0 ||
+                    compare( "xa", typeElement ) == 0 || //alias xa and str to mixed
+                    compare( "str", typeElement ) == 0 )
+		{
+			entry = iso::EntrySTR;
+		}
+		else if ( compare( "da", typeElement ) == 0 )
+		{
+			entry = iso::EntryDA;
+			if ( global::cuefile == nullptr )
+			{
+				if ( !global::QuietMode )
+				{
+					printf( "      " );
+				}
+				printf( "ERROR: DA audio file(s) specified but no CUE sheet specified.\n" );
+				return false;
+			}
+			found_da = true;
+		}
+		else
+		{
+			if ( !global::QuietMode )
+			{
+				printf( "      " );
+			}
+
+			printf( "ERROR: Unknown type %s on line %d\n",
+				dirElement->Attribute( "type" ),
+				dirElement->GetLineNum() );
+
+			return false;
+		}
+
+		if ( found_da && entry != iso::EntryDA )
+		{
+			if ( !global::QuietMode )
+			{
+				printf( "      " );
+			}
+
+			printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
+				dirElement->GetLineNum() );
+
+			return false;
+		}
+
+	}
+
+	return dirTree->AddFileEntry(name.c_str(), entry, srcFile.c_str(), iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)));
+}
+
+static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
+{
+	if ( found_da )
+	{
+		if ( !global::QuietMode )
+		{
+			printf( "      " );
+		}
+
+		printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
+			dirElement->GetLineNum() );
+
+		return false;
+	}
+
+	// TODO: For now this is a hack, unify this code again with the file type in the future
+	// so it isn't as awkward
+	int dummyType = 0; // Data
+	const char* type = dirElement->Attribute( "type" );
+	if ( type != nullptr )
+	{
+		// TODO: Make reasonable
+		if ( compare(type, "2336") == 0 )
+		{
+			dummyType = 1; // XA
+		}
+	}
+
+
+	dirTree->AddDummyEntry( atoi( dirElement->Attribute( "sectors" ) ), dummyType );
+	return true;
+}
+
+static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
+{
+	const char* nameElement = dirElement->Attribute( "name" );
+	if ( strlen( nameElement ) > 12 )
+	{
+		printf( "ERROR: Directory name %s on line %d is more than 12 "
+			"characters long.\n", nameElement,
+				dirElement->GetLineNum() );
+		return false;
+	}
+
+	const iso::EntryAttributes attribs = iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement));
+
+	bool alreadyExists = false;
+	iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
+		nameElement, dirElement->Attribute( "source" ), attribs, alreadyExists );
+
+	if ( subdir == nullptr )
+	{
+		return false;
+	}
+
+	if ( found_da && !alreadyExists )
+	{
+		if ( !global::QuietMode )
+		{
+			printf( "      " );
+		}
+
+		printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
+			dirElement->GetLineNum() );
+
+		return false;
+	}
+
+	return ParseDirectory(subdir, dirElement, attribs, found_da);
+}
+
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const iso::EntryAttributes& parentAttribs, bool& found_da)
+{
+	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
         if ( compare( "file", dirElement->Name() ) == 0 )
 		{
-			if ( ( dirElement->Attribute("name") == nullptr ) &&
-				( dirElement->Attribute("source") == nullptr ) ) {
-
-				if ( !global::QuietMode )
-				{
-					printf("      ");
-				}
-
-				printf( "ERROR: Missing name and source attributes on "
-					"line %d.\n", dirElement->GetLineNum() );
-
-				return false;
-			}
-
-			srcFile = "";
-
-			if ( dirElement->Attribute("source") != nullptr )
-			{
-				srcFile = dirElement->Attribute("source");
-				while ( srcFile.rfind( "\\" ) != std::string::npos )
-				{
-					srcFile.replace( srcFile.rfind( "\\" ), 1, "/" );
-				}
-			}
-
-			if ( dirElement->Attribute("name") )
-			{
-				name = dirElement->Attribute("name");
-			}
-			else
-			{
-				if ( !srcFile.empty() )
-				{
-					name = srcFile;
-					name.erase( 0, name.rfind( '/' )+1 );
-				}
-			}
-
-			if ( srcFile.empty() ) {
-				srcFile = name;
-			}
-
-			if ( !srcDir.empty() )
-			{
-				srcFile = srcDir + srcFile;
-			}
-
-
-			if ( ( name.find( '\\', 0 ) != std::string::npos )
-				|| ( name.find( '/', 0 ) != std::string::npos ) )
-			{
-				if ( !global::QuietMode )
-				{
-					printf("      ");
-				}
-
-				printf( "ERROR: Name attribute for file entry '%s' cannot be "
-					"a path on line %d.\n", name.c_str(),
-					dirElement->GetLineNum() );
-
-				return false;
-			}
-
-			if ( name.size() > 12 )
-			{
-				if ( !global::QuietMode )
-				{
-					printf( "      " );
-				}
-
-				printf( "ERROR: Name entry for file '%s' is more than 12 "
-					"characters long on line %d.\n", name.c_str(),
-					dirElement->GetLineNum() );
-
-				return false;
-			}
-
-			int entry = iso::EntryFile;
-
-			if ( dirElement->Attribute( "type" ) != nullptr )
-			{
-				if ( compare( "data", dirElement->Attribute( "type" ) ) == 0 )
-				{
-					entry = iso::EntryFile;
-				} else if ( compare( "mixed", dirElement->Attribute( "type" ) ) == 0 ||
-                            compare( "xa", dirElement->Attribute( "type" ) ) == 0 || //alias xa and str to mixed
-                            compare( "str", dirElement->Attribute( "type" ) ) == 0 )
-				{
-					entry = iso::EntrySTR;
-				}
-				else if ( compare( "da", dirElement->Attribute( "type" ) ) == 0 )
-				{
-					entry = iso::EntryDA;
-					if ( global::cuefile == nullptr )
-					{
-						if ( !global::QuietMode )
-						{
-							printf( "      " );
-						}
-						printf( "ERROR: DA audio file(s) specified but no CUE sheet specified.\n" );
-						return false;
-					}
-					found_da = true;
-				}
-				else
-				{
-					if ( !global::QuietMode )
-					{
-						printf( "      " );
-					}
-
-					printf( "ERROR: Unknown type %s on line %d\n",
-						dirElement->Attribute( "type" ),
-						dirElement->GetLineNum() );
-
-					return false;
-				}
-
-				if ( ( found_da ) && ( entry != iso::EntryDA ) )
-				{
-					if ( !global::QuietMode )
-					{
-						printf( "      " );
-					}
-
-					printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
-						dirElement->GetLineNum() );
-
-					return false;
-				}
-
-			}
-
-			if ( !dirTree->AddFileEntry( name.c_str(), entry, srcFile.c_str() ) )
+			if (!ParseFileEntry(dirTree, dirElement, parentAttribs, found_da))
 			{
 				return false;
 			}
-
 		}
 		else if ( compare( "dummy", dirElement->Name() ) == 0 )
 		{
-			if ( found_da )
+			if (!ParseDummyEntry(dirTree, dirElement, found_da))
 			{
-				if ( !global::QuietMode )
-				{
-					printf( "      " );
-				}
-
-				printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
-					dirElement->GetLineNum() );
-
 				return false;
 			}
-
-			dirTree->AddDummyEntry( atoi( dirElement->Attribute( "sectors" ) ) );
         }
 		else if ( compare( "dir", dirElement->Name() ) == 0 )
 		{
-			if ( found_da )
-			{
-				if ( !global::QuietMode )
-				{
-					printf( "      " );
-				}
-
-				printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
-					dirElement->GetLineNum() );
-
-				return false;
-			}
-
-			if ( strlen( dirElement->Attribute( "name" ) ) > 12 )
-			{
-				printf( "ERROR: Directory name %s on line %d is more than 12 "
-					"characters long.\n", dirElement->Attribute( "source" ),
-						dirElement->GetLineNum() );
-				return false;
-			}
-
-			iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
-				dirElement->Attribute( "name" ) );
-
-			if ( subdir == nullptr )
-			{
-				return false;
-			}
-
-            if ( !ParseDirectory( subdir, dirElement ) )
+			if (!ParseDirEntry(dirTree, dirElement, parentAttribs, found_da))
 			{
 				return false;
 			}
         }
-
-		dirElement = dirElement->NextSiblingElement();
-
 	}
 
 	return true;

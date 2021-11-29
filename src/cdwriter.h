@@ -22,6 +22,7 @@ class IsoWriter {
 		int				lastSectorType;
 
 		void			PrepSector(int edcEccMode);
+		size_t			WriteSectorToDisc();
 
 	public:
 
@@ -60,9 +61,8 @@ class IsoWriter {
 
 	};
 
-	void SwapBytes(void *var, int size);
-	void SetPair16(cd::ISO_USHORT_PAIR* pair, unsigned short val);
-	void SetPair32(cd::ISO_UINT_PAIR* pair, unsigned int val);
+	ISO_USHORT_PAIR SetPair16(unsigned short val);
+	ISO_UINT_PAIR SetPair32(unsigned int val);
 
 };
 
