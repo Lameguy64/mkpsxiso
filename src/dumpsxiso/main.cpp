@@ -413,49 +413,47 @@ void ParseISO(cd::IsoReader& reader) {
 
     if (!param::xmlFile.empty()) {
 
-		tinyxml2::XMLElement *baseElement = xmldoc.NewElement(xml::elem::ISO_PROJECT);
+		tinyxml2::XMLElement *baseElement = static_cast<tinyxml2::XMLElement*>(xmldoc.InsertFirstChild(xmldoc.NewElement(xml::elem::ISO_PROJECT)));
 		baseElement->SetAttribute(xml::attrib::IMAGE_NAME, "mkpsxiso.bin");
 		baseElement->SetAttribute(xml::attrib::CUE_SHEET, "mkpsxiso.cue");
 
-		tinyxml2::XMLElement *trackElement = xmldoc.NewElement(xml::elem::TRACK);
+		tinyxml2::XMLElement *trackElement = baseElement->InsertNewChildElement(xml::elem::TRACK);
 		trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 
-		tinyxml2::XMLElement *newElement = xmldoc.NewElement(xml::elem::IDENTIFIERS);
-		auto setAttributeIfNotEmpty = [newElement](const char* name, const std::string& value)
 		{
-			if (!value.empty())
+			tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::IDENTIFIERS);
+			auto setAttributeIfNotEmpty = [newElement](const char* name, const std::string& value)
 			{
-				newElement->SetAttribute(name, value.c_str());
-			}
-		};
+				if (!value.empty())
+				{
+					newElement->SetAttribute(name, value.c_str());
+				}
+			};
 
-		setAttributeIfNotEmpty(xml::attrib::SYSTEM_ID, CleanDescElement(descriptor.systemID));
-		setAttributeIfNotEmpty(xml::attrib::APPLICATION, CleanDescElement(descriptor.applicationIdentifier));
-		setAttributeIfNotEmpty(xml::attrib::VOLUME_ID, CleanDescElement(descriptor.volumeID));
-		setAttributeIfNotEmpty(xml::attrib::VOLUME_SET, CleanDescElement(descriptor.volumeSetIdentifier));
-		setAttributeIfNotEmpty(xml::attrib::PUBLISHER, CleanDescElement(descriptor.publisherIdentifier));
-		setAttributeIfNotEmpty(xml::attrib::DATA_PREPARER, CleanDescElement(descriptor.dataPreparerIdentifier));
-		newElement->SetAttribute(xml::attrib::CREATION_DATE, LongDateToString(descriptor.volumeCreateDate).c_str());
+			setAttributeIfNotEmpty(xml::attrib::SYSTEM_ID, CleanDescElement(descriptor.systemID));
+			setAttributeIfNotEmpty(xml::attrib::APPLICATION, CleanDescElement(descriptor.applicationIdentifier));
+			setAttributeIfNotEmpty(xml::attrib::VOLUME_ID, CleanDescElement(descriptor.volumeID));
+			setAttributeIfNotEmpty(xml::attrib::VOLUME_SET, CleanDescElement(descriptor.volumeSetIdentifier));
+			setAttributeIfNotEmpty(xml::attrib::PUBLISHER, CleanDescElement(descriptor.publisherIdentifier));
+			setAttributeIfNotEmpty(xml::attrib::DATA_PREPARER, CleanDescElement(descriptor.dataPreparerIdentifier));
+			newElement->SetAttribute(xml::attrib::CREATION_DATE, LongDateToString(descriptor.volumeCreateDate).c_str());
+		}
 
-		trackElement->InsertEndChild(newElement);
+		{
+			tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
+			newElement->SetAttribute(xml::attrib::LICENSE_FILE,
+				(param::outPath / "license_data.dat").lexically_proximate(param::xmlFile.parent_path()).generic_u8string().c_str());
+		}
 
-		newElement = xmldoc.NewElement(xml::elem::LICENSE);
-		newElement->SetAttribute(xml::attrib::LICENSE_FILE,
-			(param::outPath / "license_data.dat").lexically_proximate(param::xmlFile.parent_path()).generic_u8string().c_str());
+		{
+			tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::DIRECTORY_TREE);
 
-		trackElement->InsertEndChild(newElement);
-
-		newElement = xmldoc.NewElement(xml::elem::DIRECTORY_TREE);
-
-		ParseDirectories(reader,
-						descriptor.rootDirRecord.entryOffs.lsb,
-						newElement,
-						descriptor.rootDirRecord.entrySize.lsb/2048,
-						param::outPath, param::xmlFile.parent_path());
-
-		trackElement->InsertEndChild(newElement);
-		baseElement->InsertEndChild(trackElement);
-		xmldoc.InsertEndChild(baseElement);
+			ParseDirectories(reader,
+							descriptor.rootDirRecord.entryOffs.lsb,
+							newElement,
+							descriptor.rootDirRecord.entrySize.lsb/2048,
+							param::outPath, param::xmlFile.parent_path());
+		}
 
 		if (FILE* file = OpenFile(param::xmlFile, "w"); file != nullptr)
 		{
