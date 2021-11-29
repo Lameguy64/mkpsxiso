@@ -1,4 +1,9 @@
+#ifdef WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
+
 #include <string.h>
 #include "cdwriter.h"
 #include "edcecc.h"
@@ -6,13 +11,15 @@
 
 void cd::SwapBytes(void *var, int size) {
 
-	unsigned char temp[size];
+	//unsigned char temp[size];
+	unsigned char *temp = new unsigned char[size];
 
 	memcpy(temp, var, size);
 	for(short i=0; i<size; i++) {
 		((unsigned char*)var)[i] = temp[(size-1)-i];
 	}
 
+	delete[] temp;
 }
 
 void cd::SetPair16(cd::ISO_USHORT_PAIR* pair, unsigned short val) {
@@ -84,7 +91,7 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 		// Encode ECC data
 		unsigned char tempAddr[4];
 
-		for(int i=0; i<4; i++) {
+		for(int i=0; i<3; i++) {
 
 			tempAddr[i] = cd::IsoWriter::sectorM2F1->addr[i];
 			cd::IsoWriter::sectorM2F1->addr[i] = 0x00;
@@ -96,7 +103,7 @@ void cd::IsoWriter::PrepSector(int edcEccMode) {
 		// Compute ECC Q code
 		edcEccGen.ComputeEccBlock(cd::IsoWriter::sectorBuff+0xC, 52, 43, 86, 88, cd::IsoWriter::sectorBuff+0x8C8);
 
-		for(int i=0; i<4; i++) {
+		for(int i=0; i<3; i++) {
 
 			cd::IsoWriter::sectorM2F1->addr[i] = tempAddr[i];
 

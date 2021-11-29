@@ -20,60 +20,39 @@ Another notable difference of MKPSXISO is that it injects the Sony license data 
 The latest Win32 binaries is now a release download in this repository.
 
 Older versions (probably going to be removed soon, there's no benefit to using these versions anyway):
-[mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
-[mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
-[mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
-[mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
-[mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
-[mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
-[mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
-[mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
-[mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
+* [mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
+* [mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
+* [mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
+* [mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
+* [mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
+* [mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
+* [mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
+* [mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
+* [mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
 
 ## Compiling
-This tool requires tinyxml2 to compile.
-Compile with --std=c++11.
 
-### Windows (make, no Netbeans)
-1. Install your preferred MinGW GCC compiler.
-2. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
-3. Make sure the tinyxml2 library is named libtinyxml2.a.
-4. Run "mingw32-make CONF=Release" in the mkpsxiso directory.
-5. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
+1. Set up CMake and a compiler toolchain. Install the `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
+   * MSVC with vcpkg (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
+   * MSys64 with the following packages: `make`, `cmake`, `mingw-w64-x86_64-gcc`, `mingw-w64-x86_64-tinyxml2`
+   * Cygwin64 with the following packages: `make`, `cmake`, `gcc`, `tinyxml2`
+2. Install `tinyxml2` using vcpkg, your distro's package manager or build it manually from [its repo](https://github.com/leethomason/tinyxml2).
+3. Run the following commands from the mkpsxiso directory:
 
-### Windows (Netbeans)
-1. Extract and compile tinyxml2 in the root of your C: drive (C:\tinyxml2).
-2. Open the mkpsxiso directory as a project within the Netbeans IDE.
-3. Select Release build and press F6 to compile.
-4. The result will be in "dist\Release\MinGW-Windows" named "mkpsxiso.exe".
+```bash
+cmake -S . -B build/ -DCMAKE_BUILD_TYPE=Release
+cmake --build build/
+cmake --install build/
+```
 
-### Windows (CMake)
-1. Install cygwin64 with the following:
-  * make
-  * cmake
-  * gcc
-  * tinyxml2
-2. Open the cygwin64 terminal.
-3. Navigate to the download of this repo.
-4. Run "cmake ." to generate the make file.
-5. Run "make" to compile the program.
-6. The result will be in bin_win, named "mkpsxiso.exe"
-  
-### Linux (Ubuntu/CMake)
-1. Install the following:
-  * Build Essentials (gcc, g++, make)
-  * cmake
-  * tinyxml2
-2. Open a terminal.
-3. Navigate to the download of this repo.
-4. Run "cmake ." to generate the make file.
-5. Run "make" to compile the program.
-6. The result will be in bin_nix, named "mkpsxiso"
+**NOTE**: Add `sudo` to the install command if necessary. If you are using vcpkg, add `-DCMAKE_TOOLCHAIN_FILE` to the first command as explained [here](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
+
+The default installation path is `C:\Program Files\mkpsxiso\bin` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 
 ## Issues
 
 The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
-```
+```xml
 <dir name="dira">
     <dir name="subdir1a">
         <dir name="subdiraa"/>
@@ -106,6 +85,10 @@ On Windows, browsing the subdirectories in dirb and dirc will not list the conte
 This can be avoided by minimizing identically named directories but its best to test your generated disc image before considering it ready for release.
 
 ## Changelog
+
+**Version 1.27**
+* Fixed stringop overflow bug when temporarily clearing sector address bytes.
+* Path is now stripped for the .bin file specification of cue sheets.
 
 **Version 1.25 (12/30/2020)**
 * Replaced xa and str modes with "mixed" mode (see example.xml for details). xa and str modes are now just aliases to the new "mixed" mode, for backwards compatibility.

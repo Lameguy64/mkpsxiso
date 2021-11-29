@@ -1,7 +1,7 @@
 #ifndef _EDC_ECC_H
 #define _EDC_ECC_H
 
-#ifdef __WIN32__
+#ifdef WIN32
 #include <windows.h>
 #else
 #include <unistd.h>

@@ -513,7 +513,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id)
 	}
 
 	entry.type		= EntryDir;
-	entry.subdir	= (void*) new DirTreeClass;
+	entry.subdir	= (void*) new DirTreeClass; // TODO: when should this be freed?
 
 	entries.push_back( entry );
 
@@ -1467,7 +1467,6 @@ int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb)
 			entry->next_parent	= dirIndex;
 
 			pathTable.entries.push_back(entry);
-
 		}
 	}
 
@@ -1478,7 +1477,6 @@ int iso::DirTreeClass::GeneratePathTable(unsigned char* buff, int msb)
 
 		GenPathTableSub( sub, subdir, pathTable.entries[i]->next_parent, msb );
 		pathTable.entries[i]->sub = sub;
-
 	}
 
 	*buff = 1;	// Directory identifier length
@@ -1739,7 +1737,8 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 		cd::IsoWriter::EdcEccForm1 );
 
 	// Generate and write L-path table
-	unsigned char sectorBuff[2048*pathTableSectors];
+	//unsigned char sectorBuff[2048*pathTableSectors];
+	unsigned char *sectorBuff = new unsigned char[2048*pathTableSectors];
 	memset( sectorBuff, 0x00, 2048*pathTableSectors );
 
 	dirTree->GeneratePathTable( sectorBuff, false );
@@ -1795,6 +1794,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, iso::IDENTIFIERS id,
 	}
 
 	writer->SetSubheader( cd::IsoWriter::SubData );
+	delete[] sectorBuff;
 }
 
 iso::PathEntryClass::PathEntryClass() {

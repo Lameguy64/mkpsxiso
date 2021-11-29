@@ -1,42 +1,57 @@
-cmake_minimum_required(VERSION 2.8.4)
-include(FindPkgConfig)
+# mkpsxiso build script (rewritten)
+# (C) 2021 spicyjpeg
 
-#set global exe name
-set(MAIN "mkpsxiso")
-set (CMAKE_CXX_STANDARD 11)
+cmake_minimum_required(VERSION 3.21)
+#include(FindPkgConfig)
 
-project(${MAIN})
-#include directory, same for all build types
-include_directories(src)
+project(
+	mkpsxiso
+	LANGUAGES    C CXX
+	VERSION      1.26
+	DESCRIPTION  "PlayStation ISO image maker"
+	HOMEPAGE_URL "https://github.com/Lameguy64/mkpsxiso"
+)
 
-file(GLOB SOURCES "src/*.cpp")
+## External dependencies
 
-find_package(PkgConfig REQUIRED)
+# Let CMake attempt to find tinyxml2 on its own first. This avoids invoking
+# pkg-config where it might not be installed, and allows usage of package
+# managers like vcpkg. The path to tinyxml2 can also be specified manually by
+# passing -Dtinyxml2_ROOT.
+find_package(tinyxml2 CONFIG)
 
-pkg_search_module(TINYXML REQUIRED tinyxml2)
+if(NOT tinyxml2_FOUND)
+	find_package(PkgConfig REQUIRED)
+	pkg_search_module(_tinyxml2 REQUIRED IMPORTED_TARGET tinyxml2)
 
-#include sources that are platform specific
-if(MINGW OR CYGWIN)
-  message(STATUS "WINDOWS BUILD")
-  
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin_win)
-  
-elseif(MSYS OR MSVC)
-  message(FATAL_ERROR "CAN NOT BUILD ON MICROSOFT COMPILER")
-
-elseif(WATCOM OR BORLAND)
-  message(FATAL_ERROR "CAN NOT BUILD FOR APPLE, WATCOM, BORLAND")
-  
-elseif(UNIX OR APPLE)
-  message(STATUS "UNIX BUILD")
-
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin_nix)
-
-else()
-  message(FATAL_ERROR "NO BUILD TARGET MATCH")
-  
+	add_library(tinyxml2::tinyxml2 ALIAS PkgConfig::_tinyxml2)
 endif()
 
-add_executable(${MAIN} ${SOURCES})
+## Executables
 
-target_link_libraries(${MAIN} ${TINYXML_LIBRARIES})
+# This is required in order to properly link against tinyxml2 under MSVC.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(CMAKE_CXX_STANDARD         11)
+
+function(_add_target name source_dir)
+	file(
+		GLOB _sources
+		${source_dir}/*.c
+		${source_dir}/*.cpp
+	)
+
+	add_executable            (${name} ${_sources})
+	target_compile_definitions(${name} PUBLIC VERSION="${PROJECT_VERSION}")
+	target_link_libraries     (${name} tinyxml2::tinyxml2)
+endfunction()
+
+_add_target(mkpsxiso src)
+#_add_target(mkisoxml mkisoxml/src)
+
+# Ensure the tinyxml2 DLL (if any) is installed alongside mkpsxiso.
+install(
+	TARGETS mkpsxiso
+	RUNTIME_DEPENDENCIES
+	PRE_EXCLUDE_REGEXES ".*"
+	PRE_INCLUDE_REGEXES "tinyxml2"
+)

@@ -1,6 +1,11 @@
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 #include <stdio.h>
 #include <tinyxml2.h>
-#include <unistd.h>
 #include <string>
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
@@ -9,8 +14,6 @@
 #define MA_NO_DEVICE_IO
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
-
-#define VERSION "1.26"
 
 
 namespace global
@@ -279,6 +282,9 @@ int main(int argc, const char* argv[])
 		{
 			if ( global::cuefile != nullptr )
 			{
+				std::string temp;
+				std::size_t pos;
+				
 				if ( strlen( global::cuefile ) == 0 )
 				{
 					if ( !global::QuietMode )
@@ -304,9 +310,21 @@ int main(int argc, const char* argv[])
 
 					return EXIT_FAILURE;
 				}
-
+				
+				// get file name with the path stripped
+				pos = global::ImageName.find_last_of("/\\");
+				
+				if( pos != std::string::npos )
+				{
+					temp = global::ImageName.substr(pos+1);
+				}
+				else
+				{
+					temp = global::ImageName;
+				}
+				
 				fprintf( cuefp, "FILE \"%s\" BINARY\n",
-					global::ImageName.c_str() );
+					temp.c_str() );
 			}
 		}
 

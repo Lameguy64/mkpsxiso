@@ -5,12 +5,15 @@ test/
 nbproject/private/
 Makefile
 CMakeCache.txt
+CMakeUserPresets.json
 *.cmake
 *.layout
 *.depend
 *.exe
 *.bin
-*.cue 
+*.cue
 .dep.inc
 build
 dist
+.vscode
+.DS_Store
