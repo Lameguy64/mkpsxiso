@@ -35,6 +35,10 @@ endif()
 add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
 target_include_directories(tinyxml2 PUBLIC tinyxml2)
 
+# Build libFLAC
+option(WITH_OGG "" OFF)
+add_subdirectory(flac)
+
 ## Internal dependencies
 
 # Populate shared files
@@ -66,7 +70,7 @@ add_executable(dumpsxiso
 	${dumpsxiso_dir}/cdreader.cpp
 	${dumpsxiso_dir}/main.cpp
 )
-target_link_libraries(dumpsxiso tinyxml2 iso_shared)
+target_link_libraries(dumpsxiso tinyxml2 FLAC iso_shared)
 if(MINGW)
 	target_link_libraries(dumpsxiso "-municode")
 endif()

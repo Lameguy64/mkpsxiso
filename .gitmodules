@@ -4,3 +4,6 @@
 [submodule "miniaudio"]
 	path = miniaudio
 	url = https://github.com/mackron/miniaudio
+[submodule "flac"]
+	path = flac
+	url = https://github.com/xiph/flac
