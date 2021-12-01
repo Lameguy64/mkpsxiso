@@ -123,7 +123,7 @@ void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, 
 	int bytesLeft = cddaSize;
 	cd::RIFF_HEADER riffHeader;
     prepareRIFFHeader(&riffHeader, cddaSize);
-    fwrite((void*)&riffHeader, 1, sizeof(cd::RIFF_HEADER), outFile);    
+    fwrite((void*)&riffHeader, 1, sizeof(cd::RIFF_HEADER), outFile);
 
     while (bytesLeft > 0) {
 
@@ -136,11 +136,79 @@ void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, 
 
     	if (!isInvalid)
     		reader.ReadBytesDA(copyBuff, bytesToRead);
-    	
+
     	fwrite(copyBuff, 1, bytesToRead, outFile);
 
     	bytesLeft -= bytesToRead;
     }
+}
+
+void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, const int isInvalid)
+{
+	FLAC__bool ok = true;
+	FLAC__StreamEncoder *encoder = 0;
+	FLAC__StreamEncoderInitStatus init_status;
+	if((encoder = FLAC__stream_encoder_new()) == NULL)
+	{
+		fprintf(stderr, "ERROR: allocating encoder\n");
+		return;
+	}
+	unsigned sample_rate = 44100;
+	unsigned channels = 2;
+	unsigned bps = 16;
+	unsigned total_samples = cddaSize / (channels * (bps/8));
+
+	ok &= FLAC__stream_encoder_set_verify(encoder, true);
+	ok &= FLAC__stream_encoder_set_compression_level(encoder, 5);
+	ok &= FLAC__stream_encoder_set_channels(encoder, channels);
+	ok &= FLAC__stream_encoder_set_bits_per_sample(encoder, bps);
+	ok &= FLAC__stream_encoder_set_sample_rate(encoder, sample_rate);
+	ok &= FLAC__stream_encoder_set_total_samples_estimate(encoder, total_samples);
+	if(!ok)
+	{
+		fprintf(stderr, "ERROR: setting encoder settings\n");
+		goto writeFLACFile_cleanup;
+	}
+
+	init_status = FLAC__stream_encoder_init_FILE(encoder, outFile, /*progress_callback=*/NULL, /*client_data=*/NULL);
+	if(init_status != FLAC__STREAM_ENCODER_INIT_STATUS_OK)
+	{
+		fprintf(stderr, "ERROR: initializing encoder: %s\n", FLAC__StreamEncoderInitStatusString[init_status]);
+		goto writeFLACFile_cleanup;
+	}
+
+    {
+    size_t left = (size_t)total_samples;
+	size_t max_pcmframe_read = 2352 / (channels * (bps/8));
+
+	while (left && ok) {
+
+    	u_char copyBuff[2352];
+		int32_t pcm[channels * max_pcmframe_read];
+    	memset(copyBuff, 0, 2352);
+
+		size_t need = (left > max_pcmframe_read ? max_pcmframe_read : left);
+		size_t needBytes = need * (channels * (bps/8));
+		if(!isInvalid)
+			reader.ReadBytesDA(copyBuff, needBytes);
+
+    	/* convert the packed little-endian 16-bit PCM samples from WAVE into an interleaved FLAC__int32 buffer for libFLAC */
+		for(size_t i = 0; i < need*channels; i++)
+		{
+			/* inefficient but simple and works on big- or little-endian machines */
+			pcm[i] = (FLAC__int32)(((FLAC__int16)(FLAC__int8)copyBuff[2*i+1] << 8) | (FLAC__int16)copyBuff[2*i]);
+		}
+		/* feed samples to encoder */
+		ok = FLAC__stream_encoder_process_interleaved(encoder, pcm, need);
+		left -= need;
+    }
+    }
+	ok &= FLAC__stream_encoder_finish(encoder); // closes outFile
+	fprintf(stderr, "encoding: %s\n", ok? "succeeded" : "FAILED");
+	fprintf(stderr, "   state: %s\n", FLAC__StreamEncoderStateString[FLAC__stream_encoder_get_state(encoder)]);
+
+writeFLACFile_cleanup:
+	FLAC__stream_encoder_delete(encoder);
 }
 
 // XML attribute stuff
@@ -385,6 +453,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				writeWaveFile(outFile, reader, cddaSize, result);
 
 				fclose(outFile);
+				//writeFLACFile(outFile, reader, cddaSize, result)
 
 			}
 			else if (type == EntryType::EntryFile)
