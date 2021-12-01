@@ -36,7 +36,14 @@ add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
 target_include_directories(tinyxml2 PUBLIC tinyxml2)
 
 # Build libFLAC
-option(WITH_OGG "" OFF)
+set(BUILD_CXXLIBS OFF CACHE INTERNAL "")
+set(BUILD_PROGRAMS OFF CACHE INTERNAL "")
+set(BUILD_EXAMPLES OFF CACHE INTERNAL "")
+set(BUILD_DOCS OFF CACHE INTERNAL "")
+set(INSTALL_MANPAGES OFF CACHE INTERNAL "")
+set(INSTALL_PKGCONFIG_MODULES OFF CACHE INTERNAL "")
+set(INSTALL_CMAKE_CONFIG_MODULE OFF CACHE INTERNAL "")
+set(WITH_OGG OFF CACHE INTERNAL "")
 add_subdirectory(flac)
 
 ## Internal dependencies
