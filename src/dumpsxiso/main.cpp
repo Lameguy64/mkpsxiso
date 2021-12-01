@@ -21,6 +21,8 @@
 #include "cdreader.h"
 #include "xml.h"
 
+#include "FLAC/stream_encoder.h"
+
 #include <time.h>
 
 
@@ -114,6 +116,31 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
 
     fwrite(license.data, 1, sizeof(license.data), outFile);
     fclose(outFile);
+}
+
+void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const int isInvalid)
+{
+	int bytesLeft = cddaSize;
+	cd::RIFF_HEADER riffHeader;
+    prepareRIFFHeader(&riffHeader, cddaSize);
+    fwrite((void*)&riffHeader, 1, sizeof(cd::RIFF_HEADER), outFile);    
+
+    while (bytesLeft > 0) {
+
+    	u_char copyBuff[2352]{};
+
+    	int bytesToRead = bytesLeft;
+
+    	if (bytesToRead > 2352)
+    		bytesToRead = 2352;
+
+    	if (!isInvalid)
+    		reader.ReadBytesDA(copyBuff, bytesToRead);
+    	
+    	fwrite(copyBuff, 1, bytesToRead, outFile);
+
+    	bytesLeft -= bytesToRead;
+    }
 }
 
 // XML attribute stuff
@@ -353,33 +380,9 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				}
 
 				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
+				size_t cddaSize = 2352 * sectorsToRead;
 
-				size_t cddaSize = CD_SECTOR_SIZE * sectorsToRead;
-				size_t bytesLeft = cddaSize;
-
-				cd::RIFF_HEADER riffHeader;
-
-				prepareRIFFHeader(&riffHeader, cddaSize);
-				fwrite((void*)&riffHeader, sizeof(riffHeader), 1, outFile);
-
-
-				while (bytesLeft > 0) {
-
-					u_char copyBuff[2352] {};
-
-					size_t bytesToRead = bytesLeft;
-
-					if (bytesToRead > 2352)
-						bytesToRead = 2352;
-
-					if (!result)
-						reader.ReadBytesDA(copyBuff, bytesToRead);
-
-					fwrite(copyBuff, 1, bytesToRead, outFile);
-
-					bytesLeft -= bytesToRead;
-
-				}
+				writeWaveFile(outFile, reader, cddaSize, result);
 
 				fclose(outFile);
 
