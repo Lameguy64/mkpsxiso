@@ -20,8 +20,7 @@ namespace iso
 		EntryFile = 0,
 		EntryDir,
 		EntryXA,
-		EntrySTR,
-		EntrySTR_DO,
+		EntryXA_DO,
 		EntryDA,
 		EntryDummy
 	};

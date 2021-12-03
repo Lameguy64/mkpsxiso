@@ -1113,7 +1113,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
                     compare( "xa", typeElement ) == 0 || //alias xa and str to mixed
                     compare( "str", typeElement ) == 0 )
 		{
-			entry = iso::EntrySTR;
+			entry = iso::EntryXA;
 		}
 		else if ( compare( "da", typeElement ) == 0 )
 		{

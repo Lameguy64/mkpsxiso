@@ -354,60 +354,6 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 				printf("      ");
 			}
 
-			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped!\n", srcfile.lexically_normal().c_str());
-
-			return false;
-		}
-
-		// Check if size is a multiple of 2336 bytes
-		if ( ( fileAttrib->st_size % 2336 ) != 0 )
-		{
-			if ( !global::QuietMode )
-			{
-				printf("      ");
-			}
-
-			printf("ERROR: %" PRFILESYSTEM_PATH " is not a multiple of 2336 bytes.\n", srcfile.lexically_normal().c_str());
-
-			if ( !global::QuietMode )
-			{
-				printf("      ");
-			}
-
-			printf("Did you create your multichannel XA file with subheader data?\n");
-
-			return false;
-		}
-
-		// Check if first sub header is valid usually by checking
-		// if the first four bytes match the next four bytes
-		else if ( ((int*)buff)[0] == ((int*)buff)[1] )
-		{
-			if ( !global::QuietMode )
-			{
-				printf("      ");
-			}
-
-			printf("WARNING: %" PRFILESYSTEM_PATH " may not have a valid subheader. ", srcfile.lexically_normal().c_str());
-		}
-
-	// Check STR data
-	} else if ( type == EntrySTR ) {
-
-		// Check header
-		char buff[4];
-		FILE* fp = OpenFile(srcfile, "rb");
-		fread(buff, 1, 4, fp);
-		fclose(fp);
-
-		// Check if its a RIFF (WAV container)
-		if ( strncmp(buff, "RIFF", 4) == 0 )
-		{
-			if (!global::QuietMode)
-			{
-				printf("      ");
-			}
-
 			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped.\n", srcfile.lexically_normal().c_str());
 
 			return false;
@@ -418,7 +364,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, int type, const std::filesy
 		{
 			if ( ( fileAttrib->st_size % 2048) == 0 )
 			{
-				type = EntrySTR_DO;
+				type = EntryXA_DO;
 			}
 			else
 			{
@@ -624,11 +570,11 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 		else
 		{
 			// Increment LBA by the size of file
-			if ( entry.type == EntryFile || entry.type == EntrySTR_DO || entry.type == EntryDummy )
+			if ( entry.type == EntryFile || entry.type == EntryXA_DO || entry.type == EntryDummy )
 			{
 				lba += (entry.length+2047)/2048;
 			}
-			else if ( entry.type == EntryXA || entry.type == EntrySTR )
+			else if ( entry.type == EntryXA )
 			{
 				lba += (entry.length+2335)/2336;
 			}
@@ -802,11 +748,11 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		int lba = entry.lba;
 		int length = 0;
 
-		if ( ( entry.type == EntryXA ) || ( entry.type == EntrySTR ) )
+		if ( entry.type == EntryXA )
 		{
 			length = 2048*((entry.length+2335)/2336);
 		}
-		else if ( entry.type == EntrySTR_DO )
+		else if ( entry.type == EntryXA_DO )
 		{
 			length = 2048*((entry.length+2047)/2048);
 		}
@@ -843,7 +789,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 
 			unsigned short attributes = entry.perms;
 			if ( (entry.type == EntryFile) ||
-				(entry.type == EntrySTR_DO) ||
+				(entry.type == EntryXA_DO) ||
 				(entry.type == EntryDummy) )
 			{
 				attributes |= 0x800;
@@ -852,8 +798,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 			{
 				attributes |= 0x4000;
 			}
-			else if ( (entry.type == EntrySTR) ||
-				(entry.type == EntryXA) )
+			else if (entry.type == EntryXA)
 			{
 				attributes |= entry.attribs != 0xFFu ? (entry.attribs << 8) : 0x3800;
 				xa->filenum = 1;
@@ -863,8 +808,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 				attributes |= 0x8800;
 			}
 
-			if ( (entry.type == EntrySTR) ||
-				(entry.type == EntryXA) )
+			if (entry.type == EntryXA)
 			{
 				xa->filenum = 1;
 			}
@@ -988,42 +932,16 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 				}
 			}
 
-		// Write XA audio streams as Mode 2 Form 2 sectors without ECC
-		}
-		else if (entry.type == EntryXA)
-		{
-			char buff[2336];
-
-			if (!global::QuietMode)
-			{
-				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
-			}
-
-			FILE *fp = OpenFile( entry.srcfile, "rb" );
-
-			while( !feof( fp ) )
-			{
-				fread( buff, 1, 2336, fp );
-				writer->WriteBytesXA(buff, 2336, cd::IsoWriter::EdcEccForm2);
-			}
-
-			fclose( fp );
-
-			if ( !global::QuietMode )
-			{
-				printf( "Done.\n" );
-			}
-
-		// Write STR video streams as Mode 2 Form 1 (video sectors) and Mode 2 Form 2 (XA audio sectors)
+		// Write XA/STR video streams as Mode 2 Form 1 (video sectors) and Mode 2 Form 2 (XA audio sectors)
 		// Video sectors have EDC/ECC while XA does not
 		}
-		else if ( entry.type == EntrySTR )
+		else if ( entry.type == EntryXA )
 		{
 			char buff[2336];
 
 			if ( !global::QuietMode )
 			{
-				printf( "      Packing STR %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
+				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 			}
 
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -1057,7 +975,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 
 		// Write data only STR streams as Mode 2 Form 1
 		}
-		else if ( entry.type == EntrySTR_DO )
+		else if ( entry.type == EntryXA_DO )
 		{
 			char buff[2048];
 
@@ -1065,7 +983,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing STR-DO %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
+					printf( "      Packing XA-DO %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -1278,12 +1196,8 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 			{
 				fprintf( fp, "Dir   " );
 			}
-			else if ( ( entry.type == EntrySTR ) ||
-				( entry.type == EntrySTR_DO ) )
-			{
-				fprintf( fp, "STR   " );
-			}
-			else if ( entry.type == EntryXA )
+			else if ( ( entry.type == EntryXA ) ||
+				( entry.type == EntryXA_DO ) )
 			{
 				fprintf( fp, "XA    " );
 			}
