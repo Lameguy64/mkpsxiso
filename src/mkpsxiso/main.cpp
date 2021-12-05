@@ -1101,23 +1101,23 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 		return false;
 	}
 
-	int entry = iso::EntryFile;
+	EntryType entry = EntryType::EntryFile;
 
 	const char* typeElement = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
 	if ( typeElement != nullptr )
 	{
 		if ( compare( "data", typeElement ) == 0 )
 		{
-			entry = iso::EntryFile;
+			entry = EntryType::EntryFile;
 		} else if ( compare( "mixed", typeElement ) == 0 ||
                     compare( "xa", typeElement ) == 0 || //alias xa and str to mixed
                     compare( "str", typeElement ) == 0 )
 		{
-			entry = iso::EntrySTR;
+			entry = EntryType::EntrySTR;
 		}
 		else if ( compare( "da", typeElement ) == 0 )
 		{
-			entry = iso::EntryDA;
+			entry = EntryType::EntryDA;
 			if ( !global::cuefile )
 			{
 				if ( !global::QuietMode )
@@ -1143,7 +1143,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			return false;
 		}
 
-		if ( found_da && entry != iso::EntryDA )
+		if ( found_da && entry != EntryType::EntryDA )
 		{
 			if ( !global::QuietMode )
 			{

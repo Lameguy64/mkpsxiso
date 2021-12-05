@@ -16,15 +16,15 @@ class ListView
 public:
 	using type = T;
 
-	ListView(std::list<T>& list)
+	explicit ListView(std::list<T>& list)
 		: m_list(list)
 	{
 	}
 
 	// Create a new view over the same list
-	ListView<T> NewView() const
+	ListView NewView() const
 	{
-		return ListView<T>(m_list);
+		return ListView(m_list);
 	}
 
 	template<typename... Args>
@@ -41,11 +41,13 @@ public:
 		std::sort(m_view.begin(), m_view.end(), std::forward<Compare>(comp));
 	}
 
-	// Access to the view. Read only.
+	// Access to the view.
+	std::vector<std::reference_wrapper<type>>& GetView() { return m_view; }
 	const std::vector<std::reference_wrapper<type>>& GetView() const { return m_view; }
 
 	// Access to the entire list. Use sparingly.
-	std::list<T>& GetUnderlyingList() const { return m_list; }
+	std::list<T>& GetUnderlyingList() { return m_list; }
+	const std::list<T>& GetUnderlyingList() const { return m_list; }
 
 private:
 	std::vector<std::reference_wrapper<type>> m_view;
