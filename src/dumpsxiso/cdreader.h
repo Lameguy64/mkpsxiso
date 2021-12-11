@@ -3,7 +3,10 @@
 
 #include "cd.h"
 #include "xa.h"
+#include "listview.h"
 #include <filesystem>
+#include <memory>
+#include <optional>
 #include <vector>
 #include <string>
 
@@ -32,7 +35,7 @@ namespace cd {
         // Initializer
         IsoReader();
         // De-initializer
-        virtual ~IsoReader();
+        ~IsoReader();
 
         // Open ISO image
         bool Open(const std::filesystem::path& fileName);
@@ -87,13 +90,18 @@ namespace cd {
             ISO_DIR_ENTRY entry;
             cdxa::ISO_XA_ATTRIB extData;
             std::string identifier;
+            std::filesystem::path virtualPath;
+
+            std::unique_ptr<IsoDirEntries> subdir;
         };
-        std::vector<Entry> dirEntryList;
+        ListView<Entry> dirEntryList;
 
-        void FreeDirEntries();
-        size_t ReadDirEntries(cd::IsoReader* reader, int lba, int sectors=1);
-        void SortByLBA();
+        IsoDirEntries(ListView<Entry> view);
+        void ReadDirEntries(cd::IsoReader* reader, int lba, int sectors);
+        void ReadRootDir(cd::IsoReader* reader, int lba);
 
+    private:
+        std::optional<Entry> ReadEntry(cd::IsoReader* reader, size_t* bytesRead) const;
     };
 
 }

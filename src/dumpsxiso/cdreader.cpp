@@ -331,66 +331,93 @@ std::filesystem::path cd::IsoPathTable::GetFullDirPath(int dirEntry) const
 	return path;
 }
 
-void cd::IsoDirEntries::FreeDirEntries()
+cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
+	: dirEntryList(std::move(view))
 {
-	dirEntryList.clear();
 }
 
-size_t cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors) {
-
-	FreeDirEntries();
-
+void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors)
+{
+	size_t numEntries = 0; // Used to skip the first two entries, . and ..
     for (int sec = 0; sec < sectors; sec++)
     {
         size_t sectorBytesRead = 0;
         reader->SeekToSector(lba + sec);
 		while (true)
 		{
-			Entry entry;
-
             //check if there is enough data to read in the current sector. In case there is not, we must move to next sector.
-			if (2048 - sectorBytesRead < sizeof(entry.entry))
+			if (2048 - sectorBytesRead < sizeof(Entry))
+			{
                 break;
+			}
 
-			// Read 33 byte directory entry
-			sectorBytesRead += reader->ReadBytes(&entry.entry, sizeof(entry.entry));
-
-			// The file entry table usually ends with null bytes so break if we reached that area
-			if (entry.entry.entryLength == 0)
+			auto entry = ReadEntry(reader, &sectorBytesRead);
+			if (!entry)
+			{
 				break;
+			}
 
-			// Read identifier string
-			entry.identifier.resize(entry.entry.identifierLen);
-			sectorBytesRead += reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen);
-
-			// Strip trailing zeroes, if any
-			entry.identifier.resize(strlen(entry.identifier.c_str()));
-
-			// ECMA-119 9.1.12 - 00 field present only if file identifier length is an even number
-			if ((entry.entry.identifierLen % 2) == 0)
-            {
-                reader->SkipBytes(1);
-                sectorBytesRead++;
-            }
-
-			// Read XA attribute data
-			sectorBytesRead += reader->ReadBytes(&entry.extData, sizeof(entry.extData));
-
-			// XA attributes are big endian, swap them
-			entry.extData.attributes = SwapBytes16(entry.extData.attributes);
-			entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
-			entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
-
-			dirEntryList.emplace_back(std::move(entry));
+			if (numEntries++ >= 2)
+			{
+				dirEntryList.emplace(std::move(entry.value()));
+			}
 		}
     }
-	return dirEntryList.size();
+
+	// Sort the directory by LBA for pretty printing
+	dirEntryList.SortView([](const auto& left, const auto& right)
+		{
+			return left.get().entry.entryOffs.lsb < right.get().entry.entryOffs.lsb;
+		});
 }
 
-void cd::IsoDirEntries::SortByLBA()
+std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoReader* reader, size_t* bytesRead) const
 {
-	std::sort(dirEntryList.begin(), dirEntryList.end(), [](const auto& left, const auto& right)
-		{
-			return left.entry.entryOffs.lsb < right.entry.entryOffs.lsb;
-		});
+	Entry entry;
+
+	// Read 33 byte directory entry
+	size_t read = reader->ReadBytes(&entry.entry, sizeof(entry.entry));
+
+	// The file entry table usually ends with null bytes so break if we reached that area
+	if (entry.entry.entryLength == 0)
+		return std::nullopt;
+
+	// Read identifier string
+	entry.identifier.resize(entry.entry.identifierLen);
+	read += reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen);
+
+	// Strip trailing zeroes, if any
+	entry.identifier.resize(strlen(entry.identifier.c_str()));
+
+	// ECMA-119 9.1.12 - 00 field present only if file identifier length is an even number
+	if ((entry.entry.identifierLen % 2) == 0)
+    {
+        reader->SkipBytes(1);
+        read++;
+    }
+
+	// Read XA attribute data
+	read += reader->ReadBytes(&entry.extData, sizeof(entry.extData));
+
+	// XA attributes are big endian, swap them
+	entry.extData.attributes = SwapBytes16(entry.extData.attributes);
+	entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
+	entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
+
+	if (bytesRead != nullptr)
+	{
+		*bytesRead += read;
+	}
+
+	return entry;
+}
+
+void cd::IsoDirEntries::ReadRootDir(cd::IsoReader* reader, int lba)
+{
+	reader->SeekToSector(lba);
+	auto entry = ReadEntry(reader, nullptr);
+	if (entry)
+	{
+		dirEntryList.emplace(std::move(entry.value()));
+	}
 }

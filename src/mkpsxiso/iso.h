@@ -11,20 +11,10 @@
 #include <vector>
 #include <filesystem>
 #include "cdwriter.h"
+#include "common.h"
 
 namespace iso
 {
-
-	enum EntryType
-	{
-		EntryFile = 0,
-		EntryDir,
-		EntryXA,
-		EntryXA_DO,
-		EntryDA,
-		EntryDummy
-	};
-
 	typedef struct
 	{
 		const char*	SystemID;
@@ -45,7 +35,7 @@ namespace iso
 		int		lba;		/// File LBA (in sectors)
 
 		std::filesystem::path srcfile;	/// Filename with path to source file (empty if directory or dummy)
-		int			type;		/// File type (0 - file, 1 - directory)
+		EntryType	  type;		/// File type (0 - file, 1 - directory)
 		unsigned char attribs;	/// XA attributes, 0xFF is not set
 		unsigned short perms;	/// XA permissions
 		unsigned short GID;		/// Owner group ID
@@ -162,7 +152,7 @@ namespace iso
 		 *	*srcfile	- Path and filename to the source file.
 		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 */
-		bool AddFileEntry(const char* id, int type, const std::filesystem::path& srcfile, const EntryAttributes& attributes);
+		bool AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes);
 
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.

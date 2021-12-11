@@ -3,6 +3,16 @@
 #include "cd.h"
 #include <string>
 
+enum class EntryType
+{
+	EntryFile,
+	EntryDir,
+	EntryXA,
+	EntryXA_DO,
+	EntryDA,
+	EntryDummy
+};
+
 // Helper functions for datestamp manipulation
 cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
 
