@@ -363,7 +363,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 }
 
-void WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement*& dirElement, std::filesystem::path& currentVirtualPath,
+tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement* dirElement, std::filesystem::path* currentVirtualPath,
 	const std::filesystem::path& sourcePath)
 {
 	tinyxml2::XMLElement* newelement;
@@ -385,7 +385,10 @@ void WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement*&
 		}
 
 		dirElement = newelement;
-		currentVirtualPath /= entry.identifier;
+		if (currentVirtualPath != nullptr)
+		{
+			*currentVirtualPath /= entry.identifier;
+		}
     }
 	else
 	{
@@ -407,14 +410,17 @@ void WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement*&
 		}
 	}
 	WriteOptionalXMLAttribs(newelement, entry, entryType);
+	return dirElement;
 }
 
-void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath)
+void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, bool onlyDA)
 {
 	std::filesystem::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
 
 	for (const auto& entry : files)
 	{
+		if (onlyDA && GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) != EntryType::EntryDA) continue;
+
 		// Work out the relative position between the current directory and the element to create
 		const std::filesystem::path relative = entry.virtualPath.lexically_relative(currentVirtualPath);
 		for (const std::filesystem::path& part : relative)
@@ -439,7 +445,24 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 			currentVirtualPath /= part;
 		}
 
-		WriteXMLEntry(entry, dirElement, currentVirtualPath, sourcePath);
+		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath);
+	}
+}
+
+// Writes all entries BUT DA! Those must not be "pretty printed"
+void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath)
+{
+	for (const auto& e : directory->dirEntryList.GetView())
+	{
+		const auto& entry = e.get();
+		if (GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA) continue;
+		
+		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath);
+		// Recursively write children if there are any
+		if (const cd::IsoDirEntries* subdir = entry.subdir.get(); subdir != nullptr)
+		{
+			WriteXMLByDirectories(subdir, child, sourcePath);
+		}
 	}
 }
 
@@ -550,15 +573,21 @@ void ParseISO(cd::IsoReader& reader) {
 					(param::outPath / "license_data.dat").lexically_proximate(param::xmlFile.parent_path()).generic_u8string().c_str());
 			}
 
+			const std::filesystem::path sourcePath = param::outPath.lexically_proximate(param::xmlFile.parent_path());
+
 			// TODO: Commandline switch
 			bool preserveLBA = true;
 			if (preserveLBA)
 			{
-				WriteXMLByLBA(entries, trackElement, param::outPath.lexically_proximate(param::xmlFile.parent_path()));
+				WriteXMLByLBA(entries, trackElement, sourcePath, false);
 			}
 			else
 			{
-			
+				// All this to get contents of a "root dir"...
+				WriteXMLByDirectories(rootDir->dirEntryList.GetView().front().get().subdir.get(), trackElement, sourcePath);
+
+				// Write DAs by LBA
+				WriteXMLByLBA(entries, trackElement, sourcePath, true);
 			}
 
 			xmldoc.SaveFile(file);
