@@ -867,7 +867,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 	// Calculate directory tree LBAs and retrieve size of image
 	int pathTableLen = dirTree->CalculatePathTableLen(root);
 
-	const int rootLBA = 17+(((pathTableLen+2047)/2048)*4);
+	const int rootLBA = 17+(GetSizeInSectors(pathTableLen)*4);
 	int totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
@@ -978,7 +978,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 	}
 
 	// Write padding which will be written with proper data later on
-	for ( int i=0; i<18+(((dirTree->CalculatePathTableLen(root)+2047)/2048)*4); i++ )
+	for ( int i=0; i<18+(GetSizeInSectors(dirTree->CalculatePathTableLen(root))*4); i++ )
 	{
 		char buff[2048];
 		memset( buff, 0x00, 2048 );

@@ -20,6 +20,8 @@ cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
 cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
 std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src);
 
+uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize = 2048);
+
 // Endianness swap
 unsigned short SwapBytes16(unsigned short val);
 unsigned int SwapBytes32(unsigned int val);

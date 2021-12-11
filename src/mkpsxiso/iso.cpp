@@ -539,7 +539,7 @@ void iso::DirTreeClass::PrintRecordPath()
 int iso::DirTreeClass::CalculateTreeLBA(int lba)
 {
 	bool passedSector = false;
-	lba += CalculateDirEntryLen(&passedSector) / 2048;
+	lba += GetSizeInSectors(CalculateDirEntryLen(&passedSector));
 
 	if ( ( global::NoLimit == false) && passedSector )
 	{
@@ -565,22 +565,22 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 				entry.subdir->name = entry.id;
 			}
 
-			lba += entry.subdir->CalculateDirEntryLen() / 2048;
+			lba += GetSizeInSectors(entry.subdir->CalculateDirEntryLen());
 		}
 		else
 		{
 			// Increment LBA by the size of file
 			if ( entry.type == EntryType::EntryFile || entry.type == EntryType::EntryXA_DO || entry.type == EntryType::EntryDummy )
 			{
-				lba += (entry.length+2047)/2048;
+				lba += GetSizeInSectors(entry.length, 2048);
 			}
 			else if ( entry.type == EntryType::EntryXA )
 			{
-				lba += (entry.length+2335)/2336;
+				lba += GetSizeInSectors(entry.length, 2336);
 			}
 			else if ( entry.type == EntryType::EntryDA )
 			{
-				lba += ((entry.length+2351)/2352);
+				lba += GetSizeInSectors(entry.length, 2352);
 
 				// TODO: Configurable pregap
 				if (!firstDAWritten)
@@ -635,7 +635,7 @@ int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
 		*passedSector = true;
 	}
 
-	return 2048*((dirEntryLen+2047)/2048);
+	return 2048 * GetSizeInSectors(dirEntryLen);
 }
 
 void iso::DirTreeClass::SortDirectoryEntries()
@@ -682,7 +682,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		if (i == 0)
 		{
 			// Current
-			dirlen = 2048*((CalculateDirEntryLen()+2047)/2048);
+			dirlen = 2048 * GetSizeInSectors(CalculateDirEntryLen());
 
 			dirEntry->entrySize = cd::SetPair32( dirlen );
 			dirEntry->entryOffs = cd::SetPair32( dir.lba );
@@ -696,7 +696,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 			} else {
 				dirlen = CalculateDirEntryLen();
 			}
-			dirlen = 2048*((dirlen+2047)/2048);
+			dirlen = 2048 * GetSizeInSectors(dirlen);
 
 			dirEntry->entrySize = cd::SetPair32( dirlen );
 			dirEntry->entryOffs = cd::SetPair32( parentDir.lba );
@@ -750,15 +750,15 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 
 		if ( entry.type == EntryType::EntryXA )
 		{
-			length = 2048*((entry.length+2335)/2336);
+			length = 2048* GetSizeInSectors(entry.length, 2336);
 		}
 		else if ( entry.type == EntryType::EntryXA_DO )
 		{
-			length = 2048*((entry.length+2047)/2048);
+			length = 2048 * GetSizeInSectors(entry.length, 2048);
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
-			length = 2048*((entry.length+2351)/2352);
+			length = 2048 * GetSizeInSectors(entry.length, 2352);
 			lba += 150;
 		}
 		else
@@ -1216,7 +1216,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write size in sector units
 		if (entry.type != EntryType::EntryDir)
 		{
-			fprintf( fp, "%-10lld", ((entry.length+2047)/2048) );
+			fprintf( fp, "%-10u", GetSizeInSectors(entry.length) );
 		}
 		else
 		{
@@ -1476,8 +1476,8 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	}
 
 	const DirTreeClass* dirTree = root.subdir.get();
-	int pathTableLen = dirTree->CalculatePathTableLen(root);
-	int pathTableSectors = (pathTableLen+2047)/2048;
+	unsigned int pathTableLen = dirTree->CalculatePathTableLen(root);
+	unsigned int pathTableSectors = GetSizeInSectors(pathTableLen);
 
 	isoDescriptor.volumeSetSize = cd::SetPair16( 1 );
 	isoDescriptor.volumeSeqNumber = cd::SetPair16( 1 );
@@ -1490,7 +1490,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	isoDescriptor.rootDirRecord.entryOffs = cd::SetPair32(
 		18+(pathTableSectors*4) );
 	isoDescriptor.rootDirRecord.entrySize = cd::SetPair32(
-		2048*((dirTree->CalculateDirEntryLen()+2047)/2048) );
+		2048 * GetSizeInSectors(dirTree->CalculateDirEntryLen()) );
 	isoDescriptor.rootDirRecord.flags = 0x02;
 	isoDescriptor.rootDirRecord.volSeqNum = cd::SetPair16( 1 );
 	isoDescriptor.rootDirRecord.identifierLen = 1;

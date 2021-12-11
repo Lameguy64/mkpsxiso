@@ -188,7 +188,7 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 		entry.virtualPath = path;
         if (entry.entry.flags & 0x2)
 		{
-            entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, entry.entry.entrySize.lsb/2048, 
+            entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb), 
 				path / CleanIdentifier(entry.identifier));
         }
     }
@@ -196,13 +196,13 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 	return dirEntries;
 }
 
-std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, int offs, int sectors)
+std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, int offs)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
     dirEntries->ReadRootDir(&reader, offs);
 
 	auto& entry = dirEntries->dirEntryList.GetView().front().get();
-    entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, entry.entry.entrySize.lsb/2048, 
+    entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb), 
 		CleanIdentifier(entry.identifier));
 	
 	return dirEntries;
@@ -227,7 +227,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				// this is the data to be read 2336 bytes per sector, both if the file is an STR or XA,
 				// because the STR contains audio.
-				size_t sectorsToRead = (entry.entry.entrySize.lsb+2047)/2048;
+				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
 
 				int bytesLeft = 2336*sectorsToRead;
 
@@ -282,7 +282,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					return;
 				}
 
-				size_t sectorsToRead = (entry.entry.entrySize.lsb + 2047) / 2048;
+				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
 
 				size_t cddaSize = 2352 * sectorsToRead;
 				size_t bytesLeft = cddaSize;
@@ -523,8 +523,7 @@ void ParseISO(cd::IsoReader& reader) {
 	std::list<cd::IsoDirEntries::Entry> entries;
 	std::unique_ptr<cd::IsoDirEntries> rootDir = ParseRoot(reader,
 					ListView(entries),
-					descriptor.rootDirRecord.entryOffs.lsb,
-					descriptor.rootDirRecord.entrySize.lsb/2048);
+					descriptor.rootDirRecord.entryOffs.lsb);
 
 	// Sort files by LBA for "strict" output
 	entries.sort([](const auto& left, const auto& right)

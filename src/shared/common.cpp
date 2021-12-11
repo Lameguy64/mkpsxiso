@@ -96,6 +96,11 @@ std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src)
 	return result;
 }
 
+uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize)
+{
+	return static_cast<uint32_t>((size + (sectorSize - 1)) / sectorSize);
+}
+
 unsigned short SwapBytes16(unsigned short val)
 {
 	return  ((val & 0xFF) << 8) |
