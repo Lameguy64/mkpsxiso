@@ -45,6 +45,8 @@ namespace attrib
 	constexpr const char* COPYRIGHT = "copyright";
 	constexpr const char* CREATION_DATE = "creation_date";
 	constexpr const char* MODIFICATION_DATE = "modification_date";
+
+	constexpr const char* NUM_DUMMY_SECTORS = "sectors";
 }
 
 }

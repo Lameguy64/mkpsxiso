@@ -1190,7 +1190,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	}
 
 
-	dirTree->AddDummyEntry( atoi( dirElement->Attribute( "sectors" ) ), dummyType );
+	dirTree->AddDummyEntry( atoi( dirElement->Attribute(xml::attrib::NUM_DUMMY_SECTORS) ), dummyType );
 	return true;
 }
 

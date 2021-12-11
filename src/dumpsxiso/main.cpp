@@ -413,13 +413,44 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 	return dirElement;
 }
 
-void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, bool onlyDA)
+void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement)
+{
+	// TODO: Detect if gap needs checksums and reflect it accordingly here
+	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
+	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
+}
+
+void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath,
+	const unsigned int startLBA, const unsigned int sizeInSectors, const bool onlyDA)
 {
 	std::filesystem::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
+	unsigned int expectedLBA = startLBA;
 
 	for (const auto& entry : files)
 	{
-		if (onlyDA && GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) != EntryType::EntryDA) continue;
+		const bool isDA = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA;
+		if (onlyDA)
+		{
+			if (!isDA)
+			{
+				continue;
+			}
+		}
+		else
+		{
+			// Insert gaps if needed
+			// TODO: Tidy it up when audio pregaps are sorted, for now hack it around like this
+			if (isDA)
+			{
+				// Ignore pregap
+				expectedLBA += 150;
+			}
+			if (entry.entry.entryOffs.lsb > expectedLBA)
+			{
+				WriteXMLGap(entry.entry.entryOffs.lsb - expectedLBA, dirElement);
+			}
+			expectedLBA = entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb);
+		}
 
 		// Work out the relative position between the current directory and the element to create
 		const std::filesystem::path relative = entry.virtualPath.lexically_relative(currentVirtualPath);
@@ -446,6 +477,15 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 		}
 
 		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath);
+	}
+
+	// If there is a gap at the end, add it too
+	if (!onlyDA)
+	{
+		if (sizeInSectors > expectedLBA)
+		{
+			WriteXMLGap(sizeInSectors - expectedLBA, dirElement);
+		}
 	}
 }
 
@@ -578,7 +618,7 @@ void ParseISO(cd::IsoReader& reader) {
 			bool preserveLBA = true;
 			if (preserveLBA)
 			{
-				WriteXMLByLBA(entries, trackElement, sourcePath, false);
+				WriteXMLByLBA(entries, trackElement, sourcePath, descriptor.rootDirRecord.entryOffs.lsb, descriptor.volumeSize.lsb, false);
 			}
 			else
 			{
@@ -586,7 +626,7 @@ void ParseISO(cd::IsoReader& reader) {
 				WriteXMLByDirectories(rootDir->dirEntryList.GetView().front().get().subdir.get(), trackElement, sourcePath);
 
 				// Write DAs by LBA
-				WriteXMLByLBA(entries, trackElement, sourcePath, true);
+				WriteXMLByLBA(entries, trackElement, sourcePath, descriptor.rootDirRecord.entryOffs.lsb, descriptor.volumeSize.lsb, true);
 			}
 
 			xmldoc.SaveFile(file);
