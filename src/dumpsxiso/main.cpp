@@ -32,6 +32,7 @@ namespace param {
     std::filesystem::path outPath;
     std::filesystem::path xmlFile;
     bool outputSortedByDir = false;
+	bool    dumpWave = false;
 }
 
 template<size_t N>
@@ -127,7 +128,7 @@ void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, 
 
     while (bytesLeft > 0) {
 
-    	u_char copyBuff[2352]{};
+		u_char copyBuff[2352]{};
 
     	int bytesToRead = bytesLeft;
 
@@ -183,9 +184,8 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
 
 	while (left && ok) {
 
-    	u_char copyBuff[2352];
+		u_char copyBuff[2352]{};
 		int32_t pcm[channels * max_pcmframe_read];
-    	memset(copyBuff, 0, 2352);
 
 		size_t need = (left > max_pcmframe_read ? max_pcmframe_read : left);
 		size_t needBytes = need * (channels * (bps/8));
@@ -204,8 +204,11 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
     }
     }
 	ok &= FLAC__stream_encoder_finish(encoder); // closes outFile
-	fprintf(stderr, "encoding: %s\n", ok? "succeeded" : "FAILED");
-	fprintf(stderr, "   state: %s\n", FLAC__StreamEncoderStateString[FLAC__stream_encoder_get_state(encoder)]);
+	if(!ok)
+	{
+		fprintf(stderr, "encoding: %s\n", ok? "succeeded" : "FAILED");
+		fprintf(stderr, "   state: %s\n", FLAC__StreamEncoderStateString[FLAC__stream_encoder_get_state(encoder)]);
+	}
 
 writeFLACFile_cleanup:
 	FLAC__stream_encoder_delete(encoder);
@@ -450,10 +453,16 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
 				size_t cddaSize = 2352 * sectorsToRead;
 
-				writeWaveFile(outFile, reader, cddaSize, result);
-
-				fclose(outFile);
-				//writeFLACFile(outFile, reader, cddaSize, result)
+				if(!param::dumpWave)
+				{
+					// libflac closes outFile
+					writeFLACFile(outFile, reader, cddaSize, result);
+				}
+				else
+				{
+					writeWaveFile(outFile, reader, cddaSize, result);
+				    fclose(outFile);
+				}
 
 			}
 			else if (type == EntryType::EntryFile)
@@ -873,6 +882,7 @@ int Main(int argc, char *argv[])
 		"  -x <path>  - Specified destination directory of extracted files.\n"
 		"  -s <path>  - Outputs an MKPSXISO compatible XML script for later rebuilding.\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
+		"   -w        - Dump CDDA audio as WAVE instead of FLAC\n"
 		"  -h|--help  - Show this help text\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
@@ -909,6 +919,11 @@ int Main(int argc, char *argv[])
 			if (ParseArgument(args, "S", "sort-by-dir"))
 			{
 				param::outputSortedByDir = true;
+				continue;
+			}
+			if(ParseArgument(args, "w"))
+			{
+				param::dumpWave = true;
 				continue;
 			}
 
