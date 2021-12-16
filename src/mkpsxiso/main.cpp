@@ -301,6 +301,73 @@ int Main(int argc, char* argv[])
 			return EXIT_FAILURE;
 		}
 
+		// convert DA syntax
+		std::vector<std::array<std::string, 2>> audioTracksToAdd;
+		tinyxml2::XMLElement *modifyISO = xmlFile.FirstChildElement(xml::elem::ISO_PROJECT);
+		tinyxml2::XMLElement *modifyTrack = modifyISO->FirstChildElement(xml::elem::TRACK);
+
+		if(modifyTrack->Attribute("type", "data"))
+		{
+			tinyxml2::XMLElement *dt =  modifyTrack->FirstChildElement(xml::elem::DIRECTORY_TREE);
+			if(dt != nullptr)
+			{
+				std::list<tinyxml2::XMLElement *> toscan{dt};
+				while(toscan.size() > 0)
+				{
+					tinyxml2::XMLElement *scanElm = toscan.front();
+					toscan.pop_front();
+					if(strcmp(scanElm->Name(), "file") == 0)
+					{
+						if(scanElm->Attribute("type", "da"))
+						{
+							const char *trackid = scanElm->Attribute("trackid");
+							const char *source = scanElm->Attribute("source");
+							if((trackid != nullptr) && (source != nullptr))
+							{
+								printf( "ERROR: Cannot specify trackid and source at the same time\n ");
+			                    return EXIT_FAILURE;
+							}
+							if(source != nullptr)
+							{
+								std::string trackid = std::to_string(audioTracksToAdd.size()+2);
+
+								audioTracksToAdd.push_back({trackid, source});
+								tinyxml2::XMLElement *newtrack = xmlFile.NewElement("track");
+								newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
+
+								modifyISO->InsertAfterChild(modifyTrack, newtrack);
+								modifyTrack = newtrack;
+
+								scanElm->DeleteAttribute("source");
+								scanElm->SetAttribute("trackid", trackid.c_str());
+							}
+						}
+						continue;
+					}
+
+					// add children to scan
+					scanElm = scanElm->FirstChildElement();
+					while(scanElm != nullptr)
+					{
+						const char *source = scanElm->Attribute("name") ? scanElm->Attribute("name") : "unknown";
+						toscan.push_back(scanElm);
+						scanElm = scanElm->NextSiblingElement();
+					}
+				}
+			}
+		}
+
+		
+
+		if (FILE* file = OpenFile("out.xml", "w"); file != nullptr)
+		{
+			printf("Saving file\n");
+			xmlFile.SaveFile(file);
+			fclose(file);
+		}
+		return EXIT_FAILURE;
+        
+
 
 		// Check if cue_sheet attribute is specified
 		FILE*	cuefp = nullptr;
