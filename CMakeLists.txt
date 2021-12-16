@@ -26,6 +26,10 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/tinyxml2/tinyxml2.cpp)
 	message(FATAL_ERROR "The tinyxml2 directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/miniaudio/miniaudio.h)
+	message(FATAL_ERROR "The miniaudio directory is empty. Run 'git submodule update --init --recursive' to populate it.")
+endif()
+
 # Build tinyxml2. I didn't bother with tinyxml2's actual CMake integration
 # because it's far easier do do this. It is a single-file library after all.
 add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
@@ -46,6 +50,7 @@ add_executable(mkpsxiso
 	${mkpsxiso_dir}/iso.cpp
 	${mkpsxiso_dir}/main.cpp
 )
+target_include_directories(mkpsxiso PUBLIC "miniaudio")
 target_link_libraries(mkpsxiso tinyxml2 iso_shared)
 
 add_executable(dumpsxiso

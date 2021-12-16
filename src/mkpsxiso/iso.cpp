@@ -135,7 +135,7 @@ int iso::DirTreeClass::GetWavSize(const std::filesystem::path& wavFile)
 	return 2352*((WAV_Subchunk2.len+2351)/2352);
 }
 
-int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile, bool pregap)
+int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile)
 {
 	FILE *fp;
 	int waveLen;
@@ -162,16 +162,6 @@ int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem
 	{
 
 		// File must be a raw, pack it anyway
-		memset(buff, 0x00, CD_SECTOR_SIZE);
-
-		if ( pregap ) {
-
-			// Write pregap region
-			for ( int i=0; i<150; i++ ) {
-				writer->WriteBytesRaw(buff, CD_SECTOR_SIZE);
-			}
-
-		}
 
 		// Write data
 		fseek(fp, 0, SEEK_END);
@@ -267,16 +257,6 @@ int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem
 	}
 
 	waveLen = WAV_Subchunk2.len;
-
-	// Write pregap region
-	memset(buff, 0x00, CD_SECTOR_SIZE);
-	if ( pregap )
-	{
-		for ( int i=0; i<150; i++ )
-		{
-			writer->WriteBytesRaw(buff, CD_SECTOR_SIZE);
-		}
-	}
 
 	// Write data
 	while ( waveLen > 0 )
@@ -862,19 +842,9 @@ int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENT
 
 int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 {
-	bool firstDAWritten = false;
-
 	for ( const DIRENTRY& entry : entries )
 	{
-		// TODO: Configurable pregap
-		if ( ( entry.type == EntryType::EntryDA ) && firstDAWritten )
-		{
-			writer->SeekToSector( entry.lba-150 );
-		}
-		else
-		{
-			writer->SeekToSector( entry.lba );
-		}
+		writer->SeekToSector( entry.lba );
 
 		// Write files as regular data sectors
 		if ( entry.type == EntryType::EntryFile )
@@ -1036,7 +1006,9 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 			}
 
 			// TODO: Configurable pregap
-			if ( PackWaveFile( writer, entry.srcfile, true/*!firstDAWritten*/ ) )
+			writer->WriteBlankSectors(150);
+
+			if ( PackWaveFile( writer, entry.srcfile) )
 			{
 				if (!global::QuietMode)
 				{
@@ -1145,18 +1117,10 @@ int iso::DirTreeClass::WriteCueEntries(FILE* fp, int* trackNum) const
 			fprintf( fp, "  TRACK %02d AUDIO\n", *trackNum );
 
 			int trackLBA = entry.lba;
-
-			// TODO: Configurable pregap?
-			/*if ( *trackNum == 2 )
-			{
-				fprintf( fp, "    PREGAP 00:02:00\n" );
-			}
-			else*/
-			{
-				fprintf( fp, "    INDEX 00 %02d:%02d:%02d\n",
+            // TODO: Configurable pregap?
+			fprintf( fp, "    INDEX 00 %02d:%02d:%02d\n",
 					(trackLBA/75)/60, (trackLBA/75)%60,
 					trackLBA%75 );
-			}
 
 			trackLBA += 150;
 

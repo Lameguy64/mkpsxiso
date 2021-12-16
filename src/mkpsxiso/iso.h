@@ -112,7 +112,7 @@ namespace iso
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
 
 		int GetWavSize(const std::filesystem::path& wavFile);
-		int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile, bool pregap);
+		int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile);
 		
 	public:
 

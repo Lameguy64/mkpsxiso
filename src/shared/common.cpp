@@ -1,4 +1,5 @@
 #include "common.h"
+#include "platform.h"
 #include <iterator>
 #include <memory>
 #include <cstring>
@@ -113,4 +114,9 @@ unsigned int SwapBytes32(unsigned int val)
 			((val & 0xFF00) << 8) |
 			((val & 0xFF0000) >> 8) |
 			((val & 0xFF000000) >> 24);
+}
+
+unique_file OpenScopedFile(const std::filesystem::path& path, const char* mode)
+{
+	return unique_file { OpenFile(path, mode) };
 }

@@ -56,7 +56,8 @@ class IsoWriter {
 
 		size_t	WriteBytes(void* data, size_t bytes, int edcEccEncode);
 		size_t	WriteBytesXA(void* data, size_t bytes, int edcEccEncode);
-		size_t	WriteBytesRaw(void* data, size_t bytes);
+		size_t	WriteBytesRaw(const void* data, size_t bytes);
+		size_t  WriteBlankSectors(const size_t count);
 
 		void	Close();
 
