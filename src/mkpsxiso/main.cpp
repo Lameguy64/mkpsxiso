@@ -37,6 +37,8 @@ namespace global
 
 	std::optional<std::filesystem::path> cuefile;
 	int			NoIsoGen = false;
+	std::filesystem::path RebuildXMLScript;
+	bool        JustRebuildXML = false;
 };
 
 
@@ -72,6 +74,7 @@ int Main(int argc, char* argv[])
 		"              (To be used with -lba or -lbahead without generating ISO).\n"
 		"  -noxa     - Do not generate CD-XA file attributes\n"
 		"              (XA data can still be included but not recommended).\n"
+		"  -rebuildxml - Rebuild the XML using our newest schema\n"
 		"  -h|--help - Show this help text\n";
 
 	static constexpr const char* VERSION_TEXT = 
@@ -123,6 +126,11 @@ int Main(int argc, char* argv[])
 				global::ImageName = *output;
 				OutputOverride = true;
 				continue;
+			}
+			if (auto newxmlfile = ParsePathArgument(args, "rebuildxml"); newxmlfile.has_value())
+			{
+				global::RebuildXMLScript = *newxmlfile;
+				global::JustRebuildXML = true;
 			}
 			if (ParseArgument(args, "y"))
 			{
@@ -205,6 +213,81 @@ int Main(int argc, char* argv[])
 			return EXIT_FAILURE;
 		}
     }
+
+	// Fix XML tree to our current spec
+	// convert DA file source syntax to DA file trackid syntax
+	unsigned trackindex = 2;
+	for(tinyxml2::XMLElement *modifyProject = xmlFile.FirstChildElement(xml::elem::ISO_PROJECT); modifyProject != nullptr; modifyProject = modifyProject->NextSiblingElement(xml::elem::ISO_PROJECT))
+	{
+		tinyxml2::XMLElement *modifyTrack = modifyProject->FirstChildElement(xml::elem::TRACK);
+		if((modifyTrack == nullptr) || (!modifyTrack->Attribute("type", "data")))
+		{
+			continue;
+		}
+		tinyxml2::XMLElement *dt =  modifyTrack->FirstChildElement(xml::elem::DIRECTORY_TREE);
+		if(dt == nullptr)
+		{
+			continue;
+		}
+		std::list<tinyxml2::XMLElement *> toscan{dt};
+		while(toscan.size() > 0)
+		{
+			tinyxml2::XMLElement *scanElm = toscan.front();
+			toscan.pop_front();
+			if(strcmp(scanElm->Name(), "file") == 0)
+			{
+				if(scanElm->Attribute("type", "da"))
+				{
+					const char *trackid = scanElm->Attribute("trackid");
+					const char *source = scanElm->Attribute("source");
+					if((trackid != nullptr) && (source != nullptr))
+					{
+						printf( "ERROR: Cannot specify trackid and source at the same time\n ");
+		                return EXIT_FAILURE;
+					}
+					if(source != nullptr)
+					{
+						std::string trackid = std::to_string(trackindex);
+						trackindex++;
+
+                        // add a new track
+						tinyxml2::XMLElement *newtrack = xmlFile.NewElement("track");
+						newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
+						newtrack->SetAttribute("trackid", trackid.c_str());
+						newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, source);
+						tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement("pregap");
+						pregap->SetAttribute("duration", "00:02:00");
+						modifyProject->InsertAfterChild(modifyTrack, newtrack);
+						modifyTrack = newtrack;
+                        
+						// update the file to point to the track
+						scanElm->DeleteAttribute("source");
+						scanElm->SetAttribute("trackid", trackid.c_str());
+					}
+				}
+				continue;
+			}
+
+			// add children to scan
+			scanElm = scanElm->FirstChildElement();
+			while(scanElm != nullptr)
+			{
+				const char *source = scanElm->Attribute("name") ? scanElm->Attribute("name") : "unknown";
+				toscan.push_back(scanElm);
+				scanElm = scanElm->NextSiblingElement();
+			}
+		}
+	}
+
+	if(global::JustRebuildXML)
+	{
+		if (FILE* file = OpenFile(global::RebuildXMLScript, "w"); file != nullptr)
+	    {
+	    	xmlFile.SaveFile(file);
+	    	fclose(file);
+	    }
+	    return EXIT_FAILURE;
+	}
 
 	// Check if there is an <iso_project> element
     const tinyxml2::XMLElement* projectElement =
@@ -300,74 +383,6 @@ int Main(int argc, char* argv[])
 			printf( "ERROR: At least one <track> element must be specified.\n" );
 			return EXIT_FAILURE;
 		}
-
-		// convert DA syntax
-		std::vector<std::array<std::string, 2>> audioTracksToAdd;
-		tinyxml2::XMLElement *modifyISO = xmlFile.FirstChildElement(xml::elem::ISO_PROJECT);
-		tinyxml2::XMLElement *modifyTrack = modifyISO->FirstChildElement(xml::elem::TRACK);
-
-		if(modifyTrack->Attribute("type", "data"))
-		{
-			tinyxml2::XMLElement *dt =  modifyTrack->FirstChildElement(xml::elem::DIRECTORY_TREE);
-			if(dt != nullptr)
-			{
-				std::list<tinyxml2::XMLElement *> toscan{dt};
-				while(toscan.size() > 0)
-				{
-					tinyxml2::XMLElement *scanElm = toscan.front();
-					toscan.pop_front();
-					if(strcmp(scanElm->Name(), "file") == 0)
-					{
-						if(scanElm->Attribute("type", "da"))
-						{
-							const char *trackid = scanElm->Attribute("trackid");
-							const char *source = scanElm->Attribute("source");
-							if((trackid != nullptr) && (source != nullptr))
-							{
-								printf( "ERROR: Cannot specify trackid and source at the same time\n ");
-			                    return EXIT_FAILURE;
-							}
-							if(source != nullptr)
-							{
-								std::string trackid = std::to_string(audioTracksToAdd.size()+2);
-
-								audioTracksToAdd.push_back({trackid, source});
-								tinyxml2::XMLElement *newtrack = xmlFile.NewElement("track");
-								newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
-
-								modifyISO->InsertAfterChild(modifyTrack, newtrack);
-								modifyTrack = newtrack;
-
-								scanElm->DeleteAttribute("source");
-								scanElm->SetAttribute("trackid", trackid.c_str());
-							}
-						}
-						continue;
-					}
-
-					// add children to scan
-					scanElm = scanElm->FirstChildElement();
-					while(scanElm != nullptr)
-					{
-						const char *source = scanElm->Attribute("name") ? scanElm->Attribute("name") : "unknown";
-						toscan.push_back(scanElm);
-						scanElm = scanElm->NextSiblingElement();
-					}
-				}
-			}
-		}
-
-		
-
-		if (FILE* file = OpenFile("out.xml", "w"); file != nullptr)
-		{
-			printf("Saving file\n");
-			xmlFile.SaveFile(file);
-			fclose(file);
-		}
-		return EXIT_FAILURE;
-        
-
 
 		// Check if cue_sheet attribute is specified
 		FILE*	cuefp = nullptr;
