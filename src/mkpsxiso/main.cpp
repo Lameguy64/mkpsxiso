@@ -220,7 +220,7 @@ int Main(int argc, char* argv[])
 	for(tinyxml2::XMLElement *modifyProject = xmlFile.FirstChildElement(xml::elem::ISO_PROJECT); modifyProject != nullptr; modifyProject = modifyProject->NextSiblingElement(xml::elem::ISO_PROJECT))
 	{
 		tinyxml2::XMLElement *modifyTrack = modifyProject->FirstChildElement(xml::elem::TRACK);
-		if((modifyTrack == nullptr) || (!modifyTrack->Attribute("type", "data")))
+		if((modifyTrack == nullptr) || (!modifyTrack->Attribute(xml::attrib::TRACK_TYPE, "data")))
 		{
 			continue;
 		}
@@ -234,12 +234,12 @@ int Main(int argc, char* argv[])
 		{
 			tinyxml2::XMLElement *scanElm = toscan.front();
 			toscan.pop_front();
-			if(strcmp(scanElm->Name(), "file") == 0)
+			if(strcmp(scanElm->Name(), xml::elem::FILE) == 0)
 			{
-				if(scanElm->Attribute("type", "da"))
+				if(scanElm->Attribute(xml::attrib::ENTRY_TYPE, "da"))
 				{
-					const char *trackid = scanElm->Attribute("trackid");
-					const char *source = scanElm->Attribute("source");
+					const char *trackid = scanElm->Attribute(xml::attrib::TRACK_ID);
+					const char *source = scanElm->Attribute(xml::attrib::ENTRY_SOURCE);
 					if((trackid != nullptr) && (source != nullptr))
 					{
 						printf( "ERROR: Cannot specify trackid and source at the same time\n ");
@@ -251,18 +251,18 @@ int Main(int argc, char* argv[])
 						trackindex++;
 
                         // add a new track
-						tinyxml2::XMLElement *newtrack = xmlFile.NewElement("track");
+						tinyxml2::XMLElement *newtrack = xmlFile.NewElement(xml::elem::TRACK);
 						newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
-						newtrack->SetAttribute("trackid", trackid.c_str());
+						newtrack->SetAttribute(xml::attrib::TRACK_ID, trackid.c_str());
 						newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, source);
-						tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement("pregap");
-						pregap->SetAttribute("duration", "00:02:00");
+						tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
+						pregap->SetAttribute(xml::attrib::PREGAP_DURATION, "00:02:00");
 						modifyProject->InsertAfterChild(modifyTrack, newtrack);
 						modifyTrack = newtrack;
                         
 						// update the file to point to the track
-						scanElm->DeleteAttribute("source");
-						scanElm->SetAttribute("trackid", trackid.c_str());
+						scanElm->DeleteAttribute(xml::attrib::ENTRY_SOURCE);
+						scanElm->SetAttribute(xml::attrib::TRACK_ID, trackid.c_str());
 					}
 				}
 				continue;
@@ -272,7 +272,6 @@ int Main(int argc, char* argv[])
 			scanElm = scanElm->FirstChildElement();
 			while(scanElm != nullptr)
 			{
-				const char *source = scanElm->Attribute("name") ? scanElm->Attribute("name") : "unknown";
 				toscan.push_back(scanElm);
 				scanElm = scanElm->NextSiblingElement();
 			}
