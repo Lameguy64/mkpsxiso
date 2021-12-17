@@ -1208,6 +1208,49 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 				printf( "ERROR: DA audio file(s) specified but no CUE sheet specified.\n" );
 				return false;
 			}
+			const char *trackid = dirElement->Attribute(xml::attrib::TRACK_ID);
+			if ( trackid == nullptr )
+			{
+				printf( "ERROR: DA audio file(s) does not have an associated CDDA track [trackid]\n" );
+				return false;
+			}
+			// locate the node containing the tracks
+			const tinyxml2::XMLElement *isoElement;
+			for( const tinyxml2::XMLElement *parent = (tinyxml2::XMLElement *)dirElement->Parent(); ; parent = (tinyxml2::XMLElement *)parent->Parent())
+			{
+				if(parent == nullptr)
+				{
+					printf( "ERROR: locating DA file\n" );
+					return false;
+				}
+				if(strcmp(parent->Name(), xml::elem::ISO_PROJECT) == 0)
+				{
+					isoElement = parent;
+					break;
+				}
+			}
+			// locate the track with trackid
+			const tinyxml2::XMLElement *trackElement;
+			for(trackElement = isoElement->FirstChildElement(xml::elem::TRACK); ; trackElement->NextSiblingElement(xml::elem::TRACK))
+			{
+				if(trackElement == nullptr)
+				{
+					printf( "ERROR: locating DA file\n" );
+					return false;
+				}
+				if(trackElement->Attribute(xml::attrib::TRACK_TYPE, "audio") && trackElement->Attribute(xml::attrib::TRACK_ID, trackid))
+				{
+					break;
+				}
+			}
+			// set the src file to the trackid source
+			sourceElement = trackElement->Attribute(xml::attrib::TRACK_SOURCE);
+			if(sourceElement == nullptr)
+			{
+				printf( "ERROR: locating DA file\n" );
+				return false;
+			}
+			srcFile = std::filesystem::u8path(sourceElement);
 			found_da = true;
 		}
 		else
