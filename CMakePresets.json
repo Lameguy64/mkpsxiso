@@ -1,0 +1,28 @@
+{
+	"version": 2,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 20,
+		"patch": 0
+	},
+	"configurePresets": [
+		{
+			"name":        "default",
+			"displayName": "Default configuration",
+			"description": "Use this preset when building mkpsxiso for local installation.",
+			"generator":   "Ninja",
+			"binaryDir":   "${sourceDir}/build"
+		},
+		{
+			"name":        "ci",
+			"displayName": "CI build",
+			"description": "This preset is used by GitHub Actions to build mkpsxiso.",
+			"generator":   "Ninja",
+			"binaryDir":   "${sourceDir}/../build",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"BUILD_INFO":       "Built by GitHub Actions ($env{GITHUB_REF_NAME} $env{GITHUB_SHA})"
+			}
+		}
+	]
+}
