@@ -35,6 +35,8 @@ endif()
 add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
 target_include_directories(tinyxml2 PUBLIC tinyxml2)
 
+## Internal dependencies
+
 # Populate shared files
 add_library(iso_shared OBJECT
 	${shared_dir}/common.cpp
@@ -44,6 +46,7 @@ target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
 
 ## Executables
+
 add_executable(mkpsxiso
 	${mkpsxiso_dir}/cdwriter.cpp
 	${mkpsxiso_dir}/edcecc.cpp
@@ -59,6 +62,35 @@ add_executable(dumpsxiso
 )
 target_link_libraries(dumpsxiso tinyxml2 iso_shared)
 
+## Installation
+
 install(TARGETS mkpsxiso dumpsxiso)
 
 include(InstallRequiredSystemLibraries)
+
+## CPack (used by GitHub Actions to package releases)
+
+if(NOT DEFINED CPACK_GENERATOR)
+	if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+		set(CPACK_GENERATOR ZIP DEB RPM)
+	else()
+		set(CPACK_GENERATOR ZIP)
+	endif()
+endif()
+
+set(CPACK_VERBATIM_VARIABLES        ON)
+set(CPACK_ARCHIVE_THREADS           0)
+set(CPACK_PACKAGE_DIRECTORY         ${PROJECT_BINARY_DIR}/packages)
+set(CPACK_PACKAGE_NAME              mkpsxiso)
+set(CPACK_PACKAGE_VENDOR            Lameguy64)
+set(CPACK_PACKAGE_CONTACT           Lameguy64)
+set(CPACK_RESOURCE_FILE_README      ${PROJECT_SOURCE_DIR}/README.md)
+set(CPACK_RESOURCE_FILE_LICENSE     ${PROJECT_SOURCE_DIR}/LICENSE.md)
+#set(CPACK_PACKAGE_ICON              ${PROJECT_SOURCE_DIR}/icon.ico)
+set(CPACK_PACKAGE_INSTALL_DIRECTORY mkpsxiso)
+
+set(CPACK_DEBIAN_PACKAGE_DEPENDS  "libc6 (>= 2.28)")
+set(CPACK_DEBIAN_PACKAGE_SECTION  devel)
+#set(CPACK_RPM_PACKAGE_RELOCATABLE ON)
+
+include(CPack)

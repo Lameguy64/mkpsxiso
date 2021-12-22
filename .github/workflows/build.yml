@@ -51,7 +51,7 @@ jobs:
     - name: Install prerequisites
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y --no-install-recommends ninja-build
+        sudo apt-get install -y --no-install-recommends build-essential ninja-build
 
     - name: Fetch repo contents
       uses: actions/checkout@v2
@@ -85,17 +85,6 @@ jobs:
     needs:   [ build-windows, build-linux ]
 
     steps:
-    #- name: Fetch repo contents
-    #  if:   ${{ github.ref_type == 'tag' }}
-    #  uses: actions/checkout@v2
-    #  with:
-    #    path: mkpsxiso
-
-    #- name: Generate release notes
-    #  if:   ${{ github.ref_type == 'tag' }}
-    #  run: |
-    #    python3 mkpsxiso/.github/scripts/generate_release_notes.py -v ${{ github.ref_name }} -o release.md mkpsxiso/CHANGELOG.md
-
     - name: Fetch build artifacts
       if:   ${{ github.ref_type == 'tag' }}
       uses: actions/download-artifact@v2
@@ -107,7 +96,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         fail_on_unmatched_files: true
-        #body_path:               release.md
+        #generate_release_notes:  true
         files: |
           *.zip
           mkpsxiso-windows/*
