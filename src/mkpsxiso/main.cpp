@@ -18,6 +18,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 #include "miniaudio_pcm.h"
+#include "miniaudio_helpers.h"
 
 
 namespace global
@@ -46,16 +47,6 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath);
 
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
-
-// Helper wrapper to simplify dealing with paths on Windows
-ma_result ma_decoder_init_path(const std::filesystem::path& pFilePath, const ma_decoder_config* pConfig, ma_decoder* pDecoder)
-{
-#ifdef _WIN32
-	return ma_decoder_init_file_w(pFilePath.c_str(), pConfig, pDecoder);
-#else
-	return ma_decoder_init_file(pFilePath.c_str(), pConfig, pDecoder);
-#endif
-}
 
 int Main(int argc, char* argv[])
 {
@@ -1392,101 +1383,15 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 	return true;
 }
 
-typedef enum {
-	DAF_WAV,
-	DAF_FLAC,
-	DAF_MP3,
-	DAF_PCM
-} DecoderAudioFormats;
-
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile)
 {
 	// open the decoder
-    ma_decoder decoder;	
-	ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_s16, 2, 44100);	
-	bool isLossy = false;
-	long pcmBytesLeft;
-
-    DecoderAudioFormats tryorder[4] = {DAF_WAV, DAF_FLAC, DAF_MP3, DAF_PCM};
-	const auto& extension = audioFile.extension().u8string();
-
-	// determine which format to try based on magic numbers
-	bool magicvalid = false;
-	char magic[12];
-	{
-		auto file = OpenScopedFile(audioFile, "rb");
-		if(file)
-		{
-			magicvalid = (fread(magic, 12, 1, file.get()) == 1);
-		}
-	}
-	if(magicvalid && (memcmp(magic, "RIFF", 4) == 0) && (memcmp(&magic[8], "WAVE", 4) == 0))
-	{
-		// it's wave, default try order is good
-	}
-	else if(magicvalid && (memcmp(magic, "fLaC", 4) == 0))
-	{
-		tryorder[0] = DAF_FLAC;
-		tryorder[1] = DAF_WAV;
-	}
-	//fallback - determine which format to try based on file extension
-	else if(extension.size() >= 4)
-	{
-		//nothing to change if wav
-		if(CompareICase(extension.c_str(), ".flac") )
-		{
-			tryorder[0] = DAF_FLAC;
-			tryorder[1] = DAF_WAV;
-		}
-		else if(CompareICase(extension.c_str(), ".mp3") )
-		{
-			tryorder[0] = DAF_MP3;
-			tryorder[1] = DAF_WAV;
-			tryorder[2] = DAF_FLAC;
-		}
-		else if((CompareICase(extension.c_str(), ".pcm") ) || (CompareICase(extension.c_str(), ".raw") ))
-		{
-			tryorder[0] = DAF_PCM;
-			tryorder[1] = DAF_WAV;
-			tryorder[2] = DAF_FLAC;
-			tryorder[3] = DAF_MP3;
-		}
-	}
+    ma_decoder decoder;
 	VirtualWavEx vw;
-	const int num_tries = std::size(tryorder);
-	int i;
-	for(i = 0; i < num_tries; i++)
+	bool isLossy;
+	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy) != MA_SUCCESS)
 	{
-		if(tryorder[i] == DAF_WAV)
-		{
-	        decoderConfig.encodingFormat = ma_encoding_format_wav;
-	        if(MA_SUCCESS == ma_decoder_init_path(audioFile, &decoderConfig, &decoder)) break;				
-		}
-        else if(tryorder[i] == DAF_FLAC)
-		{
-	        decoderConfig.encodingFormat = ma_encoding_format_flac;
-	        if(MA_SUCCESS == ma_decoder_init_path(audioFile, &decoderConfig, &decoder)) break;
-		}
-		else if(tryorder[i] == DAF_MP3)
-		{
-	        decoderConfig.encodingFormat = ma_encoding_format_mp3;
-	        if(MA_SUCCESS == ma_decoder_init_path(audioFile, &decoderConfig, &decoder))
-	        {
-	        	isLossy = true;
-	        	break;
-	        }
-		}
-		else if(tryorder[i] == DAF_PCM)
-		{
-			printf("\n    WARN: Guessing it's just signed 16 bit stereo @ 44100 kHz pcm audio\n");
-			if(MA_SUCCESS == ma_decoder_init_path_pcm(audioFile, &decoderConfig, &decoder, &vw)) break;
-		}
-	}
-	if(i == num_tries)
-	{
-		// no more formats to try, return false
-	    printf("    ERROR: No valid format found\n");
-	    return false;	
+		return 0;
 	}
 
     //  note if there's some data converting going on

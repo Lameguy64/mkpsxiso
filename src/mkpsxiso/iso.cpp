@@ -4,6 +4,7 @@
 #include "cd.h"
 #include "xa.h"
 #include "platform.h"
+#include "miniaudio_helpers.h"
 
 #include <algorithm>
 #include <cstring>
@@ -55,84 +56,26 @@ static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 	return result;
 }
 
-int iso::DirTreeClass::GetWavSize(const std::filesystem::path& wavFile)
+int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
 {
-	FILE *fp;
-
-	if ( !( fp = OpenFile( wavFile, "rb" ) ) )
+	ma_decoder decoder;
+	VirtualWavEx vw;
+	bool isLossy;
+	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy) != MA_SUCCESS)
 	{
-		printf("ERROR: File not found.\n");
-		return false;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		char	format[4];
-	} HeaderChunk;
-
-	fread( &HeaderChunk, 1, sizeof(HeaderChunk), fp );
-
-	if ( memcmp( &HeaderChunk.id, "RIFF", 4 ) ||
-		memcmp( &HeaderChunk.format, "WAVE", 4 ) )
-	{
-		// It must be a raw
-		fseek(fp, 0, SEEK_END);
-		int wavlen = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-
-		fclose( fp );
-		return wavlen;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		short	format;
-		short	chan;
-		int		freq;
-		int		brate;
-		short	balign;
-		short	bps;
-	} WAV_Subchunk1;
-
-	fread( &WAV_Subchunk1, 1, sizeof(WAV_Subchunk1), fp );
-
-	// Check if its a valid WAVE file
-	if ( memcmp( &WAV_Subchunk1.id, "fmt ", 4 ) )
-	{
-		fclose( fp );
 		return 0;
 	}
 
-	// Search for the data chunk
-	struct
+	const ma_uint64 expectedPCMFrames = ma_decoder_get_length_in_pcm_frames(&decoder);
+    if(expectedPCMFrames == 0)
 	{
-		char	id[4];
-		int		len;
-	} WAV_Subchunk2;
-
-	while ( 1 )
-	{
-		fread( &WAV_Subchunk2, 1, sizeof(WAV_Subchunk2), fp );
-
-		if ( memcmp( &WAV_Subchunk2.id, "data", 4 ) )
-		{
-			fseek( fp, WAV_Subchunk2.len, SEEK_CUR );
-		}
-		else
-		{
-			break;
-		}
+		printf("\n    ERROR: corrupt file? unable to get_length_in_pcm_frames\n");
+		ma_decoder_uninit(&decoder);
+        return 0;
 	}
 
-	fclose( fp );
-
-	return 2352*((WAV_Subchunk2.len+2351)/2352);
+    ma_decoder_uninit(&decoder);
+	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), 2352);
 }
 
 int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile)
@@ -412,7 +355,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::
 
 	if ( type == EntryType::EntryDA )
 	{
-		entry.length = GetWavSize( srcfile );
+		entry.length = GetAudioSize( srcfile );
 	}
 	else if ( type != EntryType::EntryDir )
 	{

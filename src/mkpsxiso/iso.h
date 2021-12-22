@@ -111,7 +111,7 @@ namespace iso
 		/// Internal function for recursive path table generation
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
 
-		int GetWavSize(const std::filesystem::path& wavFile);
+		int GetAudioSize(const std::filesystem::path& audioFile);
 		int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile);
 		
 	public:
