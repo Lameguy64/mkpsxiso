@@ -27,9 +27,6 @@ namespace param {
     std::filesystem::path isoFile;
     std::filesystem::path outPath;
     std::filesystem::path xmlFile;
-
-    int		printOnly=false;
-
 }
 
 template<size_t N>
@@ -637,68 +634,63 @@ void ParseISO(cd::IsoReader& reader) {
 
 int Main(int argc, char *argv[])
 {
-    printf("DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n");
-    printf("2017 Meido-Tek Productions (Lameguy64)\n");
-    printf("2020 Phoenix (SadNES cITy)\n");
-    printf("2021 Silent and Chromaryu\n\n");
+	static constexpr const char* HELP_TEXT =
+		"dumpsxiso [-h|--help] [-x <path>] [-s <path>] <isofile>\n\n"
+		"  <isofile>  - File name of ISO file (supports any 2352 byte/sector images).\n"
+		"  -x <path>  - Specified destination directory of extracted files.\n"
+		"  -s <path>  - Outputs an MKPSXISO compatible XML script for later rebuilding.\n"
+		"  -h|--help  - Show this help text\n";
 
-	if (argc == 1) {
+    printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
+			"2017 Meido-Tek Productions (Lameguy64)\n"
+			"2020 Phoenix (SadNES cITy)\n"
+			"2021 Silent and Chromaryu\n\n" );
 
-		printf("Usage:\n\n");
-		printf("   dumpsxiso <isofile> [-x <path>]\n\n");
-		printf("   <isofile>   - File name of ISO file (supports any 2352 byte/sector images).\n");
-		printf("   [-x <path>] - Specified destination directory of extracted files.\n");
-		printf("   [-s <path>] - Outputs an MKPSXISO compatible XML script for later rebuilding.\n");
-
+	if (argc == 1)
+	{
+		printf(HELP_TEXT);
 		return EXIT_SUCCESS;
 	}
 
-
-    for(int i=1; i<argc; i++) {
-
+	for (char** args = argv+1; *args != nullptr; args++)
+	{
 		// Is it a switch?
-        if (argv[i][0] == '-') {
-
-			// Directory path
-            if (strcmp("x", &argv[i][1]) == 0) {
-
-                param::outPath = std::filesystem::u8path(argv[i+1]).lexically_normal();
-
-                i++;
-
-            } else if (strcmp("s", &argv[i][1]) == 0) {
-
-                param::xmlFile = std::filesystem::u8path(argv[i+1]);
-                i++;
-
-            } else if (strcmp("p", &argv[i][1]) == 0) {
-
-            	param::printOnly = true;
-
-            } else {
-
-            	printf("Unknown parameter: %s\n", argv[i]);
-            	return EXIT_FAILURE;
-            }
-
-        } else {
-
-			if (param::isoFile.empty()) {
-
-				param::isoFile = std::filesystem::u8path(argv[i]);
-
-			} else {
-
-				printf("Only one iso file is supported.\n");
-				return EXIT_FAILURE;
+		if ((*args)[0] == '-')
+		{
+			if (ParseArgument(args, "h", "help"))
+			{
+				printf(HELP_TEXT);
+				return EXIT_SUCCESS;
+			}
+			if (auto outPath = ParsePathArgument(args, "x"); outPath.has_value())
+			{
+				param::outPath = outPath->lexically_normal();
+				continue;
+			}
+			if (auto xmlPath = ParsePathArgument(args, "s"); xmlPath.has_value())
+			{
+				param::xmlFile = *xmlPath;
+				continue;
 			}
 
-        }
+			// If we reach this point, an unknown parameter was passed
+			printf("Unknown parameter: %s\n", *args);
+			return EXIT_FAILURE;
+		}
 
-    }
+		if (param::isoFile.empty())
+		{
+			param::isoFile = std::filesystem::u8path(*args);
+		}
+		else
+		{
+			printf("Only one ISO file is supported.\n");
+			return EXIT_FAILURE;
+		}
+	}
 
-	if (param::isoFile.empty()) {
-
+	if (param::isoFile.empty())
+	{
 		printf("No iso file specified.\n");
 		return EXIT_FAILURE;
 	}

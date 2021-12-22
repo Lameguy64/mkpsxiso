@@ -36,7 +36,6 @@ namespace global
 	std::filesystem::path ImageName;
 
 	std::optional<std::filesystem::path> cuefile;
-	int			OutputOverride = false;
 	int			NoIsoGen = false;
 };
 
@@ -45,8 +44,6 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath);
 
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
-
-int compare( const char* a, const char* b );
 
 // Helper wrapper to simplify dealing with paths on Windows
 ma_result ma_decoder_init_path(const std::filesystem::path& pFilePath, const ma_decoder_config* pConfig, ma_decoder* pDecoder)
@@ -58,62 +55,95 @@ ma_result ma_decoder_init_path(const std::filesystem::path& pFilePath, const ma_
 #endif
 }
 
-
 int Main(int argc, char* argv[])
 {
+	static constexpr const char* HELP_TEXT =
+		"mkpsxiso [-h|--help] [-y] [-q|--quiet] [-o|--output <file>] [-lba <file>] [-lbahead <file>] [-nolimit]\n"
+		"  [-noisogen] <xml>\n\n"
+		"  -y        - Always overwrite ISO image files.\n"
+		"  -q|--quiet - Quiet mode (prints nothing but warnings and errors).\n"
+		"  -o|--output - Specifies output file name (overrides XML but not cue_sheet).\n"
+		"  <xml>     - File name of an ISO image project in XML document format.\n\n"
+		"Special Options:\n\n"
+		"  -lba      - Outputs a log of all files packed with LBA information.\n"
+		"  -lbahead  - Outputs a C header of all the file's LBA addresses.\n"
+		"  -nolimit  - Remove warning when a directory record exceeds a sector.\n"
+		"  -noisogen - Do not generate ISO but calculates file LBAs only\n"
+		"              (To be used with -lba or -lbahead without generating ISO).\n"
+		"  -noxa     - Do not generate CD-XA file attributes\n"
+		"              (XA data can still be included but not recommended).\n"
+		"  -h|--help - Show this help text\n";
+
+	static constexpr const char* VERSION_TEXT = 
+		"MKPSXISO " VERSION " - PlayStation ISO Image Maker\n"
+		"2017-2018 Meido-Tek Productions (Lameguy64)\n"
+		"2021 Silent, Chromaryu, and G4Vi\n\n";
+
+	bool OutputOverride = false;
+
 	// Parse arguments
-	for ( int i=1; i<argc; i++)
+	for (char** args = argv+1; *args != nullptr; args++)
 	{
-		if ( argv[i][0] == '-' )
+		// Is it a switch?
+		if ((*args)[0] == '-')
 		{
-			if ( compare( "-lbahead", argv[i] ) == 0 )
+			if (ParseArgument(args, "h", "help"))
 			{
-				i++;
-				global::LBAheaderFile = std::filesystem::u8path(argv[i]);
+				printf(VERSION_TEXT);
+				printf(HELP_TEXT);
+				return EXIT_SUCCESS;
 			}
-			else if ( compare( "-nolimit", argv[i] ) == 0 )
+			if (auto lbaHead = ParsePathArgument(args, "lbahead"); lbaHead.has_value())
+			{
+				global::LBAheaderFile = *lbaHead;
+				continue;
+			}
+			if (ParseArgument(args, "nolimit"))
 			{
 				global::NoLimit = true;
+				continue;
 			}
-			else if ( compare( "-noisogen", argv[i] ) == 0 )
+			if (ParseArgument(args, "noisogen"))
 			{
 				global::NoIsoGen = true;
+				continue;
 			}
-			else if ( compare( "-q", argv[i] ) == 0 )
+			if (ParseArgument(args, "q", "quiet"))
 			{
 				global::QuietMode = true;
+				continue;
 			}
-			else if ( compare( "-lba", argv[i] ) == 0 )
+			if (auto lbaFile = ParsePathArgument(args, "lba"); lbaFile.has_value())
 			{
-				i++;
-				global::LBAfile	= std::filesystem::u8path(argv[i]);
+				global::LBAfile	= *lbaFile;
+				continue;
 			}
-			else if ( compare( "-o", argv[i] ) == 0 )
+			if (auto output = ParsePathArgument(args, "o", "output"); output.has_value())
 			{
-				i++;
-				global::ImageName = std::filesystem::u8path(argv[i]);
-				global::OutputOverride = true;
+				global::ImageName = *output;
+				OutputOverride = true;
+				continue;
 			}
-			else if ( compare( "-y", argv[i] ) == 0 )
+			if (ParseArgument(args, "y"))
 			{
 				global::Overwrite = true;
+				continue;
 			}
-			else if ( compare( "-noxa", argv[i] ) == 0 )
+			if (ParseArgument(args, "noxa"))
 			{
 				global::noXA = true;
+				continue;
 			}
-			else
-			{
-				printf( "Unknown parameter: %s\n", argv[i] );
-				return EXIT_FAILURE;
-			}
-
+			
+			// If we reach this point, an unknown parameter was passed
+			printf("Unknown parameter: %s\n", *args);
+			return EXIT_FAILURE;
 		}
 		else
 		{
 			if ( global::XMLscript.empty() )
 			{
-				global::XMLscript = std::filesystem::u8path(argv[i]);
+				global::XMLscript = std::filesystem::u8path(*args);
 			}
 		}
 
@@ -121,36 +151,12 @@ int Main(int argc, char* argv[])
 
 	if ( (!global::QuietMode) || (argc == 1) )
 	{
-		printf( "MKPSXISO " VERSION " - PlayStation ISO Image Maker\n" );
-		printf( "2017-2018 Meido-Tek Productions (Lameguy64)\n" );
-		printf( "2021 Silent, Chromaryu, and G4Vi\n\n" );
+		printf(VERSION_TEXT);
 	}
 
 	if ( argc == 1 )
 	{
-		printf( "mkpsxiso [-y] [-q] [-o <file>] [-lba <file>] "
-			"[-lbahead <file>] [-nolimit]\n  [-noisogen] <xml>\n\n" );
-		printf( "  -y        - Always overwrite ISO image files.\n" );
-		printf( "  -q        - Quiet mode (prints nothing but warnings and "
-			"errors).\n" );
-		printf( "  -o        - Specifies output file name (overrides XML but "
-			"not cue_sheet).\n" );
-		printf( "  <xml>     - File name of an ISO image project in XML "
-			"document format.\n\n" );
-		printf( "Special Options:\n\n" );
-		printf( "  -lba      - Outputs a log of all files packed with LBA "
-			"information.\n" );
-		printf( "  -lbahead  - Outputs a C header of all the file's LBA "
-			"addresses.\n" );
-		printf( "  -nolimit  - Remove warning when a directory record exceeds "
-			"a sector.\n" );
-		printf( "  -noisogen - Do not generate ISO but calculates file "
-			"LBAs only\n" );
-		printf("              (To be used with -lba or -lbahead without "
-			"generating ISO).\n");
-		printf( "  -noxa     - Do not generate CD-XA file attributes\n" );
-		printf("              (XA data can still be included but "
-			"not recommended).\n");
+		printf(HELP_TEXT);
 		return EXIT_SUCCESS;
 	}
 
@@ -215,17 +221,13 @@ int Main(int argc, char* argv[])
 	// Build loop for XML scripts with multiple <iso_project> elements
 	while ( projectElement != nullptr )
 	{
-		if ( imagesCount == 1 )
-		{
-			if ( global::OutputOverride )
-			{
-				printf( "ERROR: -o switch cannot be used in multi-disc ISO "
-					"project.\n" );
-				return EXIT_FAILURE;
-			}
-		}
-
 		imagesCount++;
+		if ( imagesCount > 1 && OutputOverride )
+		{
+			printf( "ERROR: -o switch cannot be used in multi-disc ISO "
+				"project.\n" );
+			return EXIT_FAILURE;
+		}
 
 		// Check if image_name attribute is specified
 		if ( global::ImageName.empty() )
@@ -402,7 +404,7 @@ int Main(int argc, char* argv[])
 			}
 
 			// Generate ISO file system for data track
-			if ( compare( "data", track_type ) == 0 )
+			if ( CompareICase( "data", track_type ) == 0 )
 			{
 				if ( global::trackNum != 1 )
 				{
@@ -459,7 +461,7 @@ int Main(int argc, char* argv[])
 
 			// Add audio track
 			}
-			else if ( compare( "audio", track_type ) == 0 )
+			else if ( CompareICase( "audio", track_type ) == 0 )
 			{
 
 				// Only allow audio tracks if the cue_sheet attribute is specified
@@ -1104,16 +1106,16 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	const char* typeElement = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
 	if ( typeElement != nullptr )
 	{
-		if ( compare( "data", typeElement ) == 0 )
+		if ( CompareICase( "data", typeElement ) == 0 )
 		{
 			entry = EntryType::EntryFile;
-		} else if ( compare( "mixed", typeElement ) == 0 ||
-                    compare( "xa", typeElement ) == 0 || //alias xa and str to mixed
-                    compare( "str", typeElement ) == 0 )
+		} else if ( CompareICase( "mixed", typeElement ) == 0 ||
+                    CompareICase( "xa", typeElement ) == 0 || //alias xa and str to mixed
+                    CompareICase( "str", typeElement ) == 0 )
 		{
 			entry = EntryType::EntryXA;
 		}
-		else if ( compare( "da", typeElement ) == 0 )
+		else if ( CompareICase( "da", typeElement ) == 0 )
 		{
 			entry = EntryType::EntryDA;
 			if ( !global::cuefile )
@@ -1181,7 +1183,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	if ( type != nullptr )
 	{
 		// TODO: Make reasonable
-		if ( compare(type, "2336") == 0 )
+		if ( CompareICase(type, "2336") == 0 )
 		{
 			dummyType = 1; // XA
 		}
@@ -1240,21 +1242,21 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 {
 	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
-        if ( compare( "file", dirElement->Name() ) == 0 )
+        if ( CompareICase( "file", dirElement->Name() ) == 0 )
 		{
 			if (!ParseFileEntry(dirTree, dirElement, xmlPath, parentAttribs, found_da))
 			{
 				return false;
 			}
 		}
-		else if ( compare( "dummy", dirElement->Name() ) == 0 )
+		else if ( CompareICase( "dummy", dirElement->Name() ) == 0 )
 		{
 			if (!ParseDummyEntry(dirTree, dirElement, found_da))
 			{
 				return false;
 			}
         }
-		else if ( compare( "dir", dirElement->Name() ) == 0 )
+		else if ( CompareICase( "dir", dirElement->Name() ) == 0 )
 		{
 			if (!ParseDirEntry(dirTree, dirElement, xmlPath, parentAttribs, found_da))
 			{
@@ -1286,18 +1288,18 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
 	if(extension.size() >= 4)
 	{
 		//nothing to change if wav
-		if(compare(extension.c_str(), ".flac") == 0)
+		if(CompareICase(extension.c_str(), ".flac") == 0)
 		{
 			tryorder[0] = DAF_FLAC;
 			tryorder[1] = DAF_WAV;
 		}
-		else if(compare(extension.c_str(), ".mp3") == 0)
+		else if(CompareICase(extension.c_str(), ".mp3") == 0)
 		{
 			tryorder[0] = DAF_MP3;
 			tryorder[1] = DAF_WAV;
 			tryorder[2] = DAF_FLAC;
 		}
-		else if((compare(extension.c_str(), ".pcm") == 0) || (compare(extension.c_str(), ".raw") == 0))
+		else if((CompareICase(extension.c_str(), ".pcm") == 0) || (CompareICase(extension.c_str(), ".raw") == 0))
 		{
 			tryorder[0] = DAF_PCM;
 			tryorder[1] = DAF_WAV;
@@ -1385,22 +1387,4 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
 		return false;
 	}
     return true;   
-}	
-
-int compare( const char* a, const char* b )
-{
-	if ( strlen( a ) != strlen( b ) )
-	{
-		return 1;
-	}
-
-	for ( int i=0; a[i]!=0x00; i++ )
-	{
-		if ( std::tolower( a[i] ) != std::tolower( b[i] ) )
-		{
-			return 1;
-		}
-	}
-
-	return 0;
 }

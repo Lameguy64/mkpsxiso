@@ -120,3 +120,36 @@ unique_file OpenScopedFile(const std::filesystem::path& path, const char* mode)
 {
 	return unique_file { OpenFile(path, mode) };
 }
+
+bool CompareICase(std::string_view strLeft, std::string_view strRight)
+{
+	return std::equal(strLeft.begin(), strLeft.end(), strRight.begin(), strRight.end(), [](char left, char right)
+		{
+			return left == right || std::tolower(left) == std::tolower(right);
+		});
+}
+
+bool ParseArgument(char** argv, std::string_view command, std::string_view longCommand)
+{
+	const std::string_view arg(*argv);
+	// Try the long command first
+	if (!longCommand.empty() && arg.length() > 2 && arg[0] == '-' && arg[1] == '-' && CompareICase(arg.substr(2), longCommand))
+	{
+		return true;
+	}
+	if (!command.empty() && arg.length() > 1 && arg[0] == '-' && CompareICase(arg.substr(1), command))
+	{
+		return true;
+	}
+	return false;
+}
+
+std::optional<std::filesystem::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand)
+{
+	if (ParseArgument(argv, command, longCommand) && *(argv+1) != nullptr)
+	{
+		argv++;
+		return std::filesystem::u8path(*argv);
+	}
+	return std::nullopt;
+}

@@ -3,6 +3,7 @@
 #include "cd.h"
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 
 enum class EntryType
@@ -41,3 +42,9 @@ struct file_deleter
 };
 using unique_file = std::unique_ptr<FILE, file_deleter>;
 unique_file OpenScopedFile(const std::filesystem::path& path, const char* mode);
+
+bool CompareICase(std::string_view strLeft, std::string_view strRight);
+
+// Argument parsing
+bool ParseArgument(char** argv, std::string_view command, std::string_view longCommand = std::string_view{});
+std::optional<std::filesystem::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand = std::string_view{});
