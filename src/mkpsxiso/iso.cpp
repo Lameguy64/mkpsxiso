@@ -943,6 +943,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
+			continue;
 			if ( !global::QuietMode )
 			{
 				printf( "      Packing DA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );

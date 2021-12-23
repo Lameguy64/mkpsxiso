@@ -44,7 +44,7 @@ namespace global
 
 
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da);
-int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath);
+int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath);
 
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
 
@@ -501,7 +501,7 @@ int Main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 
-				if ( !ParseISOfileSystem( &writer, cuefp, trackElement, global::XMLscript.parent_path() ) )
+				if ( !ParseISOfileSystem( &writer, trackElement, global::XMLscript.parent_path() ) )
 				{
 					if ( !global::NoIsoGen )
 					{
@@ -518,6 +518,12 @@ int Main(int argc, char* argv[])
 					}
 
 					return EXIT_FAILURE;
+				}
+
+				if ( cuefp != nullptr )
+				{
+					fprintf( cuefp, "  TRACK %02d MODE2/2352\n", global::trackNum );
+					fprintf( cuefp, "    INDEX 01 00:00:00\n" );
 				}
 
 				if ( global::NoIsoGen )
@@ -723,7 +729,7 @@ iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement
 	return result;
 };
 
-int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath)
+int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath)
 {
 	const tinyxml2::XMLElement* identifierElement =
 		trackElement->FirstChildElement(xml::elem::IDENTIFIERS);
@@ -1012,14 +1018,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 		}
 	}
 
-	if ( cue_fp != nullptr )
-	{
-		fprintf( cue_fp, "  TRACK 01 MODE2/2352\n" );
-		fprintf( cue_fp, "    INDEX 01 00:00:00\n" );
-
-		dirTree->WriteCueEntries( cue_fp, &global::trackNum );
-	}
-
 	if ( global::NoIsoGen )
 	{
 		return true;
@@ -1222,7 +1220,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			}
 			// locate the track with trackid
 			const tinyxml2::XMLElement *trackElement;
-			for(trackElement = isoElement->FirstChildElement(xml::elem::TRACK); ; trackElement->NextSiblingElement(xml::elem::TRACK))
+			for(trackElement = isoElement->FirstChildElement(xml::elem::TRACK); ; trackElement = trackElement->NextSiblingElement(xml::elem::TRACK))
 			{
 				if(trackElement == nullptr)
 				{
