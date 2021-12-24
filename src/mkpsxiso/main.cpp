@@ -1282,10 +1282,31 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
 	ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_s16, 2, 44100);	
 	bool isLossy = false;
 	long pcmBytesLeft;
-	// determine which format to try based on file extension
+
     DecoderAudioFormats tryorder[4] = {DAF_WAV, DAF_FLAC, DAF_MP3, DAF_PCM};
 	const auto& extension = audioFile.extension().u8string();
-	if(extension.size() >= 4)
+
+	// determine which format to try based on magic numbers
+	bool magicvalid = false;
+	char magic[12];
+	{
+		auto file = OpenScopedFile(audioFile, "rb");
+		if(file)
+		{
+			magicvalid = (fread(magic, 12, 1, file.get()) == 1);
+		}
+	}
+	if(magicvalid && (memcmp(magic, "RIFF", 4) == 0) && (memcmp(&magic[8], "WAVE", 4) == 0))
+	{
+		// it's wave, default try order is good
+	}
+	else if(magicvalid && (memcmp(magic, "fLaC", 4) == 0))
+	{
+		tryorder[0] = DAF_FLAC;
+		tryorder[1] = DAF_WAV;
+	}
+	//fallback - determine which format to try based on file extension
+	else if(extension.size() >= 4)
 	{
 		//nothing to change if wav
 		if(CompareICase(extension.c_str(), ".flac") )
