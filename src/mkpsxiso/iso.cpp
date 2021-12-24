@@ -503,6 +503,9 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			}
 			else if ( entry.type == EntryType::EntryDA )
 			{
+				// DA files don't take up any space in the ISO filesystem, they are just links to CD tracks
+				entry.lba = 0xDEADBEEF; // we will write the lba into the filesystem when writing the CDDA track
+				continue;
 				lba += GetSizeInSectors(entry.length, 2352);
 
 				// TODO: Configurable pregap
@@ -682,7 +685,17 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		else if ( entry.type == EntryType::EntryDA )
 		{
 			length = 2048 * GetSizeInSectors(entry.length, 2352);
-			lba += 150;
+			// TODO save offset of dirEntry->entryOffs in the file, so it can be updated			
+			uint8_t *offsetAddr = (uint8_t*)&dirEntry->entryOffs;
+			uint8_t *entryAddr = (uint8_t*)dirEntry;
+			uint8_t *currentDataBufAddr  = (uint8_t*)dataBuffPtr;
+			uint8_t *dirAddr = (uint8_t*)&dataBuff;
+
+			int cs = writer->CurrentSector();
+			unsigned fileSectorAddr = (cs*2352);
+			unsigned toWriteAddr = (unsigned)(fileSectorAddr + offsetof(cd::SECTOR_M2F1, data) + (currentDataBufAddr - dirAddr) + (offsetAddr - entryAddr));
+			printf("file %s, need to write LBA at %u\n", entry.srcfile.lexically_normal().c_str() , toWriteAddr);
+			// Updating the LBA isn't a good method as ECC ...
 		}
 		else
 		{
