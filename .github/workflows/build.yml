@@ -27,7 +27,7 @@ jobs:
     - name: Update repo submodules
       run: |
         cd mkpsxiso
-        git submodule update --init --recursive --remote
+        git submodule update --init --recursive
 
     - name: Build and package mkpsxiso
       run: |
@@ -61,7 +61,7 @@ jobs:
     - name: Update repo submodules
       run: |
         cd mkpsxiso
-        git submodule update --init --recursive --remote
+        git submodule update --init --recursive
 
     - name: Build and package mkpsxiso
       run: |
