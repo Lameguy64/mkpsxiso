@@ -55,12 +55,18 @@ add_executable(mkpsxiso
 )
 target_include_directories(mkpsxiso PUBLIC "miniaudio")
 target_link_libraries(mkpsxiso tinyxml2 iso_shared)
+if(MINGW)
+	target_link_libraries(mkpsxiso "-municode")
+endif()
 
 add_executable(dumpsxiso
 	${dumpsxiso_dir}/cdreader.cpp
 	${dumpsxiso_dir}/main.cpp
 )
 target_link_libraries(dumpsxiso tinyxml2 iso_shared)
+if(MINGW)
+	target_link_libraries(dumpsxiso "-municode")
+endif()
 
 ## Installation
 
