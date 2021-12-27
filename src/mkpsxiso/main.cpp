@@ -404,7 +404,7 @@ int Main(int argc, char* argv[])
 			}
 
 			// Generate ISO file system for data track
-			if ( CompareICase( "data", track_type ) == 0 )
+			if ( CompareICase( "data", track_type ) )
 			{
 				if ( global::trackNum != 1 )
 				{
@@ -461,7 +461,7 @@ int Main(int argc, char* argv[])
 
 			// Add audio track
 			}
-			else if ( CompareICase( "audio", track_type ) == 0 )
+			else if ( CompareICase( "audio", track_type ) )
 			{
 
 				// Only allow audio tracks if the cue_sheet attribute is specified
@@ -1106,16 +1106,16 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	const char* typeElement = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
 	if ( typeElement != nullptr )
 	{
-		if ( CompareICase( "data", typeElement ) == 0 )
+		if ( CompareICase( "data", typeElement ) )
 		{
 			entry = EntryType::EntryFile;
-		} else if ( CompareICase( "mixed", typeElement ) == 0 ||
-                    CompareICase( "xa", typeElement ) == 0 || //alias xa and str to mixed
-                    CompareICase( "str", typeElement ) == 0 )
+		} else if ( CompareICase( "mixed", typeElement ) ||
+                    CompareICase( "xa", typeElement ) || //alias xa and str to mixed
+                    CompareICase( "str", typeElement ) )
 		{
 			entry = EntryType::EntryXA;
 		}
-		else if ( CompareICase( "da", typeElement ) == 0 )
+		else if ( CompareICase( "da", typeElement ) )
 		{
 			entry = EntryType::EntryDA;
 			if ( !global::cuefile )
@@ -1183,7 +1183,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	if ( type != nullptr )
 	{
 		// TODO: Make reasonable
-		if ( CompareICase(type, "2336") == 0 )
+		if ( CompareICase(type, "2336") )
 		{
 			dummyType = 1; // XA
 		}
@@ -1242,21 +1242,21 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 {
 	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
-        if ( CompareICase( "file", dirElement->Name() ) == 0 )
+        if ( CompareICase( "file", dirElement->Name() ))
 		{
 			if (!ParseFileEntry(dirTree, dirElement, xmlPath, parentAttribs, found_da))
 			{
 				return false;
 			}
 		}
-		else if ( CompareICase( "dummy", dirElement->Name() ) == 0 )
+		else if ( CompareICase( "dummy", dirElement->Name() ))
 		{
 			if (!ParseDummyEntry(dirTree, dirElement, found_da))
 			{
 				return false;
 			}
         }
-		else if ( CompareICase( "dir", dirElement->Name() ) == 0 )
+		else if ( CompareICase( "dir", dirElement->Name() ))
 		{
 			if (!ParseDirEntry(dirTree, dirElement, xmlPath, parentAttribs, found_da))
 			{
@@ -1288,18 +1288,18 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
 	if(extension.size() >= 4)
 	{
 		//nothing to change if wav
-		if(CompareICase(extension.c_str(), ".flac") == 0)
+		if(CompareICase(extension.c_str(), ".flac") )
 		{
 			tryorder[0] = DAF_FLAC;
 			tryorder[1] = DAF_WAV;
 		}
-		else if(CompareICase(extension.c_str(), ".mp3") == 0)
+		else if(CompareICase(extension.c_str(), ".mp3") )
 		{
 			tryorder[0] = DAF_MP3;
 			tryorder[1] = DAF_WAV;
 			tryorder[2] = DAF_FLAC;
 		}
-		else if((CompareICase(extension.c_str(), ".pcm") == 0) || (CompareICase(extension.c_str(), ".raw") == 0))
+		else if((CompareICase(extension.c_str(), ".pcm") ) || (CompareICase(extension.c_str(), ".raw") ))
 		{
 			tryorder[0] = DAF_PCM;
 			tryorder[1] = DAF_WAV;
