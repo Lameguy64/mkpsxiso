@@ -590,18 +590,43 @@ int Main(int argc, char* argv[])
 
 					if ( !global::NoIsoGen )
 					{
-						int trackLBA = writer.SeekToEnd();
+						int trackLBA = writer.SeekToEnd(); //Fix me to LBA from data tracks?
 
-                        // TODO configurable pregap
-						fprintf( cuefp, "    INDEX 00 %02d:%02d:%02d\n",
+						// pregap
+						int pregapSectors = 150; // by default 2 seconds
+						const tinyxml2::XMLElement *pregapElement = trackElement->FirstChildElement(xml::elem::TRACK_PREGAP);
+						if(pregapElement != nullptr)
+						{
+							const char *duration = pregapElement->Attribute("duration");
+							if(duration != nullptr)
+							{
+								unsigned minutes, seconds, frames;
+								if(
+									(sscanf(duration, "%u:%u:%u", &minutes, &seconds, &frames) != 3) ||
+									(minutes > 80) || (seconds > 59) || (frames > 74) ||
+									(((float)minutes + (float)(seconds/60) + ((float)frames/75)/60) > 80)
+								)
+								{
+									printf( "ERROR: %s duration is invalid MM:SS:FF"
+										"for track on line %d.\n", xml::attrib::TRACK_SOURCE, pregapElement->GetLineNum() );
+									return EXIT_FAILURE;
+								}
+								pregapSectors = (((minutes * 60)+seconds)*75)+frames;
+							}
+						}
+						if(pregapSectors > 0)
+						{
+							fprintf( cuefp, "    INDEX 00 %02d:%02d:%02d\n",
 								(trackLBA/75)/60, (trackLBA/75)%60,
 								trackLBA%75 );
-
-						writer.WriteBlankSectors(150);
-						trackLBA += 150;
+							writer.WriteBlankSectors(pregapSectors);
+							trackLBA += pregapSectors;
+						}					
 
 						fprintf( cuefp, "    INDEX 01 %02d:%02d:%02d\n",
 							(trackLBA/75)/60, (trackLBA/75)%60, trackLBA%75 );
+
+						// should set filesystem lba for DA track here
 
 						// Pack the audio file
 						if ( !global::QuietMode )
