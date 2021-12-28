@@ -44,9 +44,18 @@ namespace global
 
 
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da);
-int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath);
+int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries);
 
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
+
+void UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const unsigned lba)
+{
+	for(auto& entry : entries)
+	{
+		if(entry.trackid != trackid) continue;
+		entry.lba = lba; 
+	}
+}
 
 int Main(int argc, char* argv[])
 {
@@ -437,6 +446,7 @@ int Main(int argc, char* argv[])
 		}
 
 		global::trackNum = 1;
+		iso::EntryList entries;
 
 		// Parse tracks
 		while ( trackElement != nullptr )
@@ -501,7 +511,7 @@ int Main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 
-				if ( !ParseISOfileSystem( &writer, trackElement, global::XMLscript.parent_path() ) )
+				if ( !ParseISOfileSystem( &writer, trackElement, global::XMLscript.parent_path(), entries ) )
 				{
 					if ( !global::NoIsoGen )
 					{
@@ -626,7 +636,11 @@ int Main(int argc, char* argv[])
 						fprintf( cuefp, "    INDEX 01 %02d:%02d:%02d\n",
 							(trackLBA/75)/60, (trackLBA/75)%60, trackLBA%75 );
 
-						// should set filesystem lba for DA track here
+						const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
+						if(trackid != nullptr)
+						{
+							UpdateDAFilesWithLBA(entries, trackid, trackLBA);
+						}						
 
 						// Pack the audio file
 						if ( !global::QuietMode )
@@ -688,9 +702,17 @@ int Main(int argc, char* argv[])
 			global::trackNum++;
 		}
 
-		// Get the last LBA of the image to calculate total size
+		
 		if ( !global::NoIsoGen )
 		{
+			// Finally write the directories, Packing all the tracks was the easiest way to know LBA's for DA files
+			// Sort directory entries and write it
+			iso::DIRENTRY& root = entries.front();
+	        iso::DirTreeClass* dirTree = root.subdir.get();
+			dirTree->SortDirectoryEntries();
+			dirTree->WriteDirectoryRecords( &writer, root, root );
+
+			// Get the last LBA of the image to calculate total size
 			int totalImageSize = writer.SeekToEnd();
 
 			// Close both ISO writer and CUE sheet
@@ -754,7 +776,7 @@ iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement
 	return result;
 };
 
-int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath)
+int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries)
 {
 	const tinyxml2::XMLElement* identifierElement =
 		trackElement->FirstChildElement(xml::elem::IDENTIFIERS);
@@ -944,7 +966,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 		printf( "    Parsing directory tree...\n" );
 	}
 
-	iso::EntryList entries;
 	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate);
 	iso::DirTreeClass* dirTree = root.subdir.get();
 
@@ -1089,10 +1110,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 		printf( "      Writing filesystem... " );
 	}
 
-	// Sort directory entries and write it
-	dirTree->SortDirectoryEntries();
-	dirTree->WriteDirectoryRecords( writer, root, root );
-
 	// Write file system descriptors to finish the image
 	iso::WriteDescriptor( writer, isoIdentifiers, root, totalLen );
 
@@ -1124,6 +1141,12 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 			}
 			fclose( fp );
 		}
+	}
+
+	if(writer->SeekToEnd() != totalLen)
+	{
+		printf( "      Not good, writer->seektoend != totalLen" );
+		return false;
 	}
 
 	return true;
@@ -1197,6 +1220,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	}
 
 	EntryType entry = EntryType::EntryFile;
+	const char *trackid = nullptr;
 
 	const char* typeElement = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
 	if ( typeElement != nullptr )
@@ -1222,7 +1246,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 				printf( "ERROR: DA audio file(s) specified but no CUE sheet specified.\n" );
 				return false;
 			}
-			const char *trackid = dirElement->Attribute(xml::attrib::TRACK_ID);
+			trackid = dirElement->Attribute(xml::attrib::TRACK_ID);
 			if ( trackid == nullptr )
 			{
 				printf( "ERROR: DA audio file(s) does not have an associated CDDA track [trackid]\n" );
@@ -1296,7 +1320,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 
 	}
 
-	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)));
+	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)), trackid);
 }
 
 static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)

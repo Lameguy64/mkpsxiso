@@ -246,7 +246,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	return entries.back();
 }
 
-bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes)
+bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes, const char *trackid)
 {
     auto fileAttrib = Stat(srcfile);
     if ( !fileAttrib )
@@ -356,6 +356,12 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::
 	if ( type == EntryType::EntryDA )
 	{
 		entry.length = GetAudioSize( srcfile );
+		if(trackid == nullptr)
+		{
+			printf("ERROR: no trackid for DA track\n");
+			return false;
+		}
+		entry.trackid = trackid;
 	}
 	else if ( type != EntryType::EntryDir )
 	{
@@ -694,7 +700,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 			int cs = writer->CurrentSector();
 			unsigned fileSectorAddr = (cs*2352);
 			unsigned toWriteAddr = (unsigned)(fileSectorAddr + offsetof(cd::SECTOR_M2F1, data) + (currentDataBufAddr - dirAddr) + (offsetAddr - entryAddr));
-			printf("file %s, need to write LBA at %u\n", entry.srcfile.lexically_normal().c_str() , toWriteAddr);
+			printf("file %s, LBA at %u\n", entry.srcfile.lexically_normal().c_str() , toWriteAddr);
 			// Updating the LBA isn't a good method as ECC ...
 		}
 		else

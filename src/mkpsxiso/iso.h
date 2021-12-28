@@ -43,6 +43,7 @@ namespace iso
 		std::unique_ptr<class DirTreeClass> subdir;
 
 		cd::ISO_DATESTAMP date;
+		std::string trackid; /// only used for DA files
 
 	};
 
@@ -152,7 +153,7 @@ namespace iso
 		 *	*srcfile	- Path and filename to the source file.
 		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 */
-		bool AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes);
+		bool AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes, const char *trackid = nullptr);
 
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.
