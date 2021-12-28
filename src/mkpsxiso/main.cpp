@@ -1471,12 +1471,18 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
 	ma_uint64 framesRead;
 	ma_uint64 totalFramesProcessed = 0;
 	unsigned char buff[CD_SECTOR_SIZE];
-	do {
+	while(totalFramesProcessed < expectedPCMFrames)
+	{
 		memset(buff, 0x00, CD_SECTOR_SIZE);
 		framesRead = ma_decoder_read_pcm_frames(&decoder, &buff, framesToRead);
 		writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
 		totalFramesProcessed += framesRead;
-	} while(framesToRead == framesRead);
+		if((framesRead != framesToRead) && (totalFramesProcessed < expectedPCMFrames))
+		{
+			printf("\n    ERROR: unexpected short read\n");
+			return false;
+		}
+	}
 	ma_decoder_uninit(&decoder);
 	if(totalFramesProcessed != expectedPCMFrames)
 	{
