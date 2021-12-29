@@ -44,7 +44,7 @@ namespace global
 
 
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da);
-int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries);
+int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
 
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
 
@@ -447,6 +447,8 @@ int Main(int argc, char* argv[])
 
 		global::trackNum = 1;
 		iso::EntryList entries;
+		iso::IDENTIFIERS isoIdentifiers {};
+		int totalLen;
 
 		// Parse tracks
 		while ( trackElement != nullptr )
@@ -511,7 +513,7 @@ int Main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 
-				if ( !ParseISOfileSystem( &writer, trackElement, global::XMLscript.parent_path(), entries ) )
+				if ( !ParseISOfileSystem( &writer, trackElement, global::XMLscript.parent_path(), entries, isoIdentifiers, totalLen ) )
 				{
 					if ( !global::NoIsoGen )
 					{
@@ -631,7 +633,9 @@ int Main(int argc, char* argv[])
 								trackLBA%75 );
 							writer.WriteBlankSectors(pregapSectors);
 							trackLBA += pregapSectors;
-						}					
+						}
+
+						totalLen += (pregapSectors + (iso::DirTreeClass::GetAudioSize(track_source)/2352));
 
 						fprintf( cuefp, "    INDEX 01 %02d:%02d:%02d\n",
 							(trackLBA/75)/60, (trackLBA/75)%60, trackLBA%75 );
@@ -712,6 +716,9 @@ int Main(int argc, char* argv[])
 			dirTree->SortDirectoryEntries();
 			dirTree->WriteDirectoryRecords( &writer, root, root );
 
+			// Write file system descriptors to finish the image
+	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLen );
+
 			// Get the last LBA of the image to calculate total size
 			int totalImageSize = writer.SeekToEnd();
 
@@ -776,7 +783,7 @@ iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement
 	return result;
 };
 
-int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries)
+int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen)
 {
 	const tinyxml2::XMLElement* identifierElement =
 		trackElement->FirstChildElement(xml::elem::IDENTIFIERS);
@@ -784,7 +791,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 		trackElement->FirstChildElement(xml::elem::LICENSE);
 
 	// Set file system identifiers
-	iso::IDENTIFIERS isoIdentifiers {};
 
 	if ( identifierElement != nullptr )
 	{
@@ -992,7 +998,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 	int pathTableLen = dirTree->CalculatePathTableLen(root);
 
 	const int rootLBA = 17+(GetSizeInSectors(pathTableLen)*4);
-	int totalLen = dirTree->CalculateTreeLBA(rootLBA);
+	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
 	{
@@ -1110,8 +1116,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 		printf( "      Writing filesystem... " );
 	}
 
-	// Write file system descriptors to finish the image
-	iso::WriteDescriptor( writer, isoIdentifiers, root, totalLen );
+
 
 	if ( !global::QuietMode )
 	{
