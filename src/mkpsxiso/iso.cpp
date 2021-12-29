@@ -75,7 +75,7 @@ int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
 	}
 
     ma_decoder_uninit(&decoder);
-	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), 2352);
+	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), 2352)*2352;
 }
 
 int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile)
