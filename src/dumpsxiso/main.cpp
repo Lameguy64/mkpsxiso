@@ -161,7 +161,7 @@ static EntryType GetXAEntryType(unsigned short xa_attr)
 	// here all flags are set to the same value. From what I could see until now, when both flags are the same,
 	// this is interpreted in the following two ways, which both lead us to choose str/xa type.
 	// 1. Both values are 1, which means there is an indication by the mode 2 form 2 flag that the data is not
-	//    regular mode 2 form 1 data (i.e., it is either mixed or just xa). 
+	//    regular mode 2 form 1 data (i.e., it is either mixed or just xa).
 	// 2. Both values are 0. The fact that the mode 2 form 2 flag is 0 simply means that the data might not
 	//    be *pure* mode 2 form 2 data (i.e., xa), so, we do not conclude it is regular mode 2 form 1 data.
 	//    We thus give priority to the mode 2 form 1 flag, which is also zero,
@@ -185,11 +185,11 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 		entry.virtualPath = path;
         if (entry.entry.flags & 0x2)
 		{
-            entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb), 
+            entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb),
 				path / CleanIdentifier(entry.identifier));
         }
     }
-	
+
 	return dirEntries;
 }
 
@@ -199,9 +199,9 @@ std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd:
     dirEntries->ReadRootDir(&reader, offs);
 
 	auto& entry = dirEntries->dirEntryList.GetView().front().get();
-    entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb), 
+    entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb),
 		CleanIdentifier(entry.identifier));
-	
+
 	return dirEntries;
 }
 
@@ -301,7 +301,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 					if (!result)
 						reader.ReadBytesDA(copyBuff, bytesToRead);
-					
+
 					fwrite(copyBuff, 1, bytesToRead, outFile);
 
 					bytesLeft -= bytesToRead;
@@ -348,7 +348,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				printf("ERROR: File %s is of invalid type", entry.identifier.c_str());
 				continue;
 			}
-        }	
+        }
     }
 
 	// Update timestamps AFTER all files have been extracted
@@ -361,7 +361,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 }
 
 tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement* dirElement, std::filesystem::path* currentVirtualPath,
-	const std::filesystem::path& sourcePath)
+	const std::filesystem::path& sourcePath, const std::string& trackid)
 {
 	tinyxml2::XMLElement* newelement;
 
@@ -391,7 +391,14 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 	{
         newelement = dirElement->InsertNewChildElement("file");
         newelement->SetAttribute(xml::attrib::ENTRY_NAME, std::string(CleanIdentifier(entry.identifier)).c_str());
-        newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.generic_u8string().c_str());		
+		if(entryType != EntryType::EntryDA)
+		{
+			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.generic_u8string().c_str());
+		}
+		else
+		{
+			newelement->SetAttribute(xml::attrib::TRACK_ID, trackid.c_str());
+		}
 
 		if (entryType == EntryType::EntryXA)
 		{
@@ -417,15 +424,25 @@ void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement)
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 }
 
+typedef struct {
+	std::string trackid;
+	std::string source;
+	unsigned pregap_sectors;
+} CDTrack;
+
 void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath,
 	const unsigned int startLBA, const unsigned int sizeInSectors, const bool onlyDA)
 {
+	std::vector<CDTrack> tracks;
 	std::filesystem::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
 	unsigned int expectedLBA = startLBA;
-
+    bool wasDA;
+	unsigned tracknum = 2;
 	for (const auto& entry : files)
 	{
 		const bool isDA = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA;
+		unsigned pregap_len = 0;
+		std::string trackid;
 		if (onlyDA)
 		{
 			if (!isDA)
@@ -436,11 +453,21 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 		else
 		{
 			// Insert gaps if needed
-			// TODO: Tidy it up when audio pregaps are sorted, for now hack it around like this
 			if (isDA)
 			{
-				// Ignore pregap
-				expectedLBA += 150;
+				// if the last track was DA, assume the pregap runs from the end of that track instead of hardcoding 150 frames
+				pregap_len = wasDA ? (entry.entry.entryOffs.lsb - expectedLBA) : 150; // terrible, still hardcoding 150 for first track
+				expectedLBA += pregap_len;
+
+                char tidbuf[3];
+				snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum);
+				trackid = tidbuf;
+				tracks.push_back({
+					trackid,
+					(sourcePath / entry.virtualPath / CleanIdentifier(entry.identifier)).generic_u8string(),
+					pregap_len
+				});
+				tracknum++;
 			}
 			if (entry.entry.entryOffs.lsb > expectedLBA)
 			{
@@ -473,7 +500,8 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 			currentVirtualPath /= part;
 		}
 
-		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath);
+		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath, trackid);
+		wasDA = isDA;
 	}
 
 	// If there is a gap at the end, add it too
@@ -484,6 +512,59 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 			WriteXMLGap(sizeInSectors - expectedLBA, dirElement);
 		}
 	}
+
+    // add the tracks
+	tinyxml2::XMLDocument *xmlFile = dirElement->GetDocument();
+	if(xmlFile == nullptr)
+	{
+		printf("ERROR, unable to get document\n");
+		return;
+	}
+	tinyxml2::XMLNode *modifyTrack = nullptr;
+	tinyxml2::XMLElement *modifyProject = nullptr;
+	for(tinyxml2::XMLElement *elmIt = dirElement; elmIt != nullptr; elmIt = elmIt->Parent()->ToElement())
+	{
+		if(strcmp(elmIt->Name(), xml::elem::TRACK) == 0)
+		{
+			modifyTrack = elmIt;
+		}
+		else if(strcmp(elmIt->Name(), xml::elem::ISO_PROJECT) == 0)
+		{
+			modifyProject = elmIt;
+		}
+	}
+	if((modifyTrack == nullptr) || (modifyProject == nullptr))
+	{
+		printf("ERROR, unable to find track or project\n");
+		return;
+	}
+	// not sure why comment doesn't appear in xml
+	/*if(tracks.size() > 0)
+	{
+		tinyxml2::XMLComment *comment = xmlFile->NewComment(" *** WHEN an AUDIO `<track> DOES NOT CONTAIN PREGAP, a DEFAULT EMPTY 2 SECOND or 150 SECTOR PREGAP IS USED! ***");
+		modifyTrack->InsertAfterChild(modifyTrack, comment);
+		modifyTrack = comment;
+	}*/
+	for(auto& track : tracks)
+	{
+		// add a new track
+		tinyxml2::XMLElement *newtrack = xmlFile->NewElement(xml::elem::TRACK);
+		newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
+		newtrack->SetAttribute(xml::attrib::TRACK_ID, track.trackid.c_str());
+		newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, track.source.c_str());
+
+		// only write the pregap element if it's non default
+		if(track.pregap_sectors != 150)
+		{
+			tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
+		    char pregapbuf[16];
+		    snprintf( pregapbuf, sizeof(pregapbuf), "%02d:%02d:%02d", (track.pregap_sectors/75)/60, (track.pregap_sectors/75)%60, track.pregap_sectors%75 );
+		    pregap->SetAttribute(xml::attrib::PREGAP_DURATION, pregapbuf);
+		}
+
+		modifyProject->InsertAfterChild(modifyTrack, newtrack);
+		modifyTrack = newtrack;
+	}
 }
 
 // Writes all entries BUT DA! Those must not be "pretty printed"
@@ -493,8 +574,8 @@ void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElem
 	{
 		const auto& entry = e.get();
 		if (GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA) continue;
-		
-		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath);
+
+		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath, "");
 		// Recursively write children if there are any
 		if (const cd::IsoDirEntries* subdir = entry.subdir.get(); subdir != nullptr)
 		{
@@ -575,7 +656,7 @@ void ParseISO(cd::IsoReader& reader) {
 	{
 		if (FILE* file = OpenFile(param::xmlFile, "w"); file != nullptr)
 		{
-			tinyxml2::XMLDocument xmldoc;    
+			tinyxml2::XMLDocument xmldoc;
 
 			tinyxml2::XMLElement *baseElement = static_cast<tinyxml2::XMLElement*>(xmldoc.InsertFirstChild(xmldoc.NewElement(xml::elem::ISO_PROJECT)));
 			baseElement->SetAttribute(xml::attrib::IMAGE_NAME, "mkpsxiso.bin");

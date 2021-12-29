@@ -53,7 +53,7 @@ void UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const un
 	for(auto& entry : entries)
 	{
 		if(entry.trackid != trackid) continue;
-		entry.lba = lba; 
+		entry.lba = lba;
 	}
 }
 
@@ -77,7 +77,7 @@ int Main(int argc, char* argv[])
 		"  -rebuildxml - Rebuild the XML using our newest schema\n"
 		"  -h|--help - Show this help text\n";
 
-	static constexpr const char* VERSION_TEXT = 
+	static constexpr const char* VERSION_TEXT =
 		"MKPSXISO " VERSION " - PlayStation ISO Image Maker\n"
 		"2017-2018 Meido-Tek Productions (Lameguy64)\n"
 		"2021 Silent, Chromaryu, and G4Vi\n\n";
@@ -131,6 +131,7 @@ int Main(int argc, char* argv[])
 			{
 				global::RebuildXMLScript = *newxmlfile;
 				global::JustRebuildXML = true;
+				continue;
 			}
 			if (ParseArgument(args, "y"))
 			{
@@ -142,7 +143,7 @@ int Main(int argc, char* argv[])
 				global::noXA = true;
 				continue;
 			}
-			
+
 			// If we reach this point, an unknown parameter was passed
 			printf("Unknown parameter: %s\n", *args);
 			return EXIT_FAILURE;
@@ -247,7 +248,9 @@ int Main(int argc, char* argv[])
 					}
 					if(source != nullptr)
 					{
-						std::string trackid = std::to_string(trackindex);
+						char tid[3];
+						snprintf(tid, sizeof(tid), "%02u", trackindex);
+						std::string trackid = tid;
 						trackindex++;
 
                         // add a new track
@@ -255,11 +258,12 @@ int Main(int argc, char* argv[])
 						newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
 						newtrack->SetAttribute(xml::attrib::TRACK_ID, trackid.c_str());
 						newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, source);
-						tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
-						pregap->SetAttribute(xml::attrib::PREGAP_DURATION, "00:02:00");
+						// a 2 second pregap is assumed, don't write it
+						/*tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
+						pregap->SetAttribute(xml::attrib::PREGAP_DURATION, "00:02:00");*/
 						modifyProject->InsertAfterChild(modifyTrack, newtrack);
 						modifyTrack = newtrack;
-                        
+
 						// update the file to point to the track
 						scanElm->DeleteAttribute(xml::attrib::ENTRY_SOURCE);
 						scanElm->SetAttribute(xml::attrib::TRACK_ID, trackid.c_str());
@@ -644,7 +648,7 @@ int Main(int argc, char* argv[])
 						if(trackid != nullptr)
 						{
 							UpdateDAFilesWithLBA(entries, trackid, trackLBA);
-						}						
+						}
 
 						// Pack the audio file
 						if ( !global::QuietMode )
@@ -706,7 +710,7 @@ int Main(int argc, char* argv[])
 			global::trackNum++;
 		}
 
-		
+
 		if ( !global::NoIsoGen )
 		{
 			// Finally write the directories, Packing all the tracks was the easiest way to know LBA's for DA files
@@ -987,7 +991,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 		return false;
 	}
 
-	bool found_da = false;	
+	bool found_da = false;
 	const iso::EntryAttributes rootAttributes = iso::EntryAttributes::Overlay(iso::EntryAttributes::MakeDefault(), ReadEntryAttributes(directoryTree));
 	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, rootAttributes, found_da) )
 	{
@@ -1449,16 +1453,16 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
     //  note if there's some data converting going on
     ma_format internalFormat;
 	ma_uint32 internalChannels;
-	ma_uint32 internalSampleRate; 
+	ma_uint32 internalSampleRate;
 	if(MA_SUCCESS != ma_data_source_get_data_format(decoder.pBackend, &internalFormat, &internalChannels, &internalSampleRate))
 	{
 		printf("\n    ERROR: unable to get internal metadata for %" PRFILESYSTEM_PATH "\n", audioFile.c_str());
 		ma_decoder_uninit(&decoder);
 	    return false;
-	} 
+	}
 	if((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100) || isLossy)
 	{
-		printf("\n    WARN: This is not Redbook audio, converting.\n    ");			
+		printf("\n    WARN: This is not Redbook audio, converting.\n    ");
 	}
 
 	// get expected pcm frame count (if your file isn't redbook this can vary from the input file's amount)
@@ -1470,7 +1474,7 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
 		ma_decoder_uninit(&decoder);
         return false;
 	}
-	
+
 	// read a sector and write a sector until done
 	const ma_uint64 framesToRead = (CD_SECTOR_SIZE/(2 * sizeof(int16_t))); // 2 channels 2 bytes per single channel sample (588 intrachannel pcm frames)
 	ma_uint64 framesRead;
@@ -1494,5 +1498,5 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
 		printf("\n    ERROR: corrupt file? (totalFramesProcessed != expectedPCMFrames)\n");
 		return false;
 	}
-    return true;   
+    return true;
 }
