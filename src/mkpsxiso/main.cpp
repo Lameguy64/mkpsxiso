@@ -713,7 +713,12 @@ int Main(int argc, char* argv[])
 
 		if ( !global::NoIsoGen )
 		{
-			// Finally write the directories, Packing all the tracks was the easiest way to know LBA's for DA files
+			// Write file system
+			if ( !global::QuietMode )
+			{
+				printf( "      Writing filesystem... " );
+			}
+
 			// Sort directory entries and write it
 			iso::DIRENTRY& root = entries.front();
 	        iso::DirTreeClass* dirTree = root.subdir.get();
@@ -722,6 +727,12 @@ int Main(int argc, char* argv[])
 
 			// Write file system descriptors to finish the image
 	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLen );
+
+			if ( !global::QuietMode )
+			{
+				printf( "Ok.\n" );
+			}
+
 
 			// Get the last LBA of the image to calculate total size
 			int totalImageSize = writer.SeekToEnd();
@@ -1113,19 +1124,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 
 	// Copy the files into the disc image
 	dirTree->WriteFiles( writer );
-
-	// Write file system
-	if ( !global::QuietMode )
-	{
-		printf( "      Writing filesystem... " );
-	}
-
-
-
-	if ( !global::QuietMode )
-	{
-		printf( "Ok.\n" );
-	}
 
 	// Write license data
 	if ( licenseElement != nullptr )

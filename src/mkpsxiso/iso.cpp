@@ -78,151 +78,6 @@ int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
 	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), 2352)*2352;
 }
 
-int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile)
-{
-	FILE *fp;
-	int waveLen;
-	unsigned char buff[CD_SECTOR_SIZE];
-
-	if ( !( fp = OpenFile( wavFile, "rb" ) ) )
-	{
-		printf("ERROR: File not found.\n");
-		return false;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		char	format[4];
-	} HeaderChunk;
-
-	fread( &HeaderChunk, 1, sizeof(HeaderChunk), fp );
-
-	if ( memcmp( &HeaderChunk.id, "RIFF", 4 ) ||
-		memcmp( &HeaderChunk.format, "WAVE", 4 ) )
-	{
-
-		// File must be a raw, pack it anyway
-
-		// Write data
-		fseek(fp, 0, SEEK_END);
-		waveLen = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-
-		while ( waveLen > 0 )
-		{
-			memset(buff, 0x00, CD_SECTOR_SIZE);
-
-			int readLen = waveLen;
-
-			if (readLen > CD_SECTOR_SIZE)
-			{
-				readLen = CD_SECTOR_SIZE;
-			}
-
-			fread( buff, 1, readLen, fp );
-			writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
-
-			waveLen -= readLen;
-		}
-
-		printf("Packed as raw... ");
-
-		fclose( fp );
-		return true;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		short	format;
-		short	chan;
-		int		freq;
-		int		brate;
-		short	balign;
-		short	bps;
-	} WAV_Subchunk1;
-
-	fread( &WAV_Subchunk1, 1, sizeof(WAV_Subchunk1), fp );
-
-	// Check if its a valid WAVE file
-	if ( memcmp( &WAV_Subchunk1.id, "fmt ", 4 ) )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "\n    " );
-		}
-
-		printf( "ERROR: Unsupported WAV format.\n" );
-
-		fclose( fp );
-		return false;;
-	}
-
-
-    if ( (WAV_Subchunk1.chan != 2) || (WAV_Subchunk1.freq != 44100) ||
-		(WAV_Subchunk1.bps != 16) )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "\n    " );
-		}
-
-		printf( "ERROR: Only 44.1KHz, 16-bit Stereo WAV files are supported.\n" );
-
-		fclose( fp );
-		return false;
-    }
-
-	// Search for the data chunk
-	struct
-	{
-		char	id[4];
-		int		len;
-	} WAV_Subchunk2;
-
-	while ( 1 )
-	{
-		fread( &WAV_Subchunk2, 1, sizeof(WAV_Subchunk2), fp );
-
-		if ( memcmp( &WAV_Subchunk2.id, "data", 4 ) )
-		{
-			fseek( fp, WAV_Subchunk2.len, SEEK_CUR );
-		}
-		else
-		{
-			break;
-		}
-	}
-
-	waveLen = WAV_Subchunk2.len;
-
-	// Write data
-	while ( waveLen > 0 )
-	{
-		memset(buff, 0x00, CD_SECTOR_SIZE);
-
-        int readLen = waveLen;
-
-        if (readLen > CD_SECTOR_SIZE)
-		{
-			readLen = CD_SECTOR_SIZE;
-		}
-
-		fread( buff, 1, readLen, fp );
-        writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
-
-        waveLen -= readLen;
-	}
-
-	fclose( fp );
-	return true;
-}
-
 iso::DirTreeClass::DirTreeClass(EntryList& entries, DirTreeClass* parent)
 	: name(rootname), entries(entries), parent(parent)
 {
@@ -691,17 +546,6 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		else if ( entry.type == EntryType::EntryDA )
 		{
 			length = 2048 * GetSizeInSectors(entry.length, 2352);
-			// TODO save offset of dirEntry->entryOffs in the file, so it can be updated			
-			uint8_t *offsetAddr = (uint8_t*)&dirEntry->entryOffs;
-			uint8_t *entryAddr = (uint8_t*)dirEntry;
-			uint8_t *currentDataBufAddr  = (uint8_t*)dataBuffPtr;
-			uint8_t *dirAddr = (uint8_t*)&dataBuff;
-
-			int cs = writer->CurrentSector();
-			unsigned fileSectorAddr = (cs*2352);
-			unsigned toWriteAddr = (unsigned)(fileSectorAddr + offsetof(cd::SECTOR_M2F1, data) + (currentDataBufAddr - dirAddr) + (offsetAddr - entryAddr));
-			printf("file %s, LBA at %u\n", entry.srcfile.lexically_normal().c_str() , toWriteAddr);
-			// Updating the LBA isn't a good method as ECC ...
 		}
 		else
 		{
@@ -963,23 +807,6 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		else if ( entry.type == EntryType::EntryDA )
 		{
 			continue;
-			if ( !global::QuietMode )
-			{
-				printf( "      Packing DA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
-			}
-
-			// TODO: Configurable pregap
-			writer->WriteBlankSectors(150);
-
-			if ( PackWaveFile( writer, entry.srcfile) )
-			{
-				if (!global::QuietMode)
-				{
-					printf( "Done.\n" );
-				}
-			}
-
-			//firstDAWritten = true;
 		}
 		/*else if ( entry.type == EntryDir )
 		{
