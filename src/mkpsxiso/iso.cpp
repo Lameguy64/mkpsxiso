@@ -928,9 +928,9 @@ int iso::DirTreeClass::WriteCueEntries(FILE* fp, int* trackNum) const
 	return *trackNum;
 }
 
-void LBAtoTimecode(int lba, char* timecode)
+void LBAtoTimecode(const int lba, char *timecode, const size_t timecode_buf_len)
 {
-	sprintf( timecode, "%02d:%02d:%02d", (lba/75)/60, (lba/75)%60, (lba%75) );
+	snprintf( timecode, timecode_buf_len, "%02d:%02d:%02d", (lba/75)/60, (lba/75)%60, (lba%75) );
 }
 
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
@@ -982,7 +982,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 
 		// Write Timecode
 		char timecode[12];
-		LBAtoTimecode( 150+entry.lba, timecode );
+		LBAtoTimecode( 150+entry.lba, timecode, sizeof(timecode) );
 		fprintf( fp, "%-12s", timecode );
 
 		// Write size in byte units
