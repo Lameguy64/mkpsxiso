@@ -1314,18 +1314,18 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			return false;
 		}
 
-		if ( found_da && entry != EntryType::EntryDA )
-		{
-			if ( !global::QuietMode )
-			{
-				printf( "      " );
-			}
-
-			printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
-				dirElement->GetLineNum() );
-
-			return false;
-		}
+		//if ( found_da && entry != EntryType::EntryDA )
+		//{
+		//	if ( !global::QuietMode )
+		//	{
+		//		printf( "      " );
+		//	}
+//
+		//	printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
+		//		dirElement->GetLineNum() );
+//
+		//	return false;
+		//}
 
 	}
 
@@ -1334,19 +1334,19 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 
 static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
 {
-	if ( found_da )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "      " );
-		}
-
-		printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
-			dirElement->GetLineNum() );
-
-		return false;
-	}
-
+	//if ( found_da )
+	//{
+	//	if ( !global::QuietMode )
+	//	{
+	//		printf( "      " );
+	//	}
+//
+	//	printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
+	//		dirElement->GetLineNum() );
+//
+	//	return false;
+	//}
+//
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
 	int dummyType = 0; // Data
@@ -1393,18 +1393,18 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 		return false;
 	}
 
-	if ( found_da && !alreadyExists )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "      " );
-		}
-
-		printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
-			dirElement->GetLineNum() );
-
-		return false;
-	}
+	//if ( found_da && !alreadyExists )
+	//{
+	//	if ( !global::QuietMode )
+	//	{
+	//		printf( "      " );
+	//	}
+//
+	//	printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
+	//		dirElement->GetLineNum() );
+//
+	//	return false;
+	//}
 
 	return ParseDirectory(subdir, dirElement, xmlPath, attribs, found_da);
 }

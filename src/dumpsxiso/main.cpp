@@ -424,25 +424,15 @@ void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement)
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 }
 
-typedef struct {
-	std::string trackid;
-	std::string source;
-	unsigned pregap_sectors;
-} CDTrack;
-
 void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath,
-	const unsigned int startLBA, const unsigned int sizeInSectors, const bool onlyDA)
+	const unsigned int startLBA, const unsigned int sizeInSectors, const bool onlyDA, unsigned& expectedLBA)
 {
-	std::vector<CDTrack> tracks;
 	std::filesystem::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
-	unsigned int expectedLBA = startLBA;
-    bool wasDA;
+	expectedLBA = startLBA;
 	unsigned tracknum = 2;
 	for (const auto& entry : files)
 	{
 		const bool isDA = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA;
-		unsigned pregap_len = 0;
-		std::string trackid;
 		if (onlyDA)
 		{
 			if (!isDA)
@@ -452,28 +442,26 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 		}
 		else
 		{
-			// Insert gaps if needed
-			if (isDA)
+			// only check for gaps, update LBA if it's inside the iso filesystem
+			if(!isDA)
 			{
-				// if the last track was DA, assume the pregap runs from the end of that track instead of hardcoding 150 frames
-				pregap_len = wasDA ? (entry.entry.entryOffs.lsb - expectedLBA) : 150; // terrible, still hardcoding 150 for first track
-				expectedLBA += pregap_len;
+				if (entry.entry.entryOffs.lsb > expectedLBA)
+				{
+					// if this is a DA file we are at the end of filesystem, flag to write the gap after DA files
+					WriteXMLGap(entry.entry.entryOffs.lsb - expectedLBA, dirElement);
+				}
+				expectedLBA = entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb);
+			}
+		}
 
-                char tidbuf[3];
-				snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum);
-				trackid = tidbuf;
-				tracks.push_back({
-					trackid,
-					(sourcePath / entry.virtualPath / CleanIdentifier(entry.identifier)).generic_u8string(),
-					pregap_len
-				});
-				tracknum++;
-			}
-			if (entry.entry.entryOffs.lsb > expectedLBA)
-			{
-				WriteXMLGap(entry.entry.entryOffs.lsb - expectedLBA, dirElement);
-			}
-			expectedLBA = entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb);
+		// add a trackid to DA tracks
+		std::string trackid;
+		if (isDA)
+		{
+			char tidbuf[3];
+			snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum);
+			trackid = tidbuf;
+			tracknum++;
 		}
 
 		// Work out the relative position between the current directory and the element to create
@@ -501,69 +489,6 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 		}
 
 		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath, trackid);
-		wasDA = isDA;
-	}
-
-	// If there is a gap at the end, add it too
-	if (!onlyDA)
-	{
-		if (sizeInSectors > expectedLBA)
-		{
-			WriteXMLGap(sizeInSectors - expectedLBA, dirElement);
-		}
-	}
-
-    // add the tracks
-	tinyxml2::XMLDocument *xmlFile = dirElement->GetDocument();
-	if(xmlFile == nullptr)
-	{
-		printf("ERROR, unable to get document\n");
-		return;
-	}
-	tinyxml2::XMLNode *modifyTrack = nullptr;
-	tinyxml2::XMLElement *modifyProject = nullptr;
-	for(tinyxml2::XMLElement *elmIt = dirElement; elmIt != nullptr; elmIt = elmIt->Parent()->ToElement())
-	{
-		if(strcmp(elmIt->Name(), xml::elem::TRACK) == 0)
-		{
-			modifyTrack = elmIt;
-		}
-		else if(strcmp(elmIt->Name(), xml::elem::ISO_PROJECT) == 0)
-		{
-			modifyProject = elmIt;
-		}
-	}
-	if((modifyTrack == nullptr) || (modifyProject == nullptr))
-	{
-		printf("ERROR, unable to find track or project\n");
-		return;
-	}
-	// not sure why comment doesn't appear in xml
-	/*if(tracks.size() > 0)
-	{
-		tinyxml2::XMLComment *comment = xmlFile->NewComment(" *** WHEN an AUDIO `<track> DOES NOT CONTAIN PREGAP, a DEFAULT EMPTY 2 SECOND or 150 SECTOR PREGAP IS USED! ***");
-		modifyTrack->InsertAfterChild(modifyTrack, comment);
-		modifyTrack = comment;
-	}*/
-	for(auto& track : tracks)
-	{
-		// add a new track
-		tinyxml2::XMLElement *newtrack = xmlFile->NewElement(xml::elem::TRACK);
-		newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
-		newtrack->SetAttribute(xml::attrib::TRACK_ID, track.trackid.c_str());
-		newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, track.source.c_str());
-
-		// only write the pregap element if it's non default
-		if(track.pregap_sectors != 150)
-		{
-			tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
-		    char pregapbuf[16];
-		    snprintf( pregapbuf, sizeof(pregapbuf), "%02d:%02d:%02d", (track.pregap_sectors/75)/60, (track.pregap_sectors/75)%60, track.pregap_sectors%75 );
-		    pregap->SetAttribute(xml::attrib::PREGAP_DURATION, pregapbuf);
-		}
-
-		modifyProject->InsertAfterChild(modifyTrack, newtrack);
-		modifyTrack = newtrack;
 	}
 }
 
@@ -583,6 +508,12 @@ void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElem
 		}
 	}
 }
+
+typedef struct {
+	unsigned lba;
+	unsigned size;
+	std::string source;
+} cdtrack;
 
 void ParseISO(cd::IsoReader& reader) {
 
@@ -692,11 +623,53 @@ void ParseISO(cd::IsoReader& reader) {
 
 			const std::filesystem::path sourcePath = param::outPath.lexically_proximate(param::xmlFile.parent_path());
 
+			// process DA "files" to tracks and add to the dirs so the XML looks nicer
+			std::list<cd::IsoDirEntries::Entry> dafiles;
+			for(auto it = entries.begin(); it != entries.end();)
+			{
+				if(GetXAEntryType(((*it).extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA)
+				{
+					dafiles.push_back(std::move(*it));
+					it = entries.erase(it);
+				}
+				else
+				{
+					it++;
+				}
+			}
+			std::vector<cdtrack> tracks;
+			for(auto& dafile : dafiles)
+			{
+				// add to make track element later
+				tracks.push_back({
+					dafile.entry.entryOffs.lsb,
+					dafile.entry.entrySize.lsb,
+					(sourcePath / dafile.virtualPath / CleanIdentifier(dafile.identifier)).generic_u8string()
+				});
+
+				// add back in to the rest of the files
+				for(auto it = entries.begin(); it != entries.end(); it++)
+				{
+				    std::filesystem::path vpath = (*it).virtualPath / CleanIdentifier((*it).identifier);
+					if(dafile.virtualPath == vpath)
+					{
+						do {
+							it++;
+						} while((it != entries.end()) && ((*it).virtualPath == dafile.virtualPath));
+						auto newitem = entries.emplace(it);
+						(*newitem) = std::move(dafile);
+						break;
+					}
+				}
+			}
+
+
 			// TODO: Commandline switch
 			bool preserveLBA = true;
+			unsigned currentLBA;
 			if (preserveLBA)
 			{
-				WriteXMLByLBA(entries, trackElement, sourcePath, descriptor.rootDirRecord.entryOffs.lsb, descriptor.volumeSize.lsb, false);
+				WriteXMLByLBA(entries, trackElement, sourcePath, descriptor.rootDirRecord.entryOffs.lsb, descriptor.volumeSize.lsb, false, currentLBA);
 			}
 			else
 			{
@@ -704,7 +677,49 @@ void ParseISO(cd::IsoReader& reader) {
 				WriteXMLByDirectories(rootDir->dirEntryList.GetView().front().get().subdir.get(), trackElement, sourcePath);
 
 				// Write DAs by LBA
-				WriteXMLByLBA(entries, trackElement, sourcePath, descriptor.rootDirRecord.entryOffs.lsb, descriptor.volumeSize.lsb, true);
+				WriteXMLByLBA(entries, trackElement, sourcePath, descriptor.rootDirRecord.entryOffs.lsb, descriptor.volumeSize.lsb, true, currentLBA);
+			}
+
+			// write CDDA tracks
+			tinyxml2::XMLNode *modifyProject = trackElement->Parent();
+			tinyxml2::XMLElement *addAfter = trackElement;
+			tinyxml2::XMLElement *dirtree  = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
+			unsigned tracknum = 2;
+			for(auto& track : tracks)
+			{
+				unsigned pregap_sectors = 0;
+				if(track.lba != currentLBA)
+				{
+					unsigned delta = (track.lba - currentLBA);
+					// HACK add dummy sectors, assumes a 150 sector pregap if this a gap of more sectors
+					if((delta > 150) && (tracknum == 2))
+					{
+						WriteXMLGap(delta-150, dirtree);
+						currentLBA += (delta-150);
+						delta = 150;
+					}
+					currentLBA += delta;
+					pregap_sectors = delta;
+				}
+				currentLBA += GetSizeInSectors(track.size);
+				char tidbuf[3];
+				snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum);
+				tinyxml2::XMLElement *newtrack = xmldoc.NewElement(xml::elem::TRACK);
+				newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
+				newtrack->SetAttribute(xml::attrib::TRACK_ID, tidbuf);
+				newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, track.source.c_str());
+				// only write the pregap element if it's non default
+	            if(pregap_sectors != 150)
+	            {
+                    tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
+	                char pregapbuf[16];
+	                snprintf( pregapbuf, sizeof(pregapbuf), "%02d:%02d:%02d", (pregap_sectors/75)/60, (pregap_sectors/75)%60, pregap_sectors%75 );
+	                pregap->SetAttribute(xml::attrib::PREGAP_DURATION, pregapbuf);
+                }
+
+                modifyProject->InsertAfterChild(addAfter, newtrack);
+	            addAfter = newtrack;
+				tracknum++;
 			}
 
 			xmldoc.SaveFile(file);
