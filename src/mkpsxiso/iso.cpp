@@ -982,7 +982,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 
 		// Write Timecode
 		char timecode[12];
-		LBAtoTimecode( 150+entry.lba, timecode, sizeof(timecode) );
+		LBAtoTimecode( entry.lba, timecode, sizeof(timecode) );
 		fprintf( fp, "%-12s", timecode );
 
 		// Write size in byte units
