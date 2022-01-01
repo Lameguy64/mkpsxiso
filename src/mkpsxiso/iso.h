@@ -205,12 +205,13 @@ namespace iso
 		int GetDirCountTotal() const;
 
 		void OutputLBAlisting(FILE* fp, int level) const;
-		int WriteCueEntries(FILE* fp, int* trackNum) const;
 	};
 
 	void WriteLicenseData(cd::IsoWriter* writer, void* data);
 
 	void WriteDescriptor(cd::IsoWriter* writer, const IDENTIFIERS& id, const DIRENTRY& root, int imageLen);
+
+	const int DA_FILE_PLACEHOLDER_LBA = 0xDEADBEEF;
 
 };
 

@@ -365,7 +365,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			else if ( entry.type == EntryType::EntryDA )
 			{
 				// DA files don't take up any space in the ISO filesystem, they are just links to CD tracks
-				entry.lba = 0xDEADBEEF; // we will write the lba into the filesystem when writing the CDDA track
+				entry.lba = iso::DA_FILE_PLACEHOLDER_LBA; // we will write the lba into the filesystem when writing the CDDA track
 				continue;
 				lba += GetSizeInSectors(entry.length, 2352);
 
@@ -545,6 +545,11 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
+			if(entry.lba == iso::DA_FILE_PLACEHOLDER_LBA)
+			{
+				printf("ERROR: DA file still has placeholder value 0x%X\n", iso::DA_FILE_PLACEHOLDER_LBA);
+				return 0;
+			}
 			length = 2048 * GetSizeInSectors(entry.length, 2352);
 		}
 		else
@@ -629,7 +634,10 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 
 int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir)
 {
-	WriteDirEntries( writer, dir, parentDir );
+	if(!WriteDirEntries( writer, dir, parentDir ))
+	{
+		return 0;
+	}
 
 	for ( const auto& e : entriesInDir )
 	{
@@ -896,43 +904,6 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 	}
 }
 
-int iso::DirTreeClass::WriteCueEntries(FILE* fp, int* trackNum) const
-{
-	for ( const auto& e : entriesInDir )
-	{
-		const DIRENTRY& entry = e.get();
-		if ( entry.type == EntryType::EntryDA )
-		{
-			*trackNum += 1;
-			fprintf( fp, "  TRACK %02d AUDIO\n", *trackNum );
-
-			int trackLBA = entry.lba;
-            // TODO: Configurable pregap?
-			fprintf( fp, "    INDEX 00 %02d:%02d:%02d\n",
-					(trackLBA/75)/60, (trackLBA/75)%60,
-					trackLBA%75 );
-
-			trackLBA += 150;
-
-			fprintf( fp, "    INDEX 01 %02d:%02d:%02d\n",
-				(trackLBA/75)/60, (trackLBA/75)%60, trackLBA%75 );
-
-		}
-		else if ( entry.type == EntryType::EntryDir )
-		{
-			entry.subdir->WriteCueEntries( fp, trackNum );
-		}
-
-	}
-
-	return *trackNum;
-}
-
-void LBAtoTimecode(const int lba, char *timecode, const size_t timecode_buf_len)
-{
-	snprintf( timecode, timecode_buf_len, "%02d:%02d:%02d", (lba/75)/60, (lba/75)%60, (lba%75) );
-}
-
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 {
 	for ( const auto& e : entriesInDir )
@@ -981,9 +952,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		fprintf( fp, "%-10d", entry.lba );
 
 		// Write Timecode
-		char timecode[12];
-		LBAtoTimecode( entry.lba, timecode, sizeof(timecode) );
-		fprintf( fp, "%-12s", timecode );
+		fprintf( fp, "%-12s", SectorsToTimecode(entry.lba).c_str());
 
 		// Write size in byte units
 		if (entry.type != EntryType::EntryDir)

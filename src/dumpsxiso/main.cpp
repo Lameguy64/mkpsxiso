@@ -425,7 +425,7 @@ void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement)
 }
 
 void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath,
-	const unsigned int startLBA, const unsigned int sizeInSectors, const bool onlyDA, unsigned& expectedLBA)
+	const unsigned int startLBA, const unsigned int sizeInSectors, const bool onlyDA, unsigned int& expectedLBA)
 {
 	std::filesystem::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
 	expectedLBA = startLBA;
@@ -712,9 +712,7 @@ void ParseISO(cd::IsoReader& reader) {
 	            if(pregap_sectors != 150)
 	            {
                     tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
-	                char pregapbuf[16];
-	                snprintf( pregapbuf, sizeof(pregapbuf), "%02d:%02d:%02d", (pregap_sectors/75)/60, (pregap_sectors/75)%60, pregap_sectors%75 );
-	                pregap->SetAttribute(xml::attrib::PREGAP_DURATION, pregapbuf);
+	                pregap->SetAttribute(xml::attrib::PREGAP_DURATION, SectorsToTimecode(pregap_sectors).c_str());
                 }
 
                 modifyProject->InsertAfterChild(addAfter, newtrack);

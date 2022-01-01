@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string>
 #include <filesystem>
+#include <queue>
+
 #include "common.h"
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
@@ -47,13 +49,22 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
 
-void UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const unsigned lba)
+bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const unsigned lba)
 {
 	for(auto& entry : entries)
 	{
 		if(entry.trackid != trackid) continue;
+		if(entry.lba != iso::DA_FILE_PLACEHOLDER_LBA)
+		{
+			printf( "ERROR: Cannot replace entry.lba when it is not 0x%X\n ", iso::DA_FILE_PLACEHOLDER_LBA);
+			return false;
+		}
 		entry.lba = lba;
+		return true;
 	}
+
+	printf( "ERROR: Did not find entry with trackid %s\n",  trackid);
+	return false;
 }
 
 int Main(int argc, char* argv[])
@@ -228,12 +239,12 @@ int Main(int argc, char* argv[])
 		{
 			continue;
 		}
-		std::list<tinyxml2::XMLElement *> toscan{dt};
-		while(toscan.size() > 0)
+		std::queue<tinyxml2::XMLElement *> toscan({dt});
+		while(!toscan.empty())
 		{
 			tinyxml2::XMLElement *scanElm = toscan.front();
-			toscan.pop_front();
-			if(strcmp(scanElm->Name(), xml::elem::FILE) == 0)
+			toscan.pop();
+			if(CompareICase(scanElm->Name(), xml::elem::FILE))
 			{
 				if(scanElm->Attribute(xml::attrib::ENTRY_TYPE, "da"))
 				{
@@ -274,7 +285,7 @@ int Main(int argc, char* argv[])
 			scanElm = scanElm->FirstChildElement();
 			while(scanElm != nullptr)
 			{
-				toscan.push_back(scanElm);
+				toscan.push(scanElm);
 				scanElm = scanElm->NextSiblingElement();
 			}
 		}
@@ -617,7 +628,7 @@ int Main(int argc, char* argv[])
 
 					if ( !global::NoIsoGen )
 					{
-						int trackLBA = writer.SeekToEnd(); //Fix me to LBA from data tracks?
+						int trackLBA = writer.SeekToEnd();
 
 						// pregap
 						int pregapSectors = 150; // by default 2 seconds
@@ -630,35 +641,39 @@ int Main(int argc, char* argv[])
 								unsigned minutes, seconds, frames;
 								if(
 									(sscanf(duration, "%u:%u:%u", &minutes, &seconds, &frames) != 3) ||
-									(minutes > 80) || (seconds > 59) || (frames > 74) ||
-									(((float)minutes + (float)(seconds/60) + ((float)frames/75)/60) > 80)
+									(seconds > 59) || (frames > 74)
 								)
 								{
 									printf( "ERROR: %s duration is invalid MM:SS:FF"
 										"for track on line %d.\n", xml::attrib::TRACK_SOURCE, pregapElement->GetLineNum() );
 									return EXIT_FAILURE;
 								}
+
+								if(((((minutes * 60) + seconds) * 75) + frames) > (80 * 60 * 75))
+								{
+									printf( "WARNING: duration > 80 minutes\n");
+								}
 								pregapSectors = (((minutes * 60)+seconds)*75)+frames;
 							}
 						}
 						if(pregapSectors > 0)
 						{
-							fprintf( cuefp, "    INDEX 00 %02d:%02d:%02d\n",
-								(trackLBA/75)/60, (trackLBA/75)%60,
-								trackLBA%75 );
+							fprintf( cuefp, "    INDEX 00 %s\n", SectorsToTimecode(trackLBA).c_str());
 							writer.WriteBlankSectors(pregapSectors);
 							trackLBA += pregapSectors;
 						}
 
 						totalLen += (pregapSectors + (iso::DirTreeClass::GetAudioSize(track_source)/2352));
 
-						fprintf( cuefp, "    INDEX 01 %02d:%02d:%02d\n",
-							(trackLBA/75)/60, (trackLBA/75)%60, trackLBA%75 );
+						fprintf( cuefp, "    INDEX 01 %s\n", SectorsToTimecode(trackLBA).c_str());
 
 						const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
 						if(trackid != nullptr)
 						{
-							UpdateDAFilesWithLBA(entries, trackid, trackLBA);
+							if(!UpdateDAFilesWithLBA(entries, trackid, trackLBA))
+							{
+								return EXIT_FAILURE;
+							}
 						}
 
 						// Pack the audio file
@@ -1276,10 +1291,10 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			{
 				if(parent == nullptr)
 				{
-					printf( "ERROR: locating DA file\n" );
+					printf( "ERROR: locating <%s> elem, necessary for locating corresponding track to da file\n", xml::elem::ISO_PROJECT );
 					return false;
 				}
-				if(strcmp(parent->Name(), xml::elem::ISO_PROJECT) == 0)
+				if(CompareICase(parent->Name(), xml::elem::ISO_PROJECT))
 				{
 					isoElement = parent;
 					break;
@@ -1291,7 +1306,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			{
 				if(trackElement == nullptr)
 				{
-					printf( "ERROR: locating DA file\n" );
+					printf( "ERROR: locating <%s %s=\"audio\" %s=\"%s\"> for da file\n", xml::elem::TRACK, xml::attrib::TRACK_TYPE, xml::attrib::TRACK_ID, trackid);
 					return false;
 				}
 				if(trackElement->Attribute(xml::attrib::TRACK_TYPE, "audio") && trackElement->Attribute(xml::attrib::TRACK_ID, trackid))
@@ -1303,7 +1318,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			sourceElement = trackElement->Attribute(xml::attrib::TRACK_SOURCE);
 			if(sourceElement == nullptr)
 			{
-				printf( "ERROR: locating DA file\n" );
+				printf( "ERROR: <%s %s=\"audio\" %s=\"%s\"> must have source\n", xml::elem::TRACK, xml::attrib::TRACK_TYPE, xml::attrib::TRACK_ID, trackid);
 				return false;
 			}
 			srcFile = std::filesystem::u8path(sourceElement);

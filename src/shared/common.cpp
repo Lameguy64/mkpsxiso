@@ -102,6 +102,13 @@ uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize)
 	return static_cast<uint32_t>((size + (sectorSize - 1)) / sectorSize);
 }
 
+std::string SectorsToTimecode(const unsigned sectors)
+{
+	char timecode[16];
+	snprintf( timecode, sizeof(timecode), "%02u:%02u:%02u", (sectors/75)/60, (sectors/75)%60, sectors%75);
+	return std::string(timecode);
+}	                
+
 unsigned short SwapBytes16(unsigned short val)
 {
 	return  ((val & 0xFF) << 8) |
