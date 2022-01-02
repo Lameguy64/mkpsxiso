@@ -4,6 +4,7 @@
 #include "cd.h"
 #include "xa.h"
 #include "platform.h"
+#include "miniaudio_helpers.h"
 
 #include <algorithm>
 #include <cstring>
@@ -55,229 +56,25 @@ static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 	return result;
 }
 
-int iso::DirTreeClass::GetWavSize(const std::filesystem::path& wavFile)
+int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
 {
-	FILE *fp;
-
-	if ( !( fp = OpenFile( wavFile, "rb" ) ) )
+	ma_decoder decoder;
+	VirtualWavEx vw;
+	bool isLossy;
+	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy) != MA_SUCCESS)
 	{
-		printf("ERROR: File not found.\n");
-		return false;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		char	format[4];
-	} HeaderChunk;
-
-	fread( &HeaderChunk, 1, sizeof(HeaderChunk), fp );
-
-	if ( memcmp( &HeaderChunk.id, "RIFF", 4 ) ||
-		memcmp( &HeaderChunk.format, "WAVE", 4 ) )
-	{
-		// It must be a raw
-		fseek(fp, 0, SEEK_END);
-		int wavlen = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-
-		fclose( fp );
-		return wavlen;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		short	format;
-		short	chan;
-		int		freq;
-		int		brate;
-		short	balign;
-		short	bps;
-	} WAV_Subchunk1;
-
-	fread( &WAV_Subchunk1, 1, sizeof(WAV_Subchunk1), fp );
-
-	// Check if its a valid WAVE file
-	if ( memcmp( &WAV_Subchunk1.id, "fmt ", 4 ) )
-	{
-		fclose( fp );
 		return 0;
 	}
 
-	// Search for the data chunk
-	struct
+	const ma_uint64 expectedPCMFrames = ma_decoder_get_length_in_pcm_frames(&decoder);
+	ma_decoder_uninit(&decoder);
+    if(expectedPCMFrames == 0)
 	{
-		char	id[4];
-		int		len;
-	} WAV_Subchunk2;
-
-	while ( 1 )
-	{
-		fread( &WAV_Subchunk2, 1, sizeof(WAV_Subchunk2), fp );
-
-		if ( memcmp( &WAV_Subchunk2.id, "data", 4 ) )
-		{
-			fseek( fp, WAV_Subchunk2.len, SEEK_CUR );
-		}
-		else
-		{
-			break;
-		}
+		printf("\n    ERROR: corrupt file? unable to get_length_in_pcm_frames\n");
+        return 0;
 	}
 
-	fclose( fp );
-
-	return 2352*((WAV_Subchunk2.len+2351)/2352);
-}
-
-int iso::DirTreeClass::PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile)
-{
-	FILE *fp;
-	int waveLen;
-	unsigned char buff[CD_SECTOR_SIZE];
-
-	if ( !( fp = OpenFile( wavFile, "rb" ) ) )
-	{
-		printf("ERROR: File not found.\n");
-		return false;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		char	format[4];
-	} HeaderChunk;
-
-	fread( &HeaderChunk, 1, sizeof(HeaderChunk), fp );
-
-	if ( memcmp( &HeaderChunk.id, "RIFF", 4 ) ||
-		memcmp( &HeaderChunk.format, "WAVE", 4 ) )
-	{
-
-		// File must be a raw, pack it anyway
-
-		// Write data
-		fseek(fp, 0, SEEK_END);
-		waveLen = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-
-		while ( waveLen > 0 )
-		{
-			memset(buff, 0x00, CD_SECTOR_SIZE);
-
-			int readLen = waveLen;
-
-			if (readLen > CD_SECTOR_SIZE)
-			{
-				readLen = CD_SECTOR_SIZE;
-			}
-
-			fread( buff, 1, readLen, fp );
-			writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
-
-			waveLen -= readLen;
-		}
-
-		printf("Packed as raw... ");
-
-		fclose( fp );
-		return true;
-	}
-
-	// Get header chunk
-	struct
-	{
-		char	id[4];
-		int		size;
-		short	format;
-		short	chan;
-		int		freq;
-		int		brate;
-		short	balign;
-		short	bps;
-	} WAV_Subchunk1;
-
-	fread( &WAV_Subchunk1, 1, sizeof(WAV_Subchunk1), fp );
-
-	// Check if its a valid WAVE file
-	if ( memcmp( &WAV_Subchunk1.id, "fmt ", 4 ) )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "\n    " );
-		}
-
-		printf( "ERROR: Unsupported WAV format.\n" );
-
-		fclose( fp );
-		return false;;
-	}
-
-
-    if ( (WAV_Subchunk1.chan != 2) || (WAV_Subchunk1.freq != 44100) ||
-		(WAV_Subchunk1.bps != 16) )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "\n    " );
-		}
-
-		printf( "ERROR: Only 44.1KHz, 16-bit Stereo WAV files are supported.\n" );
-
-		fclose( fp );
-		return false;
-    }
-
-	// Search for the data chunk
-	struct
-	{
-		char	id[4];
-		int		len;
-	} WAV_Subchunk2;
-
-	while ( 1 )
-	{
-		fread( &WAV_Subchunk2, 1, sizeof(WAV_Subchunk2), fp );
-
-		if ( memcmp( &WAV_Subchunk2.id, "data", 4 ) )
-		{
-			fseek( fp, WAV_Subchunk2.len, SEEK_CUR );
-		}
-		else
-		{
-			break;
-		}
-	}
-
-	waveLen = WAV_Subchunk2.len;
-
-	// Write data
-	while ( waveLen > 0 )
-	{
-		memset(buff, 0x00, CD_SECTOR_SIZE);
-
-        int readLen = waveLen;
-
-        if (readLen > CD_SECTOR_SIZE)
-		{
-			readLen = CD_SECTOR_SIZE;
-		}
-
-		fread( buff, 1, readLen, fp );
-        writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
-
-        waveLen -= readLen;
-	}
-
-	fclose( fp );
-	return true;
+	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), 2352)*2352;
 }
 
 iso::DirTreeClass::DirTreeClass(EntryList& entries, DirTreeClass* parent)
@@ -303,7 +100,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	return entries.back();
 }
 
-bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes)
+bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes, const char *trackid)
 {
     auto fileAttrib = Stat(srcfile);
     if ( !fileAttrib )
@@ -412,7 +209,13 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::
 
 	if ( type == EntryType::EntryDA )
 	{
-		entry.length = GetWavSize( srcfile );
+		entry.length = GetAudioSize( srcfile );
+		if(trackid == nullptr)
+		{
+			printf("ERROR: no trackid for DA track\n");
+			return false;
+		}
+		entry.trackid = trackid;
 	}
 	else if ( type != EntryType::EntryDir )
 	{
@@ -560,6 +363,9 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			}
 			else if ( entry.type == EntryType::EntryDA )
 			{
+				// DA files don't take up any space in the ISO filesystem, they are just links to CD tracks
+				entry.lba = iso::DA_FILE_PLACEHOLDER_LBA; // we will write the lba into the filesystem when writing the CDDA track
+				continue;
 				lba += GetSizeInSectors(entry.length, 2352);
 
 				// TODO: Configurable pregap
@@ -738,8 +544,12 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
+			if(entry.lba == iso::DA_FILE_PLACEHOLDER_LBA)
+			{
+				printf("ERROR: DA file still has placeholder value 0x%X\n", iso::DA_FILE_PLACEHOLDER_LBA);
+				return 0;
+			}
 			length = 2048 * GetSizeInSectors(entry.length, 2352);
-			lba += 150;
 		}
 		else
 		{
@@ -823,7 +633,10 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 
 int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir)
 {
-	WriteDirEntries( writer, dir, parentDir );
+	if(!WriteDirEntries( writer, dir, parentDir ))
+	{
+		return 0;
+	}
 
 	for ( const auto& e : entriesInDir )
 	{
@@ -1000,23 +813,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
-			if ( !global::QuietMode )
-			{
-				printf( "      Packing DA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
-			}
-
-			// TODO: Configurable pregap
-			writer->WriteBlankSectors(150);
-
-			if ( PackWaveFile( writer, entry.srcfile) )
-			{
-				if (!global::QuietMode)
-				{
-					printf( "Done.\n" );
-				}
-			}
-
-			//firstDAWritten = true;
+			continue;
 		}
 		/*else if ( entry.type == EntryDir )
 		{
@@ -1106,43 +903,6 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 	}
 }
 
-int iso::DirTreeClass::WriteCueEntries(FILE* fp, int* trackNum) const
-{
-	for ( const auto& e : entriesInDir )
-	{
-		const DIRENTRY& entry = e.get();
-		if ( entry.type == EntryType::EntryDA )
-		{
-			*trackNum += 1;
-			fprintf( fp, "  TRACK %02d AUDIO\n", *trackNum );
-
-			int trackLBA = entry.lba;
-            // TODO: Configurable pregap?
-			fprintf( fp, "    INDEX 00 %02d:%02d:%02d\n",
-					(trackLBA/75)/60, (trackLBA/75)%60,
-					trackLBA%75 );
-
-			trackLBA += 150;
-
-			fprintf( fp, "    INDEX 01 %02d:%02d:%02d\n",
-				(trackLBA/75)/60, (trackLBA/75)%60, trackLBA%75 );
-
-		}
-		else if ( entry.type == EntryType::EntryDir )
-		{
-			entry.subdir->WriteCueEntries( fp, trackNum );
-		}
-
-	}
-
-	return *trackNum;
-}
-
-void LBAtoTimecode(int lba, char* timecode)
-{
-	sprintf( timecode, "%02d:%02d:%02d", (lba/75)/60, (lba/75)%60, (lba%75) );
-}
-
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 {
 	for ( const auto& e : entriesInDir )
@@ -1191,9 +951,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		fprintf( fp, "%-10d", entry.lba );
 
 		// Write Timecode
-		char timecode[12];
-		LBAtoTimecode( 150+entry.lba, timecode );
-		fprintf( fp, "%-12s", timecode );
+		fprintf( fp, "%-12s", SectorsToTimecode(entry.lba).c_str());
 
 		// Write size in byte units
 		if (entry.type != EntryType::EntryDir)

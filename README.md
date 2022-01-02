@@ -45,7 +45,7 @@ Older versions (probably going to be removed soon, there's no benefit to using t
 2. Clone/download the repo, then run the following command from the mkpsxiso directory to ensure `tinyxml2` is also downloaded and updated:
 
    ```bash
-   git submodule update --init --recursive --remote
+   git submodule update --init --recursive
    ```
 
 3. Run the following commands:

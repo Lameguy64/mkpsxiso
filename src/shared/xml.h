@@ -13,6 +13,8 @@ namespace elem
 	constexpr const char* LICENSE = "license";
 	constexpr const char* TRACK = "track";
 	constexpr const char* DIRECTORY_TREE = "directory_tree";
+	constexpr const char* FILE = "file";
+	constexpr const char* TRACK_PREGAP = "pregap";
 }
 
 namespace attrib
@@ -23,6 +25,8 @@ namespace attrib
 
 	constexpr const char* TRACK_TYPE = "type";
 	constexpr const char* TRACK_SOURCE = "source";
+	constexpr const char* TRACK_ID = "trackid";
+	constexpr const char* PREGAP_DURATION = "duration";
 
 	constexpr const char* ENTRY_NAME = "name";
 	constexpr const char* ENTRY_SOURCE = "source";

@@ -43,6 +43,7 @@ namespace iso
 		std::unique_ptr<class DirTreeClass> subdir;
 
 		cd::ISO_DATESTAMP date;
+		std::string trackid; /// only used for DA files
 
 	};
 
@@ -111,11 +112,8 @@ namespace iso
 		/// Internal function for recursive path table generation
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
 
-		int GetWavSize(const std::filesystem::path& wavFile);
-		int PackWaveFile(cd::IsoWriter* writer, const std::filesystem::path& wavFile);
-		
 	public:
-
+        static int GetAudioSize(const std::filesystem::path& audioFile);
 		EntryList& entries; // List of all entries on the disc
 		std::vector<std::reference_wrapper<iso::DIRENTRY>> entriesInDir; // References to entries in this directory
 
@@ -152,7 +150,7 @@ namespace iso
 		 *	*srcfile	- Path and filename to the source file.
 		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 */
-		bool AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes);
+		bool AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes, const char *trackid = nullptr);
 
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.
@@ -207,12 +205,13 @@ namespace iso
 		int GetDirCountTotal() const;
 
 		void OutputLBAlisting(FILE* fp, int level) const;
-		int WriteCueEntries(FILE* fp, int* trackNum) const;
 	};
 
 	void WriteLicenseData(cd::IsoWriter* writer, void* data);
 
 	void WriteDescriptor(cd::IsoWriter* writer, const IDENTIFIERS& id, const DIRENTRY& root, int imageLen);
+
+	const int DA_FILE_PLACEHOLDER_LBA = 0xDEADBEEF;
 
 };
 

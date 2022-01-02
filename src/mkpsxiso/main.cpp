@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string>
 #include <filesystem>
+#include <queue>
+
 #include "common.h"
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
@@ -18,6 +20,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 #include "miniaudio_pcm.h"
+#include "miniaudio_helpers.h"
 
 
 namespace global
@@ -37,29 +40,38 @@ namespace global
 
 	std::optional<std::filesystem::path> cuefile;
 	int			NoIsoGen = false;
+	std::filesystem::path RebuildXMLScript;
 };
 
 
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da);
-int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath);
+int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
 
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
 
-// Helper wrapper to simplify dealing with paths on Windows
-ma_result ma_decoder_init_path(const std::filesystem::path& pFilePath, const ma_decoder_config* pConfig, ma_decoder* pDecoder)
+bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const unsigned lba)
 {
-#ifdef _WIN32
-	return ma_decoder_init_file_w(pFilePath.c_str(), pConfig, pDecoder);
-#else
-	return ma_decoder_init_file(pFilePath.c_str(), pConfig, pDecoder);
-#endif
+	for(auto& entry : entries)
+	{
+		if(entry.trackid != trackid) continue;
+		if(entry.lba != iso::DA_FILE_PLACEHOLDER_LBA)
+		{
+			printf( "ERROR: Cannot replace entry.lba when it is not 0x%X\n ", iso::DA_FILE_PLACEHOLDER_LBA);
+			return false;
+		}
+		entry.lba = lba;
+		return true;
+	}
+
+	printf( "ERROR: Did not find entry with trackid %s\n",  trackid);
+	return false;
 }
 
 int Main(int argc, char* argv[])
 {
 	static constexpr const char* HELP_TEXT =
-		"mkpsxiso [-h|--help] [-y] [-q|--quiet] [-o|--output <file>] [-lba <file>] [-lbahead <file>] [-nolimit]\n"
-		"  [-noisogen] <xml>\n\n"
+		"mkpsxiso [-h|--help] [-y] [-q|--quiet] [-o|--output <file>] [-lba <file>] [-lbahead <file>]\n"
+		"  [-rebuildxml <file>] [-nolimit] [-noisogen] <xml>\n\n"
 		"  -y        - Always overwrite ISO image files.\n"
 		"  -q|--quiet - Quiet mode (prints nothing but warnings and errors).\n"
 		"  -o|--output - Specifies output file name (overrides XML but not cue_sheet).\n"
@@ -72,9 +84,10 @@ int Main(int argc, char* argv[])
 		"              (To be used with -lba or -lbahead without generating ISO).\n"
 		"  -noxa     - Do not generate CD-XA file attributes\n"
 		"              (XA data can still be included but not recommended).\n"
+		"  -rebuildxml - Rebuild the XML using our newest schema\n"
 		"  -h|--help - Show this help text\n";
 
-	static constexpr const char* VERSION_TEXT = 
+	static constexpr const char* VERSION_TEXT =
 		"MKPSXISO " VERSION " - PlayStation ISO Image Maker\n"
 		"2017-2018 Meido-Tek Productions (Lameguy64)\n"
 		"2021 Silent, Chromaryu, and G4Vi\n\n";
@@ -124,6 +137,11 @@ int Main(int argc, char* argv[])
 				OutputOverride = true;
 				continue;
 			}
+			if (auto newxmlfile = ParsePathArgument(args, "rebuildxml"); newxmlfile.has_value())
+			{
+				global::RebuildXMLScript = *newxmlfile;
+				continue;
+			}
 			if (ParseArgument(args, "y"))
 			{
 				global::Overwrite = true;
@@ -134,7 +152,7 @@ int Main(int argc, char* argv[])
 				global::noXA = true;
 				continue;
 			}
-			
+
 			// If we reach this point, an unknown parameter was passed
 			printf("Unknown parameter: %s\n", *args);
 			return EXIT_FAILURE;
@@ -205,6 +223,96 @@ int Main(int argc, char* argv[])
 			return EXIT_FAILURE;
 		}
     }
+
+	// Fix XML tree to our current spec
+	// convert DA file source syntax to DA file trackid syntax
+	unsigned trackindex = 2;
+	for(tinyxml2::XMLElement *modifyProject = xmlFile.FirstChildElement(xml::elem::ISO_PROJECT); modifyProject != nullptr; modifyProject = modifyProject->NextSiblingElement(xml::elem::ISO_PROJECT))
+	{
+		tinyxml2::XMLElement *modifyTrack = modifyProject->FirstChildElement(xml::elem::TRACK);
+		if((modifyTrack == nullptr) || (!modifyTrack->Attribute(xml::attrib::TRACK_TYPE, "data")))
+		{
+			continue;
+		}
+		tinyxml2::XMLElement *dt =  modifyTrack->FirstChildElement(xml::elem::DIRECTORY_TREE);
+		if(dt == nullptr)
+		{
+			continue;
+		}
+		std::queue<tinyxml2::XMLElement *> toscan({dt});
+		while(!toscan.empty())
+		{
+			tinyxml2::XMLElement *scanElm = toscan.front();
+			toscan.pop();
+			if(CompareICase(scanElm->Name(), xml::elem::FILE))
+			{
+				if(scanElm->Attribute(xml::attrib::ENTRY_TYPE, "da"))
+				{
+					const char *trackid = scanElm->Attribute(xml::attrib::TRACK_ID);
+					const char *source = scanElm->Attribute(xml::attrib::ENTRY_SOURCE);
+					if((trackid != nullptr) && (source != nullptr))
+					{
+						printf( "ERROR: Cannot specify trackid and source at the same time\n ");
+		                return EXIT_FAILURE;
+					}
+					if(source != nullptr)
+					{
+						char tid[3];
+						snprintf(tid, sizeof(tid), "%02u", trackindex);
+						std::string trackid = tid;
+						trackindex++;
+
+                        // add a new track
+						tinyxml2::XMLElement *newtrack = xmlFile.NewElement(xml::elem::TRACK);
+						newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
+						newtrack->SetAttribute(xml::attrib::TRACK_ID, trackid.c_str());
+						newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, source);
+						// a 2 second pregap is assumed, don't write it
+						/*tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
+						pregap->SetAttribute(xml::attrib::PREGAP_DURATION, "00:02:00");*/
+						modifyProject->InsertAfterChild(modifyTrack, newtrack);
+						modifyTrack = newtrack;
+
+						// update the file to point to the track
+						scanElm->DeleteAttribute(xml::attrib::ENTRY_SOURCE);
+						scanElm->SetAttribute(xml::attrib::TRACK_ID, trackid.c_str());
+					}
+				}
+				continue;
+			}
+
+			// add children to scan
+			scanElm = scanElm->FirstChildElement();
+			while(scanElm != nullptr)
+			{
+				toscan.push(scanElm);
+				scanElm = scanElm->NextSiblingElement();
+			}
+		}
+	}
+
+	if(!global::RebuildXMLScript.empty())
+	{
+		if ( !global::QuietMode )
+		{
+			printf( "      Writing new XML ... " );
+		}
+		if (FILE* file = OpenFile(global::RebuildXMLScript, "w"); file != nullptr)
+	    {
+	    	xmlFile.SaveFile(file);
+	    	fclose(file);
+	    }
+		else
+		{
+			printf( "ERROR: Cannot open %s for writing\n", global::RebuildXMLScript.generic_u8string().c_str());
+			return EXIT_FAILURE;
+		}
+		if ( !global::QuietMode )
+		{
+			printf("Ok.\n");
+		}
+	    return EXIT_SUCCESS;
+	}
 
 	// Check if there is an <iso_project> element
     const tinyxml2::XMLElement* projectElement =
@@ -301,7 +409,6 @@ int Main(int argc, char* argv[])
 			return EXIT_FAILURE;
 		}
 
-
 		// Check if cue_sheet attribute is specified
 		FILE*	cuefp = nullptr;
 
@@ -365,6 +472,9 @@ int Main(int argc, char* argv[])
 		}
 
 		global::trackNum = 1;
+		iso::EntryList entries;
+		iso::IDENTIFIERS isoIdentifiers {};
+		int totalLen;
 
 		// Parse tracks
 		while ( trackElement != nullptr )
@@ -429,7 +539,7 @@ int Main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 
-				if ( !ParseISOfileSystem( &writer, cuefp, trackElement, global::XMLscript.parent_path() ) )
+				if ( !ParseISOfileSystem( &writer, trackElement, global::XMLscript.parent_path(), entries, isoIdentifiers, totalLen ) )
 				{
 					if ( !global::NoIsoGen )
 					{
@@ -446,6 +556,12 @@ int Main(int argc, char* argv[])
 					}
 
 					return EXIT_FAILURE;
+				}
+
+				if ( cuefp != nullptr )
+				{
+					fprintf( cuefp, "  TRACK %02d MODE2/2352\n", global::trackNum );
+					fprintf( cuefp, "    INDEX 01 00:00:00\n" );
 				}
 
 				if ( global::NoIsoGen )
@@ -514,16 +630,51 @@ int Main(int argc, char* argv[])
 					{
 						int trackLBA = writer.SeekToEnd();
 
-                        // TODO configurable pregap
-						fprintf( cuefp, "    INDEX 00 %02d:%02d:%02d\n",
-								(trackLBA/75)/60, (trackLBA/75)%60,
-								trackLBA%75 );
+						// pregap
+						int pregapSectors = 150; // by default 2 seconds
+						const tinyxml2::XMLElement *pregapElement = trackElement->FirstChildElement(xml::elem::TRACK_PREGAP);
+						if(pregapElement != nullptr)
+						{
+							const char *duration = pregapElement->Attribute(xml::attrib::PREGAP_DURATION);
+							if(duration != nullptr)
+							{
+								unsigned minutes, seconds, frames;
+								if(
+									(sscanf(duration, "%u:%u:%u", &minutes, &seconds, &frames) != 3) ||
+									(seconds > 59) || (frames > 74)
+								)
+								{
+									printf( "ERROR: %s duration is invalid MM:SS:FF"
+										"for track on line %d.\n", xml::attrib::TRACK_SOURCE, pregapElement->GetLineNum() );
+									return EXIT_FAILURE;
+								}
 
-						writer.WriteBlankSectors(150);
-						trackLBA += 150;
+								if(((((minutes * 60) + seconds) * 75) + frames) > (80 * 60 * 75))
+								{
+									printf( "WARNING: duration > 80 minutes\n");
+								}
+								pregapSectors = (((minutes * 60)+seconds)*75)+frames;
+							}
+						}
+						if(pregapSectors > 0)
+						{
+							fprintf( cuefp, "    INDEX 00 %s\n", SectorsToTimecode(trackLBA).c_str());
+							writer.WriteBlankSectors(pregapSectors);
+							trackLBA += pregapSectors;
+						}
 
-						fprintf( cuefp, "    INDEX 01 %02d:%02d:%02d\n",
-							(trackLBA/75)/60, (trackLBA/75)%60, trackLBA%75 );
+						totalLen += (pregapSectors + (iso::DirTreeClass::GetAudioSize(track_source)/2352));
+
+						fprintf( cuefp, "    INDEX 01 %s\n", SectorsToTimecode(trackLBA).c_str());
+
+						const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
+						if(trackid != nullptr)
+						{
+							if(!UpdateDAFilesWithLBA(entries, trackid, trackLBA))
+							{
+								return EXIT_FAILURE;
+							}
+						}
 
 						// Pack the audio file
 						if ( !global::QuietMode )
@@ -585,9 +736,93 @@ int Main(int argc, char* argv[])
 			global::trackNum++;
 		}
 
-		// Get the last LBA of the image to calculate total size
+
 		if ( !global::NoIsoGen )
 		{
+			iso::DIRENTRY& root = entries.front();
+	        iso::DirTreeClass* dirTree = root.subdir.get();
+
+			if ( !global::LBAfile.empty() )
+			{
+				FILE* fp = OpenFile( global::LBAfile, "w" );
+				if (fp != nullptr)
+				{
+					fprintf( fp, "File LBA log generated by MKPSXISO v" VERSION "\n\n" );
+					fprintf( fp, "Image bin file: %" PRFILESYSTEM_PATH "\n", global::ImageName.lexically_normal().c_str() );
+
+					if ( global::cuefile )
+					{
+						fprintf( fp, "Image cue file: %" PRFILESYSTEM_PATH "\n", global::cuefile->lexically_normal().c_str() );
+					}
+
+					fprintf( fp, "\nFile System:\n\n" );
+					fprintf( fp, "    Type  Name             Length    LBA       "
+						"Timecode    Bytes     Source File\n\n" );
+
+					dirTree->OutputLBAlisting( fp, 0 );
+
+					fclose( fp );
+
+					if ( !global::QuietMode )
+					{
+						printf( "    Wrote file LBA log %" PRFILESYSTEM_PATH ".\n\n",
+							global::LBAfile.lexically_normal().c_str() );
+					}
+				}
+				else
+				{
+					if ( !global::QuietMode )
+					{
+						printf( "    Failed to write LBA log %" PRFILESYSTEM_PATH "!\n\n",
+							global::LBAfile.lexically_normal().c_str() );
+					}
+				}
+			}
+
+			if ( !global::LBAheaderFile.empty() )
+			{
+				FILE* fp = OpenFile( global::LBAheaderFile, "w" );
+				if (fp != nullptr)
+				{
+					dirTree->OutputHeaderListing( fp, 0 );
+
+					fclose( fp );
+
+					if ( !global::QuietMode )
+					{
+						printf( "    Wrote file LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
+							global::LBAheaderFile.lexically_normal().c_str() );
+					}
+				}
+				else
+				{
+					if ( !global::QuietMode )
+					{
+						printf( "    Failed to write LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
+							global::LBAheaderFile.lexically_normal().c_str() );
+					}
+				}
+			}
+			// Write file system
+			if ( !global::QuietMode )
+			{
+				printf( "      Writing filesystem... " );
+			}
+
+			// Sort directory entries and write it
+			dirTree->SortDirectoryEntries();
+			dirTree->WriteDirectoryRecords( &writer, root, root );
+
+			// Write file system descriptors to finish the image
+	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLen );
+
+			if ( !global::QuietMode )
+			{
+				printf( "Ok.\n" );
+			}
+
+
+			// Get the last LBA of the image to calculate total size
 			int totalImageSize = writer.SeekToEnd();
 
 			// Close both ISO writer and CUE sheet
@@ -651,7 +886,7 @@ iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement
 	return result;
 };
 
-int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath)
+int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen)
 {
 	const tinyxml2::XMLElement* identifierElement =
 		trackElement->FirstChildElement(xml::elem::IDENTIFIERS);
@@ -659,7 +894,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 		trackElement->FirstChildElement(xml::elem::LICENSE);
 
 	// Set file system identifiers
-	iso::IDENTIFIERS isoIdentifiers {};
 
 	if ( identifierElement != nullptr )
 	{
@@ -841,7 +1075,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 		printf( "    Parsing directory tree...\n" );
 	}
 
-	iso::EntryList entries;
 	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate);
 	iso::DirTreeClass* dirTree = root.subdir.get();
 
@@ -857,7 +1090,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 		return false;
 	}
 
-	bool found_da = false;	
+	bool found_da = false;
 	const iso::EntryAttributes rootAttributes = iso::EntryAttributes::Overlay(iso::EntryAttributes::MakeDefault(), ReadEntryAttributes(directoryTree));
 	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, rootAttributes, found_da) )
 	{
@@ -868,7 +1101,7 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 	int pathTableLen = dirTree->CalculatePathTableLen(root);
 
 	const int rootLBA = 17+(GetSizeInSectors(pathTableLen)*4);
-	int totalLen = dirTree->CalculateTreeLBA(rootLBA);
+	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
 	{
@@ -876,76 +1109,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 		printf( "      Directories: %d\n", dirTree->GetDirCountTotal() );
 		printf( "      Total file system size: %d bytes (%d sectors)\n\n",
 			2352*totalLen, totalLen);
-	}
-
-	if ( !global::LBAfile.empty() )
-	{
-		FILE* fp = OpenFile( global::LBAfile, "w" );
-		if (fp != nullptr)
-		{
-			fprintf( fp, "File LBA log generated by MKPSXISO v" VERSION "\n\n" );
-			fprintf( fp, "Image bin file: %" PRFILESYSTEM_PATH "\n", global::ImageName.lexically_normal().c_str() );
-
-			if ( global::cuefile )
-			{
-				fprintf( fp, "Image cue file: %" PRFILESYSTEM_PATH "\n", global::cuefile->lexically_normal().c_str() );
-			}
-
-			fprintf( fp, "\nFile System:\n\n" );
-			fprintf( fp, "    Type  Name             Length    LBA       "
-				"Timecode    Bytes     Source File\n\n" );
-
-			dirTree->OutputLBAlisting( fp, 0 );
-
-			fclose( fp );
-
-			if ( !global::QuietMode )
-			{
-				printf( "    Wrote file LBA log %" PRFILESYSTEM_PATH ".\n\n",
-					global::LBAfile.lexically_normal().c_str() );
-			}
-		}
-		else
-		{
-			if ( !global::QuietMode )
-			{
-				printf( "    Failed to write LBA log %" PRFILESYSTEM_PATH "!\n\n",
-					global::LBAfile.lexically_normal().c_str() );
-			}
-		}
-	}
-
-	if ( !global::LBAheaderFile.empty() )
-	{
-		FILE* fp = OpenFile( global::LBAheaderFile, "w" );
-		if (fp != nullptr)
-		{
-			dirTree->OutputHeaderListing( fp, 0 );
-
-			fclose( fp );
-
-			if ( !global::QuietMode )
-			{
-				printf( "    Wrote file LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
-					global::LBAheaderFile.lexically_normal().c_str() );
-			}
-		}
-		else
-		{
-			if ( !global::QuietMode )
-			{
-				printf( "    Failed to write LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
-					global::LBAheaderFile.lexically_normal().c_str() );
-			}
-		}
-	}
-
-	if ( cue_fp != nullptr )
-	{
-		fprintf( cue_fp, "  TRACK 01 MODE2/2352\n" );
-		fprintf( cue_fp, "    INDEX 01 00:00:00\n" );
-
-		dirTree->WriteCueEntries( cue_fp, &global::trackNum );
 	}
 
 	if ( global::NoIsoGen )
@@ -988,24 +1151,6 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 	// Copy the files into the disc image
 	dirTree->WriteFiles( writer );
 
-	// Write file system
-	if ( !global::QuietMode )
-	{
-		printf( "      Writing filesystem... " );
-	}
-
-	// Sort directory entries and write it
-	dirTree->SortDirectoryEntries();
-	dirTree->WriteDirectoryRecords( writer, root, root );
-
-	// Write file system descriptors to finish the image
-	iso::WriteDescriptor( writer, isoIdentifiers, root, totalLen );
-
-	if ( !global::QuietMode )
-	{
-		printf( "Ok.\n" );
-	}
-
 	// Write license data
 	if ( licenseElement != nullptr )
 	{
@@ -1029,6 +1174,12 @@ int ParseISOfileSystem(cd::IsoWriter* writer, FILE* cue_fp, const tinyxml2::XMLE
 			}
 			fclose( fp );
 		}
+	}
+
+	if(writer->SeekToEnd() != totalLen)
+	{
+		printf( "      Not good, writer->seektoend != totalLen" );
+		return false;
 	}
 
 	return true;
@@ -1102,6 +1253,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	}
 
 	EntryType entry = EntryType::EntryFile;
+	const char *trackid = nullptr;
 
 	const char* typeElement = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
 	if ( typeElement != nullptr )
@@ -1127,6 +1279,49 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 				printf( "ERROR: DA audio file(s) specified but no CUE sheet specified.\n" );
 				return false;
 			}
+			trackid = dirElement->Attribute(xml::attrib::TRACK_ID);
+			if ( trackid == nullptr )
+			{
+				printf( "ERROR: DA audio file(s) does not have an associated CDDA track [trackid]\n" );
+				return false;
+			}
+			// locate the node containing the tracks
+			const tinyxml2::XMLElement *isoElement;
+			for( const tinyxml2::XMLElement *parent = (tinyxml2::XMLElement *)dirElement->Parent(); ; parent = (tinyxml2::XMLElement *)parent->Parent())
+			{
+				if(parent == nullptr)
+				{
+					printf( "ERROR: locating <%s> elem, necessary for locating corresponding track to da file\n", xml::elem::ISO_PROJECT );
+					return false;
+				}
+				if(CompareICase(parent->Name(), xml::elem::ISO_PROJECT))
+				{
+					isoElement = parent;
+					break;
+				}
+			}
+			// locate the track with trackid
+			const tinyxml2::XMLElement *trackElement;
+			for(trackElement = isoElement->FirstChildElement(xml::elem::TRACK); ; trackElement = trackElement->NextSiblingElement(xml::elem::TRACK))
+			{
+				if(trackElement == nullptr)
+				{
+					printf( "ERROR: locating <%s %s=\"audio\" %s=\"%s\"> for da file\n", xml::elem::TRACK, xml::attrib::TRACK_TYPE, xml::attrib::TRACK_ID, trackid);
+					return false;
+				}
+				if(trackElement->Attribute(xml::attrib::TRACK_TYPE, "audio") && trackElement->Attribute(xml::attrib::TRACK_ID, trackid))
+				{
+					break;
+				}
+			}
+			// set the src file to the trackid source
+			sourceElement = trackElement->Attribute(xml::attrib::TRACK_SOURCE);
+			if(sourceElement == nullptr)
+			{
+				printf( "ERROR: <%s %s=\"audio\" %s=\"%s\"> must have source\n", xml::elem::TRACK, xml::attrib::TRACK_TYPE, xml::attrib::TRACK_ID, trackid);
+				return false;
+			}
+			srcFile = std::filesystem::u8path(sourceElement);
 			found_da = true;
 		}
 		else
@@ -1143,39 +1338,39 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			return false;
 		}
 
-		if ( found_da && entry != EntryType::EntryDA )
-		{
-			if ( !global::QuietMode )
-			{
-				printf( "      " );
-			}
-
-			printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
-				dirElement->GetLineNum() );
-
-			return false;
-		}
+		//if ( found_da && entry != EntryType::EntryDA )
+		//{
+		//	if ( !global::QuietMode )
+		//	{
+		//		printf( "      " );
+		//	}
+//
+		//	printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
+		//		dirElement->GetLineNum() );
+//
+		//	return false;
+		//}
 
 	}
 
-	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)));
+	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)), trackid);
 }
 
 static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
 {
-	if ( found_da )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "      " );
-		}
-
-		printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
-			dirElement->GetLineNum() );
-
-		return false;
-	}
-
+	//if ( found_da )
+	//{
+	//	if ( !global::QuietMode )
+	//	{
+	//		printf( "      " );
+	//	}
+//
+	//	printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
+	//		dirElement->GetLineNum() );
+//
+	//	return false;
+	//}
+//
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
 	int dummyType = 0; // Data
@@ -1222,18 +1417,18 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 		return false;
 	}
 
-	if ( found_da && !alreadyExists )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "      " );
-		}
-
-		printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
-			dirElement->GetLineNum() );
-
-		return false;
-	}
+	//if ( found_da && !alreadyExists )
+	//{
+	//	if ( !global::QuietMode )
+	//	{
+	//		printf( "      " );
+	//	}
+//
+	//	printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
+	//		dirElement->GetLineNum() );
+//
+	//	return false;
+	//}
 
 	return ParseDirectory(subdir, dirElement, xmlPath, attribs, found_da);
 }
@@ -1268,116 +1463,30 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 	return true;
 }
 
-typedef enum {
-	DAF_WAV,
-	DAF_FLAC,
-	DAF_MP3,
-	DAF_PCM
-} DecoderAudioFormats;
-
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile)
 {
 	// open the decoder
-    ma_decoder decoder;	
-	ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_s16, 2, 44100);	
-	bool isLossy = false;
-	long pcmBytesLeft;
-
-    DecoderAudioFormats tryorder[4] = {DAF_WAV, DAF_FLAC, DAF_MP3, DAF_PCM};
-	const auto& extension = audioFile.extension().u8string();
-
-	// determine which format to try based on magic numbers
-	bool magicvalid = false;
-	char magic[12];
-	{
-		auto file = OpenScopedFile(audioFile, "rb");
-		if(file)
-		{
-			magicvalid = (fread(magic, 12, 1, file.get()) == 1);
-		}
-	}
-	if(magicvalid && (memcmp(magic, "RIFF", 4) == 0) && (memcmp(&magic[8], "WAVE", 4) == 0))
-	{
-		// it's wave, default try order is good
-	}
-	else if(magicvalid && (memcmp(magic, "fLaC", 4) == 0))
-	{
-		tryorder[0] = DAF_FLAC;
-		tryorder[1] = DAF_WAV;
-	}
-	//fallback - determine which format to try based on file extension
-	else if(extension.size() >= 4)
-	{
-		//nothing to change if wav
-		if(CompareICase(extension.c_str(), ".flac") )
-		{
-			tryorder[0] = DAF_FLAC;
-			tryorder[1] = DAF_WAV;
-		}
-		else if(CompareICase(extension.c_str(), ".mp3") )
-		{
-			tryorder[0] = DAF_MP3;
-			tryorder[1] = DAF_WAV;
-			tryorder[2] = DAF_FLAC;
-		}
-		else if((CompareICase(extension.c_str(), ".pcm") ) || (CompareICase(extension.c_str(), ".raw") ))
-		{
-			tryorder[0] = DAF_PCM;
-			tryorder[1] = DAF_WAV;
-			tryorder[2] = DAF_FLAC;
-			tryorder[3] = DAF_MP3;
-		}
-	}
+    ma_decoder decoder;
 	VirtualWavEx vw;
-	const int num_tries = std::size(tryorder);
-	int i;
-	for(i = 0; i < num_tries; i++)
+	bool isLossy;
+	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy) != MA_SUCCESS)
 	{
-		if(tryorder[i] == DAF_WAV)
-		{
-	        decoderConfig.encodingFormat = ma_encoding_format_wav;
-	        if(MA_SUCCESS == ma_decoder_init_path(audioFile, &decoderConfig, &decoder)) break;				
-		}
-        else if(tryorder[i] == DAF_FLAC)
-		{
-	        decoderConfig.encodingFormat = ma_encoding_format_flac;
-	        if(MA_SUCCESS == ma_decoder_init_path(audioFile, &decoderConfig, &decoder)) break;
-		}
-		else if(tryorder[i] == DAF_MP3)
-		{
-	        decoderConfig.encodingFormat = ma_encoding_format_mp3;
-	        if(MA_SUCCESS == ma_decoder_init_path(audioFile, &decoderConfig, &decoder))
-	        {
-	        	isLossy = true;
-	        	break;
-	        }
-		}
-		else if(tryorder[i] == DAF_PCM)
-		{
-			printf("\n    WARN: Guessing it's just signed 16 bit stereo @ 44100 kHz pcm audio\n");
-			if(MA_SUCCESS == ma_decoder_init_path_pcm(audioFile, &decoderConfig, &decoder, &vw)) break;
-		}
-	}
-	if(i == num_tries)
-	{
-		// no more formats to try, return false
-	    printf("    ERROR: No valid format found\n");
-	    return false;	
+		return 0;
 	}
 
     //  note if there's some data converting going on
     ma_format internalFormat;
 	ma_uint32 internalChannels;
-	ma_uint32 internalSampleRate; 
+	ma_uint32 internalSampleRate;
 	if(MA_SUCCESS != ma_data_source_get_data_format(decoder.pBackend, &internalFormat, &internalChannels, &internalSampleRate))
 	{
 		printf("\n    ERROR: unable to get internal metadata for %" PRFILESYSTEM_PATH "\n", audioFile.c_str());
 		ma_decoder_uninit(&decoder);
 	    return false;
-	} 
+	}
 	if((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100) || isLossy)
 	{
-		printf("\n    WARN: This is not Redbook audio, converting.\n    ");			
+		printf("\n    WARN: This is not Redbook audio, converting.\n    ");
 	}
 
 	// get expected pcm frame count (if your file isn't redbook this can vary from the input file's amount)
@@ -1389,23 +1498,29 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
 		ma_decoder_uninit(&decoder);
         return false;
 	}
-	
+
 	// read a sector and write a sector until done
 	const ma_uint64 framesToRead = (CD_SECTOR_SIZE/(2 * sizeof(int16_t))); // 2 channels 2 bytes per single channel sample (588 intrachannel pcm frames)
 	ma_uint64 framesRead;
 	ma_uint64 totalFramesProcessed = 0;
 	unsigned char buff[CD_SECTOR_SIZE];
-	do {
+	while(totalFramesProcessed < expectedPCMFrames)
+	{
 		memset(buff, 0x00, CD_SECTOR_SIZE);
 		framesRead = ma_decoder_read_pcm_frames(&decoder, &buff, framesToRead);
 		writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
 		totalFramesProcessed += framesRead;
-	} while(framesToRead == framesRead);
+		if((framesRead != framesToRead) && (totalFramesProcessed < expectedPCMFrames))
+		{
+			printf("\n    ERROR: unexpected short read\n");
+			return false;
+		}
+	}
 	ma_decoder_uninit(&decoder);
 	if(totalFramesProcessed != expectedPCMFrames)
 	{
 		printf("\n    ERROR: corrupt file? (totalFramesProcessed != expectedPCMFrames)\n");
 		return false;
 	}
-    return true;   
+    return true;
 }
