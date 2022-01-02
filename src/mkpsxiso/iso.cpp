@@ -67,14 +67,13 @@ int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
 	}
 
 	const ma_uint64 expectedPCMFrames = ma_decoder_get_length_in_pcm_frames(&decoder);
+	ma_decoder_uninit(&decoder);
     if(expectedPCMFrames == 0)
 	{
 		printf("\n    ERROR: corrupt file? unable to get_length_in_pcm_frames\n");
-		ma_decoder_uninit(&decoder);
         return 0;
 	}
 
-    ma_decoder_uninit(&decoder);
 	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), 2352)*2352;
 }
 
