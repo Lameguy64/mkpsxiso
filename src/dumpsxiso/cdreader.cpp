@@ -11,7 +11,6 @@
 #include "platform.h"
 #include <string.h>
 #include <stdlib.h>
-#include <algorithm>
 
 cd::IsoReader::IsoReader() {
 
