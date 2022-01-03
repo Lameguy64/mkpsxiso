@@ -21,10 +21,41 @@
 #include "cdreader.h"
 #include "xml.h"
 
+#ifndef MKPSXISO_NO_LIBFLAC
 #include "FLAC/stream_encoder.h"
+#endif
 
 #include <time.h>
 
+typedef enum {
+	EAF_WAV  = 1 << 0,
+	EAF_FLAC = 1 << 1,
+	EAF_PCM  = 1 << 2
+} EncoderAudioFormats;
+
+typedef struct {
+	const char *codec;
+	EncoderAudioFormats eaf;
+	const char *notcompiledmessage;
+} EncodingCodec;
+
+EncodingCodec EncodingCodecs[] = {
+	{"wave", EAF_WAV, ""},
+	{"flac", EAF_FLAC, "ERROR: dumpsxiso was NOT built with libFLAC support!\n"},
+	{"pcm",  EAF_PCM, ""}
+};
+
+const unsigned BUILTIN_CODECS = (EAF_WAV | EAF_PCM);
+#define BUILTIN_CODEC_TEXT "wave, pcm"
+#ifndef MKPSXISO_NO_LIBFLAC
+	#define LIBFLAC_SUPPORTED EAF_FLAC
+	#define LIBFLAC_CODEC_TEXT ", flac"
+#else
+    #define LIBFLAC_SUPPORTED 0
+	#define LIBFLAC_CODEC_TEXT ""
+#endif
+const unsigned SUPPORTED_CODECS  = (BUILTIN_CODECS | LIBFLAC_SUPPORTED);
+#define SUPPORTED_CODEC_TEXT BUILTIN_CODEC_TEXT LIBFLAC_CODEC_TEXT
 
 namespace param {
 
@@ -32,7 +63,7 @@ namespace param {
     std::filesystem::path outPath;
     std::filesystem::path xmlFile;
     bool outputSortedByDir = false;
-	bool    dumpWave = false;
+	EncoderAudioFormats encodingFormat = EAF_WAV;
 }
 
 template<size_t N>
@@ -119,14 +150,10 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
     fclose(outFile);
 }
 
-void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const int isInvalid)
+void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const int isInvalid)
 {
 	int bytesLeft = cddaSize;
-	cd::RIFF_HEADER riffHeader;
-    prepareRIFFHeader(&riffHeader, cddaSize);
-    fwrite((void*)&riffHeader, 1, sizeof(cd::RIFF_HEADER), outFile);
-
-    while (bytesLeft > 0) {
+	while (bytesLeft > 0) {
 
 		u_char copyBuff[2352]{};
 
@@ -144,6 +171,16 @@ void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, 
     }
 }
 
+void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const int isInvalid)
+{
+    cd::RIFF_HEADER riffHeader;
+    prepareRIFFHeader(&riffHeader, cddaSize);
+    fwrite((void*)&riffHeader, 1, sizeof(cd::RIFF_HEADER), outFile);
+
+    writePCMFile(outFile, reader, cddaSize, isInvalid);
+}
+
+#ifndef MKPSXISO_NO_LIBFLAC
 void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, const int isInvalid)
 {
 	FLAC__bool ok = true;
@@ -213,6 +250,7 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
 writeFLACFile_cleanup:
 	FLAC__stream_encoder_delete(encoder);
 }
+#endif
 
 // XML attribute stuff
 struct EntryAttributeCounters
@@ -443,9 +481,9 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n");
 				}
 
-				FILE* outFile = OpenFile(outputPath, "wb");
+				auto outFile = OpenScopedFile(outputPath, "wb");
 
-				if (outFile == NULL) {
+				if (!outFile) {
 					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
 					return;
 				}
@@ -453,17 +491,26 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
 				size_t cddaSize = 2352 * sectorsToRead;
 
-				if(!param::dumpWave)
+				if(param::encodingFormat == EAF_WAV)
+				{
+					writeWaveFile(outFile.get(), reader, cddaSize, result);
+				}
+#ifndef MKPSXISO_NO_LIBFLAC
+				else if(param::encodingFormat == EAF_FLAC)
 				{
 					// libflac closes outFile
-					writeFLACFile(outFile, reader, cddaSize, result);
+					writeFLACFile(outFile.release(), reader, cddaSize, result);
+				}
+#endif
+				else if(param::encodingFormat == EAF_PCM)
+				{
+					writePCMFile(outFile.get(), reader, cddaSize, result);
 				}
 				else
 				{
-					writeWaveFile(outFile, reader, cddaSize, result);
-				    fclose(outFile);
+					printf("ERROR: support for encoding format is not implemented\n");
+					return;
 				}
-
 			}
 			else if (type == EntryType::EntryFile)
 			{
@@ -882,7 +929,7 @@ int Main(int argc, char *argv[])
 		"  -x <path>  - Specified destination directory of extracted files.\n"
 		"  -s <path>  - Outputs an MKPSXISO compatible XML script for later rebuilding.\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
-		"   -w        - Dump CDDA audio as WAVE instead of FLAC\n"
+		"  -e|--encode <codec> - Codec to encode CDDA/DA audio. wave is default. Supported codecs: " SUPPORTED_CODEC_TEXT "\n"
 		"  -h|--help  - Show this help text\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
@@ -921,10 +968,29 @@ int Main(int argc, char *argv[])
 				param::outputSortedByDir = true;
 				continue;
 			}
-			if(ParseArgument(args, "w"))
+			if(auto encodingStr = ParseStringArgument(args, "e", "encode"); encodingStr.has_value())
 			{
-				param::dumpWave = true;
-				continue;
+				unsigned i;
+				for(i = 0; i < std::size(EncodingCodecs); i++)
+				{
+					if(CompareICase(*encodingStr, EncodingCodecs[i].codec))
+					{
+						break;
+					}
+				}
+				if(i == std::size(EncodingCodecs))
+				{
+					printf("Unknown codec: %s\n", (*encodingStr).c_str());
+					printf("Supported codecs: %s\n", SUPPORTED_CODEC_TEXT);
+				    return EXIT_FAILURE;
+				}
+				if(EncodingCodecs[i].eaf & SUPPORTED_CODECS)
+				{
+					param::encodingFormat = EncodingCodecs[i].eaf;
+					continue;
+				}
+				printf("%s", EncodingCodecs[i].notcompiledmessage);
+				return EXIT_FAILURE;
 			}
 
 			// If we reach this point, an unknown parameter was passed

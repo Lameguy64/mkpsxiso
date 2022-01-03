@@ -56,6 +56,8 @@ Older versions (probably going to be removed soon, there's no benefit to using t
    cmake --install ./build
    ```
 
+   If you wish to build dumpsxiso without libFLAC support (libFLAC is required for encoding CDDA/DA audio as FLAC), add `-DMKPSXISO_NO_LIBFLAC=1` to the end of the first command.
+
    Add `sudo` to the install command if necessary.
 
 The default installation path is `C:\Program Files\mkpsxiso\bin` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.

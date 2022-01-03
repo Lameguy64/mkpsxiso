@@ -35,16 +35,22 @@ endif()
 add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
 target_include_directories(tinyxml2 PUBLIC tinyxml2)
 
-# Build libFLAC
-set(BUILD_CXXLIBS OFF CACHE INTERNAL "")
-set(BUILD_PROGRAMS OFF CACHE INTERNAL "")
-set(BUILD_EXAMPLES OFF CACHE INTERNAL "")
-set(BUILD_DOCS OFF CACHE INTERNAL "")
-set(INSTALL_MANPAGES OFF CACHE INTERNAL "")
-set(INSTALL_PKGCONFIG_MODULES OFF CACHE INTERNAL "")
-set(INSTALL_CMAKE_CONFIG_MODULE OFF CACHE INTERNAL "")
-set(WITH_OGG OFF CACHE INTERNAL "")
-add_subdirectory(flac)
+# Build libFLAC, unless explicitly requested not too
+if(NOT MKPSXISO_NO_LIBFLAC)
+	if(NOT EXISTS ${PROJECT_SOURCE_DIR}/flac/include/FLAC/stream_encoder.h)
+		message(FATAL_ERROR "The flac directory is empty. Run 'git submodule update --init --recursive' to populate it.")
+	endif()
+
+	set(BUILD_CXXLIBS OFF CACHE INTERNAL "")
+	set(BUILD_PROGRAMS OFF CACHE INTERNAL "")
+	set(BUILD_EXAMPLES OFF CACHE INTERNAL "")
+	set(BUILD_DOCS OFF CACHE INTERNAL "")
+	set(INSTALL_MANPAGES OFF CACHE INTERNAL "")
+	set(INSTALL_PKGCONFIG_MODULES OFF CACHE INTERNAL "")
+	set(INSTALL_CMAKE_CONFIG_MODULE OFF CACHE INTERNAL "")
+	set(WITH_OGG OFF CACHE INTERNAL "")
+	add_subdirectory(flac)
+endif()
 
 ## Internal dependencies
 
@@ -77,7 +83,12 @@ add_executable(dumpsxiso
 	${dumpsxiso_dir}/cdreader.cpp
 	${dumpsxiso_dir}/main.cpp
 )
-target_link_libraries(dumpsxiso tinyxml2 FLAC iso_shared)
+target_link_libraries(dumpsxiso tinyxml2 iso_shared)
+if(NOT MKPSXISO_NO_LIBFLAC)
+	target_link_libraries(dumpsxiso FLAC)
+else()
+	target_compile_definitions(dumpsxiso PUBLIC MKPSXISO_NO_LIBFLAC)
+endif()
 if(MINGW)
 	target_link_libraries(dumpsxiso "-municode")
 endif()

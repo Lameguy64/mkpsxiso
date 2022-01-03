@@ -162,3 +162,13 @@ std::optional<std::filesystem::path> ParsePathArgument(char**& argv, std::string
 	}
 	return std::nullopt;
 }
+
+std::optional<std::string> ParseStringArgument(char**& argv, std::string_view command, std::string_view longCommand)
+{
+	if (ParseArgument(argv, command, longCommand) && *(argv+1) != nullptr)
+	{
+		argv++;
+		return std::string(*argv);
+	}
+	return std::nullopt;
+}

@@ -78,3 +78,4 @@ bool CompareICase(std::string_view strLeft, std::string_view strRight);
 // Argument parsing
 bool ParseArgument(char** argv, std::string_view command, std::string_view longCommand = std::string_view{});
 std::optional<std::filesystem::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand = std::string_view{});
+std::optional<std::string> ParseStringArgument(char**& argv, std::string_view command, std::string_view longCommand = std::string_view{});
