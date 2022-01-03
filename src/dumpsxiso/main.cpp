@@ -219,10 +219,10 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
     size_t left = (size_t)total_samples;
 	size_t max_pcmframe_read = 2352 / (channels * (bps/8));
 
+    std::unique_ptr<int32_t[]> pcm(new int32_t[channels * max_pcmframe_read]);
 	while (left && ok) {
 
 		u_char copyBuff[2352]{};
-		int32_t pcm[channels * max_pcmframe_read];
 
 		size_t need = (left > max_pcmframe_read ? max_pcmframe_read : left);
 		size_t needBytes = need * (channels * (bps/8));
@@ -236,7 +236,7 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
 			pcm[i] = (FLAC__int32)(((FLAC__int16)(FLAC__int8)copyBuff[2*i+1] << 8) | (FLAC__int16)copyBuff[2*i]);
 		}
 		/* feed samples to encoder */
-		ok = FLAC__stream_encoder_process_interleaved(encoder, pcm, need);
+		ok = FLAC__stream_encoder_process_interleaved(encoder, pcm.get(), need);
 		left -= need;
     }
     }
