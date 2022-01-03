@@ -410,7 +410,7 @@ int Main(int argc, char* argv[])
 		}
 
 		// Check if cue_sheet attribute is specified
-		FILE*	cuefp = nullptr;
+		unique_file cuefp;
 
 		if ( !global::NoIsoGen )
 		{
@@ -428,7 +428,7 @@ int Main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 
-				cuefp = OpenFile( global::cuefile.value(), "w" );
+				cuefp = OpenScopedFile( global::cuefile.value(), "w" );
 
 				if ( cuefp == nullptr )
 				{
@@ -442,7 +442,7 @@ int Main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 
-				fprintf(cuefp, "FILE \"%" PRFILESYSTEM_PATH "\" BINARY\n", global::ImageName.filename().c_str());
+				fprintf(cuefp.get(), "FILE \"%" PRFILESYSTEM_PATH "\" BINARY\n", global::ImageName.filename().c_str());
 			}
 		}
 
@@ -460,12 +460,6 @@ int Main(int argc, char* argv[])
 				}
 
 				printf( "ERROR: Cannot open or create output image file.\n" );
-
-				if ( cuefp != nullptr )
-				{
-					fclose( cuefp );
-				}
-
 				return EXIT_FAILURE;
 
 			}
@@ -499,11 +493,6 @@ int Main(int argc, char* argv[])
 				std::error_code ec;
 				std::filesystem::remove(global::ImageName, ec);
 
-				if ( cuefp != nullptr )
-				{
-					fclose(cuefp);
-				}
-
 				return EXIT_FAILURE;
 			}
 
@@ -531,11 +520,6 @@ int Main(int argc, char* argv[])
 						writer.Close();
 					}
 
-					if ( cuefp != nullptr )
-					{
-						fclose( cuefp );
-					}
-
 					return EXIT_FAILURE;
 				}
 
@@ -549,19 +533,13 @@ int Main(int argc, char* argv[])
 					std::error_code ec;
 					std::filesystem::remove(global::ImageName, ec);
 
-					if ( cuefp != nullptr )
-					{
-						fclose( cuefp );
-						std::filesystem::remove(std::filesystem::u8path(projectElement->Attribute(xml::attrib::CUE_SHEET)), ec);
-					}
-
 					return EXIT_FAILURE;
 				}
 
-				if ( cuefp != nullptr )
+				if ( cuefp )
 				{
-					fprintf( cuefp, "  TRACK %02d MODE2/2352\n", global::trackNum );
-					fprintf( cuefp, "    INDEX 01 00:00:00\n" );
+					fprintf( cuefp.get(), "  TRACK %02d MODE2/2352\n", global::trackNum );
+					fprintf( cuefp.get(), "    INDEX 01 00:00:00\n" );
 				}
 
 				if ( global::NoIsoGen )
@@ -615,16 +593,11 @@ int Main(int argc, char* argv[])
 						writer.Close();
 					}
 
-					if ( cuefp != nullptr )
-					{
-						fclose(cuefp);
-					}
-
 					return EXIT_FAILURE;
 				}
 				else
 				{
-					fprintf( cuefp, "  TRACK %02d AUDIO\n", global::trackNum );
+					fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
 
 					if ( !global::NoIsoGen )
 					{
@@ -658,14 +631,14 @@ int Main(int argc, char* argv[])
 						}
 						if(pregapSectors > 0)
 						{
-							fprintf( cuefp, "    INDEX 00 %s\n", SectorsToTimecode(trackLBA).c_str());
+							fprintf( cuefp.get(), "    INDEX 00 %s\n", SectorsToTimecode(trackLBA).c_str());
 							writer.WriteBlankSectors(pregapSectors);
 							trackLBA += pregapSectors;
 						}
 
 						totalLen += (pregapSectors + (iso::DirTreeClass::GetAudioSize(track_source)/2352));
 
-						fprintf( cuefp, "    INDEX 01 %s\n", SectorsToTimecode(trackLBA).c_str());
+						fprintf( cuefp.get(), "    INDEX 01 %s\n", SectorsToTimecode(trackLBA).c_str());
 
 						const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
 						if(trackid != nullptr)
@@ -693,7 +666,6 @@ int Main(int argc, char* argv[])
 						else
 						{
 							writer.Close();
-							fclose( cuefp );
 
 							return EXIT_FAILURE;
 						}
@@ -722,11 +694,6 @@ int Main(int argc, char* argv[])
 				if ( !global::NoIsoGen )
 				{
 					writer.Close();
-				}
-
-				if ( cuefp != nullptr )
-				{
-					fclose(cuefp);
 				}
 
 				return EXIT_FAILURE;
@@ -827,11 +794,7 @@ int Main(int argc, char* argv[])
 
 			// Close both ISO writer and CUE sheet
 			writer.Close();
-
-			if ( cuefp != nullptr )
-			{
-				fclose( cuefp );
-			}
+			cuefp.reset();
 
 			if ( !global::QuietMode )
 			{
