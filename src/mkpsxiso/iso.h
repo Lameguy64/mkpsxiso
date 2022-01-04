@@ -185,7 +185,7 @@ namespace iso
 		 *
 		 *	*writer	- Pointer to a cd::IsoWriter class that is ready for writing.
 		 */
-		int	WriteFiles(cd::IsoWriter* writer);
+		bool WriteFiles(cd::IsoWriter* writer) const;
 
 		/**	Writes the file system of the directory records to a CD image. Execute this after the source files
 		 *	have been written to the CD image.

@@ -45,7 +45,7 @@ namespace global
 
 
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da);
-int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
+int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
 
 int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
 
@@ -400,10 +400,7 @@ int Main(int argc, char* argv[])
 
 
 		// Check if there is a track element specified
-		const tinyxml2::XMLElement* trackElement =
-			projectElement->FirstChildElement(xml::elem::TRACK);
-
-		if ( trackElement == nullptr )
+		if ( projectElement->FirstChildElement(xml::elem::TRACK) == nullptr )
 		{
 			printf( "ERROR: At least one <track> element must be specified.\n" );
 			return EXIT_FAILURE;
@@ -446,32 +443,18 @@ int Main(int argc, char* argv[])
 			}
 		}
 
-
-		// Create ISO image for writing
-		cd::IsoWriter writer;
-
-		if ( !global::NoIsoGen )
-		{
-			if ( !writer.Create( global::ImageName.c_str() ) ) {
-
-				if ( !global::QuietMode )
-				{
-					printf( "  " );
-				}
-
-				printf( "ERROR: Cannot open or create output image file.\n" );
-				return EXIT_FAILURE;
-
-			}
-		}
-
 		global::trackNum = 1;
 		iso::EntryList entries;
 		iso::IDENTIFIERS isoIdentifiers {};
-		int totalLen;
+		int totalLenLBA = 0;
+
+		std::vector<cdtrack> audioTracks;
+
+		const tinyxml2::XMLElement* dataTrack = nullptr;
 
 		// Parse tracks
-		while ( trackElement != nullptr )
+		for ( const tinyxml2::XMLElement* trackElement = projectElement->FirstChildElement(xml::elem::TRACK);
+			trackElement != nullptr; trackElement = trackElement->NextSiblingElement(xml::elem::TRACK) )
 		{
 			const char* track_type = trackElement->Attribute(xml::attrib::TRACK_TYPE);
 
@@ -485,14 +468,6 @@ int Main(int argc, char* argv[])
 				printf( "ERROR: %s attribute not specified in <track> "
 					"element on line %d.\n", xml::attrib::TRACK_TYPE, trackElement->GetLineNum() );
 
-				if ( !global::NoIsoGen )
-				{
-					writer.Close();
-				}
-
-				std::error_code ec;
-				std::filesystem::remove(global::ImageName, ec);
-
 				return EXIT_FAILURE;
 			}
 
@@ -505,6 +480,7 @@ int Main(int argc, char* argv[])
 			// Generate ISO file system for data track
 			if ( CompareICase( "data", track_type ) )
 			{
+				dataTrack = trackElement;
 				if ( global::trackNum != 1 )
 				{
 					if ( !global::QuietMode )
@@ -515,24 +491,11 @@ int Main(int argc, char* argv[])
 					printf( "ERROR: Only the first track can be set as a "
 						"data track on line: %d\n", trackElement->GetLineNum() );
 
-					if ( !global::NoIsoGen )
-					{
-						writer.Close();
-					}
-
 					return EXIT_FAILURE;
 				}
 
-				if ( !ParseISOfileSystem( &writer, trackElement, global::XMLscript.parent_path(), entries, isoIdentifiers, totalLen ) )
+				if ( !ParseISOfileSystem( trackElement, global::XMLscript.parent_path(), entries, isoIdentifiers, totalLenLBA ) )
 				{
-					if ( !global::NoIsoGen )
-					{
-						writer.Close();
-					}
-
-					std::error_code ec;
-					std::filesystem::remove(global::ImageName, ec);
-
 					return EXIT_FAILURE;
 				}
 
@@ -569,11 +532,6 @@ int Main(int argc, char* argv[])
 					printf( "ERROR: %s attribute must be specified "
 						"when using audio tracks.\n", xml::attrib::CUE_SHEET );
 
-					if ( !global::NoIsoGen )
-					{
-						writer.Close();
-					}
-
 					return EXIT_FAILURE;
 				}
 
@@ -588,90 +546,61 @@ int Main(int argc, char* argv[])
 					printf( "ERROR: %s attribute not specified "
 						"for track on line %d.\n", xml::attrib::TRACK_SOURCE, trackElement->GetLineNum() );
 
-					if ( !global::NoIsoGen )
-					{
-						writer.Close();
-					}
-
 					return EXIT_FAILURE;
 				}
 				else
 				{
 					fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
 
-					if ( !global::NoIsoGen )
+					// pregap
+					int pregapSectors = 150; // by default 2 seconds
+					const tinyxml2::XMLElement *pregapElement = trackElement->FirstChildElement(xml::elem::TRACK_PREGAP);
+					if(pregapElement != nullptr)
 					{
-						int trackLBA = writer.SeekToEnd();
-
-						// pregap
-						int pregapSectors = 150; // by default 2 seconds
-						const tinyxml2::XMLElement *pregapElement = trackElement->FirstChildElement(xml::elem::TRACK_PREGAP);
-						if(pregapElement != nullptr)
+						const char *duration = pregapElement->Attribute(xml::attrib::PREGAP_DURATION);
+						if(duration != nullptr)
 						{
-							const char *duration = pregapElement->Attribute(xml::attrib::PREGAP_DURATION);
-							if(duration != nullptr)
+							unsigned minutes, seconds, frames;
+							if(
+								(sscanf(duration, "%u:%u:%u", &minutes, &seconds, &frames) != 3) ||
+								(seconds > 59) || (frames > 74)
+							)
 							{
-								unsigned minutes, seconds, frames;
-								if(
-									(sscanf(duration, "%u:%u:%u", &minutes, &seconds, &frames) != 3) ||
-									(seconds > 59) || (frames > 74)
-								)
-								{
-									printf( "ERROR: %s duration is invalid MM:SS:FF"
-										"for track on line %d.\n", xml::attrib::TRACK_SOURCE, pregapElement->GetLineNum() );
-									return EXIT_FAILURE;
-								}
-
-								if(((((minutes * 60) + seconds) * 75) + frames) > (80 * 60 * 75))
-								{
-									printf( "WARNING: duration > 80 minutes\n");
-								}
-								pregapSectors = (((minutes * 60)+seconds)*75)+frames;
-							}
-						}
-						if(pregapSectors > 0)
-						{
-							fprintf( cuefp.get(), "    INDEX 00 %s\n", SectorsToTimecode(trackLBA).c_str());
-							writer.WriteBlankSectors(pregapSectors);
-							trackLBA += pregapSectors;
-						}
-
-						totalLen += (pregapSectors + (iso::DirTreeClass::GetAudioSize(track_source)/2352));
-
-						fprintf( cuefp.get(), "    INDEX 01 %s\n", SectorsToTimecode(trackLBA).c_str());
-
-						const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
-						if(trackid != nullptr)
-						{
-							if(!UpdateDAFilesWithLBA(entries, trackid, trackLBA))
-							{
+								printf( "ERROR: %s duration is invalid MM:SS:FF"
+									"for track on line %d.\n", xml::attrib::TRACK_SOURCE, pregapElement->GetLineNum() );
 								return EXIT_FAILURE;
 							}
-						}
 
-						// Pack the audio file
-						if ( !global::QuietMode )
-						{
-							printf( "    Packing audio %s... ", track_source );
-						}
-
-						if ( PackFileAsCDDA( &writer, track_source ) )
-						{
-							if ( !global::QuietMode )
+							if(((((minutes * 60) + seconds) * 75) + frames) > (80 * 60 * 75))
 							{
-								printf( "Done.\n" );
+								printf( "WARNING: duration > 80 minutes\n");
 							}
-
+							pregapSectors = (((minutes * 60)+seconds)*75)+frames;
 						}
-						else
-						{
-							writer.Close();
+					}
+					if(pregapSectors > 0)
+					{
+						fprintf( cuefp.get(), "    INDEX 00 %s\n", SectorsToTimecode(totalLenLBA).c_str());
 
-							return EXIT_FAILURE;
-						}
-
+						audioTracks.emplace_back(totalLenLBA, pregapSectors * CD_SECTOR_SIZE);
+						totalLenLBA += pregapSectors;
 					}
 
+					fprintf( cuefp.get(), "    INDEX 01 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+
+					const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
+					if(trackid != nullptr)
+					{
+						if(!UpdateDAFilesWithLBA(entries, trackid, totalLenLBA))
+						{
+							return EXIT_FAILURE;
+						}
+					}
+
+					const unsigned int audioSize = iso::DirTreeClass::GetAudioSize(track_source);
+					audioTracks.emplace_back(totalLenLBA, audioSize, track_source);
+
+					totalLenLBA += audioSize/CD_SECTOR_SIZE;
 				}
 
 				if ( !global::QuietMode )
@@ -691,85 +620,170 @@ int Main(int argc, char* argv[])
 				printf( "ERROR: Unknown track type on line %d.\n",
 					trackElement->GetLineNum() );
 
-				if ( !global::NoIsoGen )
-				{
-					writer.Close();
-				}
-
 				return EXIT_FAILURE;
 			}
 
-			trackElement = trackElement->NextSiblingElement(xml::elem::TRACK);
 			global::trackNum++;
 		}
 
+		iso::DIRENTRY& root = entries.front();
+	    iso::DirTreeClass* dirTree = root.subdir.get();
+
+		if ( !global::LBAfile.empty() )
+		{
+			FILE* fp = OpenFile( global::LBAfile, "w" );
+			if (fp != nullptr)
+			{
+				fprintf( fp, "File LBA log generated by MKPSXISO v" VERSION "\n\n" );
+				fprintf( fp, "Image bin file: %" PRFILESYSTEM_PATH "\n", global::ImageName.lexically_normal().c_str() );
+
+				if ( global::cuefile )
+				{
+					fprintf( fp, "Image cue file: %" PRFILESYSTEM_PATH "\n", global::cuefile->lexically_normal().c_str() );
+				}
+
+				fprintf( fp, "\nFile System:\n\n" );
+				fprintf( fp, "    Type  Name             Length    LBA       "
+					"Timecode    Bytes     Source File\n\n" );
+
+				dirTree->OutputLBAlisting( fp, 0 );
+
+				fclose( fp );
+
+				if ( !global::QuietMode )
+				{
+					printf( "    Wrote file LBA log %" PRFILESYSTEM_PATH ".\n\n",
+						global::LBAfile.lexically_normal().c_str() );
+				}
+			}
+			else
+			{
+				if ( !global::QuietMode )
+				{
+					printf( "    Failed to write LBA log %" PRFILESYSTEM_PATH "!\n\n",
+						global::LBAfile.lexically_normal().c_str() );
+				}
+			}
+		}
+
+		if ( !global::LBAheaderFile.empty() )
+		{
+			FILE* fp = OpenFile( global::LBAheaderFile, "w" );
+			if (fp != nullptr)
+			{
+				dirTree->OutputHeaderListing( fp, 0 );
+
+				fclose( fp );
+
+				if ( !global::QuietMode )
+				{
+					printf( "    Wrote file LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
+						global::LBAheaderFile.lexically_normal().c_str() );
+				}
+			}
+			else
+			{
+				if ( !global::QuietMode )
+				{
+					printf( "    Failed to write LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
+						global::LBAheaderFile.lexically_normal().c_str() );
+				}
+			}
+		}
 
 		if ( !global::NoIsoGen )
 		{
+			// Create ISO image for writing
+			cd::IsoWriter writer;
+
+			if ( !writer.Create( global::ImageName.c_str() ) ) {
+
+				if ( !global::QuietMode )
+				{
+					printf( "  " );
+				}
+
+				printf( "ERROR: Cannot open or create output image file.\n" );
+				return EXIT_FAILURE;
+
+			}
+
+
+			// Write the file system
+			if ( !global::QuietMode )
+			{
+				printf( "    Building filesystem... " );
+			}
+
+			//unsigned char subHead[] = { 0x00, 0x00, 0x08, 0x00 };
+			writer.SetSubheader( cd::IsoWriter::SubData );
+
+			if ( !global::QuietMode )
+			{
+				printf( "\n" );
+			}
+
+			// Copy the files into the disc image
 			iso::DIRENTRY& root = entries.front();
-	        iso::DirTreeClass* dirTree = root.subdir.get();
+			iso::DirTreeClass* dirTree = root.subdir.get();
+			dirTree->WriteFiles( &writer );
 
-			if ( !global::LBAfile.empty() )
+			// Write out the audio tracks
+			for (const cdtrack& track : audioTracks)
 			{
-				FILE* fp = OpenFile( global::LBAfile, "w" );
-				if (fp != nullptr)
+				// TODO: This will not be needed soon
+				writer.SeekToSector(track.lba);
+
+				if (!track.source.empty())
 				{
-					fprintf( fp, "File LBA log generated by MKPSXISO v" VERSION "\n\n" );
-					fprintf( fp, "Image bin file: %" PRFILESYSTEM_PATH "\n", global::ImageName.lexically_normal().c_str() );
-
-					if ( global::cuefile )
-					{
-						fprintf( fp, "Image cue file: %" PRFILESYSTEM_PATH "\n", global::cuefile->lexically_normal().c_str() );
-					}
-
-					fprintf( fp, "\nFile System:\n\n" );
-					fprintf( fp, "    Type  Name             Length    LBA       "
-						"Timecode    Bytes     Source File\n\n" );
-
-					dirTree->OutputLBAlisting( fp, 0 );
-
-					fclose( fp );
-
+					// Pack the audio file
 					if ( !global::QuietMode )
 					{
-						printf( "    Wrote file LBA log %" PRFILESYSTEM_PATH ".\n\n",
-							global::LBAfile.lexically_normal().c_str() );
+						printf( "    Packing audio %s... ", track.source.c_str() );
+					}
+
+					if ( PackFileAsCDDA( &writer, std::filesystem::u8path(track.source) ) )
+					{
+						if ( !global::QuietMode )
+						{
+							printf( "Done.\n" );
+						}
 					}
 				}
 				else
 				{
-					if ( !global::QuietMode )
-					{
-						printf( "    Failed to write LBA log %" PRFILESYSTEM_PATH "!\n\n",
-							global::LBAfile.lexically_normal().c_str() );
-					}
+					// Write pregap
+					writer.WriteBlankSectors(track.size / CD_SECTOR_SIZE);
 				}
 			}
+						
 
-			if ( !global::LBAheaderFile.empty() )
+			// Write license data
+			const tinyxml2::XMLElement* licenseElement = dataTrack->FirstChildElement(xml::elem::LICENSE);
+			if ( licenseElement != nullptr )
 			{
-				FILE* fp = OpenFile( global::LBAheaderFile, "w" );
+				FILE* fp = OpenFile( global::XMLscript.parent_path() / std::filesystem::u8path(licenseElement->Attribute(xml::attrib::LICENSE_FILE)), "rb" );
 				if (fp != nullptr)
 				{
-					dirTree->OutputHeaderListing( fp, 0 );
+					auto license = std::make_unique<cd::ISO_LICENSE>();
+					if (fread( license->data, sizeof(license->data), 1, fp ) == 1)
+					{
+						if ( !global::QuietMode )
+						{
+							printf( "      Writing license data..." );
+						}
 
+						iso::WriteLicenseData( &writer, license->data );
+
+						if ( !global::QuietMode )
+						{
+							printf( "Ok.\n" );
+						}
+					}
 					fclose( fp );
-
-					if ( !global::QuietMode )
-					{
-						printf( "    Wrote file LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
-							global::LBAheaderFile.lexically_normal().c_str() );
-					}
-				}
-				else
-				{
-					if ( !global::QuietMode )
-					{
-						printf( "    Failed to write LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
-							global::LBAheaderFile.lexically_normal().c_str() );
-					}
 				}
 			}
+
 			// Write file system
 			if ( !global::QuietMode )
 			{
@@ -781,16 +795,12 @@ int Main(int argc, char* argv[])
 			dirTree->WriteDirectoryRecords( &writer, root, root );
 
 			// Write file system descriptors to finish the image
-	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLen );
+	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLenLBA );
 
 			if ( !global::QuietMode )
 			{
 				printf( "Ok.\n" );
 			}
-
-
-			// Get the last LBA of the image to calculate total size
-			int totalImageSize = writer.SeekToEnd();
 
 			// Close both ISO writer and CUE sheet
 			writer.Close();
@@ -800,7 +810,7 @@ int Main(int argc, char* argv[])
 			{
 				printf( "ISO image generated successfully.\n" );
 				printf( "Total image size: %d bytes (%d sectors)\n",
-					(CD_SECTOR_SIZE*totalImageSize), totalImageSize );
+					(CD_SECTOR_SIZE*totalLenLBA), totalLenLBA );
 			}
 		}
 
@@ -849,7 +859,7 @@ iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement
 	return result;
 };
 
-int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen)
+int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen)
 {
 	const tinyxml2::XMLElement* identifierElement =
 		trackElement->FirstChildElement(xml::elem::IDENTIFIERS);
@@ -1071,78 +1081,17 @@ int ParseISOfileSystem(cd::IsoWriter* writer, const tinyxml2::XMLElement* trackE
 		printf( "      Files Total: %d\n", dirTree->GetFileCountTotal() );
 		printf( "      Directories: %d\n", dirTree->GetDirCountTotal() );
 		printf( "      Total file system size: %d bytes (%d sectors)\n\n",
-			2352*totalLen, totalLen);
+			CD_SECTOR_SIZE*totalLen, totalLen);
 	}
-
-	if ( global::NoIsoGen )
-	{
-		return true;
-	}
-
-	// Write the file system
-	if ( !global::QuietMode )
-	{
-		printf( "    Building filesystem... " );
-	}
-
-	//unsigned char subHead[] = { 0x00, 0x00, 0x08, 0x00 };
-	writer->SetSubheader( cd::IsoWriter::SubData );
 
 	if ( (global::NoLimit == false) &&
-		(dirTree->CalculatePathTableLen(root) > 2048) )
+		(pathTableLen > 2048) )
 	{
 		if ( !global::QuietMode )
 		{
 			printf( "      " );
 		}
 		printf( "WARNING: Path table exceeds 2048 bytes.\n" );
-	}
-
-	if ( !global::QuietMode )
-	{
-		printf( "\n" );
-	}
-
-	// Write padding which will be written with proper data later on
-	for ( int i=0; i<18+(GetSizeInSectors(dirTree->CalculatePathTableLen(root))*4); i++ )
-	{
-		char buff[2048];
-		memset( buff, 0x00, 2048 );
-		writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
-	}
-
-	// Copy the files into the disc image
-	dirTree->WriteFiles( writer );
-
-	// Write license data
-	if ( licenseElement != nullptr )
-	{
-		FILE* fp = OpenFile( xmlPath / std::filesystem::u8path(licenseElement->Attribute(xml::attrib::LICENSE_FILE)), "rb" );
-		if (fp != nullptr)
-		{
-			auto license = std::make_unique<cd::ISO_LICENSE>();
-			if (fread( license->data, sizeof(license->data), 1, fp ) == 1)
-			{
-				if ( !global::QuietMode )
-				{
-					printf( "      Writing license data..." );
-				}
-
-				iso::WriteLicenseData( writer, license->data );
-
-				if ( !global::QuietMode )
-				{
-					printf( "Ok.\n" );
-				}
-			}
-			fclose( fp );
-		}
-	}
-
-	if(writer->SeekToEnd() != totalLen)
-	{
-		printf( "      Not good, writer->seektoend != totalLen" );
-		return false;
 	}
 
 	return true;

@@ -281,7 +281,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
 
-				size_t cddaSize = 2352 * sectorsToRead;
+				size_t cddaSize = CD_SECTOR_SIZE * sectorsToRead;
 				size_t bytesLeft = cddaSize;
 
 				cd::RIFF_HEADER riffHeader;
@@ -509,12 +509,6 @@ void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElem
 	}
 }
 
-typedef struct {
-	unsigned lba;
-	unsigned size;
-	std::string source;
-} cdtrack;
-
 void ParseISO(cd::IsoReader& reader) {
 
     cd::ISO_DESCRIPTOR descriptor;
@@ -641,11 +635,11 @@ void ParseISO(cd::IsoReader& reader) {
 			for(auto& dafile : dafiles)
 			{
 				// add to make track element later
-				tracks.push_back({
+				tracks.emplace_back(
 					dafile.entry.entryOffs.lsb,
 					dafile.entry.entrySize.lsb,
 					(sourcePath / dafile.virtualPath / CleanIdentifier(dafile.identifier)).generic_u8string()
-				});
+				);
 
 				// add back in to the rest of the files
 				for(auto it = entries.begin(); it != entries.end(); it++)

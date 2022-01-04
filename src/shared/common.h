@@ -16,6 +16,18 @@ enum class EntryType
 	EntryDummy
 };
 
+struct cdtrack
+{
+	cdtrack(unsigned int lba, unsigned int size, std::string source = std::string())
+		: lba(lba), size(size), source(std::move(source))
+	{
+	}
+
+	unsigned int lba;
+	unsigned int size;
+	std::string source;
+};
+
 // Helper functions for datestamp manipulation
 cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
 

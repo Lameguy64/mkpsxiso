@@ -37,11 +37,7 @@ cd::IsoWriter::IsoWriter() {
 
 cd::IsoWriter::~IsoWriter() {
 
-	if (cd::IsoWriter::filePtr != nullptr)
-		fclose(cd::IsoWriter::filePtr);
-
-	cd::IsoWriter::filePtr = nullptr;
-
+	Close();
 }
 
 void cd::IsoWriter::PrepSector(int edcEccMode) {

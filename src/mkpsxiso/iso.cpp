@@ -74,7 +74,7 @@ int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
         return 0;
 	}
 
-	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), 2352)*2352;
+	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), CD_SECTOR_SIZE)*CD_SECTOR_SIZE;
 }
 
 iso::DirTreeClass::DirTreeClass(EntryList& entries, DirTreeClass* parent)
@@ -653,7 +653,7 @@ int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENT
 	return 1;
 }
 
-int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
+bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 {
 	for ( const DIRENTRY& entry : entries )
 	{
@@ -847,7 +847,7 @@ int iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer)
 		}
 	}
 
-	return 1;
+	return true;
 }
 
 void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
