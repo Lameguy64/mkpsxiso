@@ -56,6 +56,12 @@ static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 	return result;
 }
 
+template<typename T>
+static T RoundToEven(T val)
+{
+	return (val + 1) & -2;
+}
+
 int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
 {
 	ma_decoder decoder;
@@ -94,6 +100,13 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.subdir	= std::make_unique<DirTreeClass>(entries);
 	entry.date		= volumeDate;
 	entry.length	= entry.subdir->CalculateDirEntryLen();
+
+	// TODO: Verify
+	const EntryAttributes attributes = EntryAttributes::MakeDefault();
+	entry.attribs	= attributes.XAAttrib.value();
+	entry.perms		= attributes.XAPerm.value();
+	entry.GID		= attributes.GID.value();
+	entry.UID		= attributes.UID.value();
 
 	entries.emplace_back( std::move(entry) );
 
@@ -404,7 +417,7 @@ int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
 
 		if ( !global::noXA )
 		{
-			dataLen = (dataLen + 1) & -2; // Align up to 2b
+			dataLen = RoundToEven(dataLen);
 			dataLen += sizeof( cdxa::ISO_XA_ATTRIB );
 		}
 
@@ -446,80 +459,23 @@ void iso::DirTreeClass::SortDirectoryEntries()
 		});
 }
 
-int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const
+bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const
 {
-	char	dataBuff[2048] {};
-	char*	dataBuffPtr=dataBuff;
-	char	entryBuff[128];
-	int		dirlen;
+	//char	dataBuff[2048] {};
+	//char*	dataBuffPtr=dataBuff;
+	//char	entryBuff[128];
+	//int		dirlen;
 
-	writer->SeekToSector( dir.lba );
+	auto sectorView = writer->GetSectorViewM2F1(dir.lba, GetSizeInSectors(CalculateDirEntryLen()), cd::IsoWriter::EdcEccForm::Form1);
 
-	for( int i=0; i<2; i++ )
+	//writer->SeekToSector( dir.lba );
+
+	auto writeOneEntry = [&sectorView](const DIRENTRY& entry, std::optional<bool> currentOrParent = std::nullopt) -> void
 	{
-		cd::ISO_DIR_ENTRY* dirEntry = (cd::ISO_DIR_ENTRY*)dataBuffPtr;
+		std::byte buffer[128] {};
 
-		dirEntry->volSeqNum = cd::SetPair16( 1 );
-		dirEntry->identifierLen = 1;
-
-		// TODO: What is this? It's sizeof(*dirEntry) - 1
-		int dataLen = 32;
-
-		if (i == 0)
-		{
-			// Current
-			dirlen = 2048 * GetSizeInSectors(CalculateDirEntryLen());
-
-			dirEntry->entrySize = cd::SetPair32( dirlen );
-			dirEntry->entryOffs = cd::SetPair32( dir.lba );
-			dirEntry->entryDate = dir.date;
-		}
-		else
-		{
-			// Parent
-			if ( parent ) {
-				dirlen = parent->CalculateDirEntryLen();
-			} else {
-				dirlen = CalculateDirEntryLen();
-			}
-			dirlen = 2048 * GetSizeInSectors(dirlen);
-
-			dirEntry->entrySize = cd::SetPair32( dirlen );
-			dirEntry->entryOffs = cd::SetPair32( parentDir.lba );
-			dirEntry->entryDate = parentDir.date;
-			dataBuffPtr[dataLen+1] = 0x01;
-		}
-
-		dataLen += 2;
-
-		if ( !global::noXA )
-		{
-			cdxa::ISO_XA_ATTRIB* xa = (cdxa::ISO_XA_ATTRIB*)(dataBuffPtr+dataLen);
-			memset( xa, 0x00, sizeof(*xa) );
-
-			xa->id[0] = 'X';
-			xa->id[1] = 'A';
-			xa->attributes  = 0x558d;
-
-			dataLen += sizeof(*xa);
-		}
-
-		dirEntry->flags = 0x02;
-		dirEntry->entryLength = dataLen;
-
-		dataBuffPtr += dataLen;
-	}
-
-	for ( const auto& e : entriesInDir )
-	{
-		const DIRENTRY& entry = e.get();
-		if ( entry.id.empty() )
-		{
-			continue;
-		}
-
-		memset( entryBuff, 0x00, 128 );
-		cd::ISO_DIR_ENTRY* dirEntry = (cd::ISO_DIR_ENTRY*)entryBuff;
+		auto dirEntry = reinterpret_cast<cd::ISO_DIR_ENTRY*>(buffer);
+		int entryLength = sizeof(*dirEntry);
 
 		if ( entry.type == EntryType::EntryDir )
 		{
@@ -531,8 +487,7 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 		}
 
 		// File length correction for certain file types
-		int lba = entry.lba;
-		int length = 0;
+		int length;
 
 		if ( entry.type == EntryType::EntryXA )
 		{
@@ -547,7 +502,6 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 			if(entry.lba == iso::DA_FILE_PLACEHOLDER_LBA)
 			{
 				printf("ERROR: DA file still has placeholder value 0x%X\n", iso::DA_FILE_PLACEHOLDER_LBA);
-				return 0;
 			}
 			length = 2048 * GetSizeInSectors(entry.length, 2352);
 		}
@@ -556,23 +510,30 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 			length = entry.length;
 		}
 
-		dirEntry->entryOffs = cd::SetPair32( lba );
+		dirEntry->entryOffs = cd::SetPair32( entry.lba );
 		dirEntry->entrySize = cd::SetPair32( length );
 		dirEntry->volSeqNum = cd::SetPair16( 1 );
-
-		dirEntry->identifierLen = entry.id.length();
 		dirEntry->entryDate = entry.date;
 
-		int dataLen = sizeof(*dirEntry);
-
-		strncpy( &entryBuff[dataLen], entry.id.c_str(), dirEntry->identifierLen );
-		dataLen += dirEntry->identifierLen;
+		// Normal case - write out the identifier
+		char* identifierBuffer = reinterpret_cast<char*>(dirEntry+1);
+		if (!currentOrParent.has_value())
+		{
+			dirEntry->identifierLen = entry.id.length();
+			strncpy(identifierBuffer, entry.id.c_str(), entry.id.length());
+		}
+		else
+		{
+			// Special cases - current/parent directory entry
+			dirEntry->identifierLen = 1;
+			identifierBuffer[0] = currentOrParent.value() ? '\1' : '\0';
+		}
+		entryLength += dirEntry->identifierLen;
 
 		if ( !global::noXA )
 		{
-			dataLen = (dataLen + 1) & -2; // Align up to 2b
-			cdxa::ISO_XA_ATTRIB* xa = (cdxa::ISO_XA_ATTRIB*)(entryBuff+dataLen);
-			memset(xa, 0x00, sizeof(*xa));
+			entryLength = RoundToEven(entryLength);
+			auto xa = reinterpret_cast<cdxa::ISO_XA_ATTRIB*>(buffer+entryLength);
 
 			xa->id[0] = 'X';
 			xa->id[1] = 'A';
@@ -607,35 +568,40 @@ int iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& di
 			xa->ownergroupid = SwapBytes16(entry.GID);
 			xa->owneruserid = SwapBytes16(entry.UID);
 
-			dataLen += sizeof(*xa);
+			entryLength += sizeof(*xa);
 		}
 
-		dirEntry->entryLength = dataLen;
+		dirEntry->entryLength = entryLength;
 
-		if ( (dataBuffPtr+dataLen) > (dataBuff+2047) )
+		if (sectorView->GetSpaceInCurrentSector() < entryLength)
 		{
-			writer->SetSubheader( cd::IsoWriter::SubData );
-			writer->WriteBytes( dataBuff, 2048, cd::IsoWriter::EdcEccForm1 );
-
-			memset( dataBuff, 0x00, 2048 );
-			dataBuffPtr = dataBuff;
+			sectorView->NextSector();
 		}
+		sectorView->WriteMemory(buffer, entryLength);
+	};
 
-		memcpy( dataBuffPtr, entryBuff, dataLen );
-		dataBuffPtr += dataLen;
+	writeOneEntry(dir, false);
+	writeOneEntry(parentDir, true);
+
+	for ( const auto& e : entriesInDir )
+	{
+		const DIRENTRY& entry = e.get();
+		if ( entry.id.empty() )
+		{
+			continue;
+		}
+		
+		writeOneEntry(e);
 	}
 
-	writer->SetSubheader( cd::IsoWriter::SubEOF );
-	writer->WriteBytes( dataBuff, 2048, cd::IsoWriter::EdcEccForm1 );
-
-	return 1;
+	return true;
 }
 
-int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir)
+bool iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir)
 {
 	if(!WriteDirEntries( writer, dir, parentDir ))
 	{
-		return 0;
+		return false;
 	}
 
 	for ( const auto& e : entriesInDir )
@@ -645,20 +611,18 @@ int iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENT
 		{
 			if ( !entry.subdir->WriteDirectoryRecords(writer, entry, dir) )
 			{
-				return 0;
+				return false;
 			}
 		}
 	}
 
-	return 1;
+	return true;
 }
 
 bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 {
 	for ( const DIRENTRY& entry : entries )
 	{
-		writer->SeekToSector( entry.lba );
-
 		// Write files as regular data sectors
 		if ( entry.type == EntryType::EntryFile )
 		{
@@ -672,24 +636,13 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
-
-				writer->SetSubheader( cd::IsoWriter::SubData );
-
-				size_t totalBytesRead = 0;
-				while( totalBytesRead < entry.length )
+				if (fp != nullptr)
 				{
-					memset( buff, 0x00, 2048 );
-					totalBytesRead += fread( buff, 1, 2048, fp );
+					auto sectorView = writer->GetSectorViewM2F1(entry.lba, GetSizeInSectors(entry.length), cd::IsoWriter::EdcEccForm::Form1);
+					sectorView->WriteFile(fp);
 
-					if ( totalBytesRead >= entry.length )
-					{
-						writer->SetSubheader( cd::IsoWriter::SubEOF );
-					}
-
-					writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
+					fclose(fp);
 				}
-
-				fclose( fp );
 
 				if ( !global::QuietMode )
 				{
@@ -699,6 +652,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			}
 			else
 			{
+				// TODO: DO
 				memset( buff, 0x00, 2048 );
 
 				writer->SetSubheader( cd::IsoWriter::SubData );
@@ -711,7 +665,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 					{
 						writer->SetSubheader( cd::IsoWriter::SubEOF );
 					}
-					writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
+					writer->WriteBytes( buff, 2048, /*cd::IsoWriter::EdcEccForm1*/0 );
 				}
 			}
 
@@ -728,8 +682,15 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			}
 
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
+			if (fp != nullptr)
+			{
+				auto sectorView = writer->GetSectorViewM2F2(entry.lba, GetSizeInSectors(entry.length, 2336), cd::IsoWriter::EdcEccForm::Autodetect);
+				sectorView->WriteFile(fp);
 
-			while ( !feof( fp ) )
+				fclose( fp );
+			}
+
+			/*while ( !feof( fp ) )
 			{
 				memset( buff, 0x00, 2336 );
 				fread( buff, 1, 2336, fp );
@@ -747,9 +708,9 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 					writer->WriteBytesXA( buff, 2336, cd::IsoWriter::EdcEccForm1 );
 				}
 
-			}
+			}*/
 
-			fclose( fp );
+			
 
 			if (!global::QuietMode)
 			{
@@ -760,6 +721,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		}
 		else if ( entry.type == EntryType::EntryXA_DO )
 		{
+			// TODO: DO
 			char buff[2048];
 
 			if ( !entry.srcfile.empty() )
@@ -778,7 +740,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 					memset( buff, 0x00, 2048 );
 					fread( buff, 1, 2048, fp );
 
-					writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
+					writer->WriteBytes( buff, 2048, /*cd::IsoWriter::EdcEccForm1*/0 );
 				}
 
 				fclose( fp );
@@ -805,7 +767,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 					{
 						writer->SetSubheader( cd::IsoWriter::SubEOF );
 					}
-					writer->WriteBytes( buff, 2048, cd::IsoWriter::EdcEccForm1 );
+					writer->WriteBytes( buff, 2048, /*cd::IsoWriter::EdcEccForm1*/0 );
 				}
 			}
 
@@ -822,28 +784,13 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		// Write dummies as gaps without data
 		else if ( entry.type == EntryType::EntryDummy )
 		{
-			char buff[2048] {};
-
 			// TODO: HUGE HACK, will be removed once EntryDummy is unified with EntryFile again
 			const bool isForm2 = entry.perms != 0;
-			int eccEdcEncode;
-			if (isForm2)
-			{
-				writer->SetSubheader(0x00200000);
-				eccEdcEncode = cd::IsoWriter::EdcEccForm2;
-			}
-			else
-			{
-				writer->SetSubheader(0u);
-				eccEdcEncode = cd::IsoWriter::EdcEccForm1;
-			}
 
-			size_t totalBytesRead = 0;
-			while( totalBytesRead < entry.length )
-			{
-				totalBytesRead += 2048;
-				writer->WriteBytes( buff, 2048, eccEdcEncode );
-			}
+			const uint32_t sizeInSectors = GetSizeInSectors(entry.length);
+			auto sectorView = writer->GetSectorViewM2F1(entry.lba, sizeInSectors, isForm2 ? cd::IsoWriter::EdcEccForm::Form2 : cd::IsoWriter::EdcEccForm::Form1);
+
+			sectorView->WriteBlankSectors(sizeInSectors);
 		}
 	}
 
@@ -1098,19 +1045,11 @@ int iso::DirTreeClass::GetDirCountTotal() const
 
 void iso::WriteLicenseData(cd::IsoWriter* writer, void* data)
 {
-	writer->SeekToSector( 0 );
-	writer->WriteBytesXA( data, 2336*12, cd::IsoWriter::EdcEccForm1 );
+	auto licenseSectors = writer->GetSectorViewM2F2(0, 12, cd::IsoWriter::EdcEccForm::Form1);
+	licenseSectors->WriteMemory(data, 2336 * 12);
 
-	char blank[2048] {};
-
-	writer->SetSubheader(0x00200000);
-
-	for( int i=0; i<4; i++ ) {
-
-		writer->WriteBytes( blank, 2048, cd::IsoWriter::EdcEccForm2 );
-	}
-
-	writer->SetSubheader(0x00080000);
+	auto licenseBlankSectors = writer->GetSectorViewM2F1(12, 4, cd::IsoWriter::EdcEccForm::Form2);
+	licenseBlankSectors->WriteBlankSectors(4);
 }
 
 template<size_t N>
@@ -1232,10 +1171,12 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	isoDescriptor.volumeSize = cd::SetPair32( imageLen );
 
 	// Write the descriptor
-	writer->SeekToSector( 16 );
-	writer->SetSubheader( cd::IsoWriter::SubEOL );
-	writer->WriteBytes( &isoDescriptor, sizeof(isoDescriptor),
-		cd::IsoWriter::EdcEccForm1 );
+	unsigned int currentHeaderLBA = 16;
+
+	auto isoDescriptorSectors = writer->GetSectorViewM2F1(currentHeaderLBA, 2, cd::IsoWriter::EdcEccForm::Form1);
+	isoDescriptorSectors->SetSubheader(cd::IsoWriter::SubEOL);
+
+	isoDescriptorSectors->WriteMemory(&isoDescriptor, sizeof(isoDescriptor));
 
 	// Write descriptor terminator;
 	memset( &isoDescriptor, 0x00, sizeof(cd::ISO_DESCRIPTOR) );
@@ -1243,66 +1184,31 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	isoDescriptor.header.version = 1;
 	CopyStringPadWithSpaces( isoDescriptor.header.id, "CD001" );
 
-	writer->SetSubheader( cd::IsoWriter::SubEOF );
-	writer->WriteBytes( &isoDescriptor, sizeof(isoDescriptor),
-		cd::IsoWriter::EdcEccForm1 );
+	isoDescriptorSectors->WriteMemory(&isoDescriptor, sizeof(isoDescriptor));
+	currentHeaderLBA += 2;
 
 	// Generate and write L-path table
-	auto sectorBuff = std::make_unique<unsigned char[]>(static_cast<size_t>(2048)*pathTableSectors);
+	const size_t pathTableSize = static_cast<size_t>(2048)*pathTableSectors;
+	auto sectorBuff = std::make_unique<unsigned char[]>(pathTableSize);
 
 	dirTree->GeneratePathTable( root, sectorBuff.get(), false );
-	writer->SetSubheader( cd::IsoWriter::SubData );
+	auto lpathTable1 = writer->GetSectorViewM2F1(currentHeaderLBA, pathTableSectors, cd::IsoWriter::EdcEccForm::Form1);
+	lpathTable1->WriteMemory(sectorBuff.get(), pathTableSize);
+	currentHeaderLBA += pathTableSectors;
 
-	for ( int i=0; i<pathTableSectors; i++ )
-	{
-		if ( i == pathTableSectors-1 )
-		{
-			writer->SetSubheader( cd::IsoWriter::SubEOF );
-		}
-		writer->WriteBytes( &sectorBuff[2048*i], 2048,
-			cd::IsoWriter::EdcEccForm1 );
-	}
-
-	writer->SetSubheader( cd::IsoWriter::SubData );
-
-	for( int i=0; i<pathTableSectors; i++ )
-	{
-		if ( i == pathTableSectors-1 )
-		{
-			writer->SetSubheader( cd::IsoWriter::SubEOF );
-		}
-		writer->WriteBytes( &sectorBuff[2048*i], 2048,
-			cd::IsoWriter::EdcEccForm1 );
-	}
-
+	auto lpathTable2 = writer->GetSectorViewM2F1(currentHeaderLBA, pathTableSectors, cd::IsoWriter::EdcEccForm::Form1);
+	lpathTable2->WriteMemory(sectorBuff.get(), pathTableSize);
+	currentHeaderLBA += pathTableSectors;
 
 	// Generate and write M-path table
 	dirTree->GeneratePathTable( root, sectorBuff.get(), true );
-	writer->SetSubheader( cd::IsoWriter::SubData );
+	auto mpathTable1 = writer->GetSectorViewM2F1(currentHeaderLBA, pathTableSectors, cd::IsoWriter::EdcEccForm::Form1);
+	mpathTable1->WriteMemory(sectorBuff.get(), pathTableSize);
+	currentHeaderLBA += pathTableSectors;
 
-	for ( int i=0; i<pathTableSectors; i++ )
-	{
-		if ( i == pathTableSectors-1 )
-		{
-			writer->SetSubheader( cd::IsoWriter::SubEOF );
-		}
-		writer->WriteBytes( &sectorBuff[2048*i], 2048,
-			cd::IsoWriter::EdcEccForm1 );
-	}
-
-	writer->SetSubheader( cd::IsoWriter::SubData );
-
-	for ( int i=0; i<pathTableSectors; i++ )
-	{
-		if ( i == pathTableSectors-1 )
-		{
-			writer->SetSubheader( cd::IsoWriter::SubEOF );
-		}
-		writer->WriteBytes( &sectorBuff[2048*i], 2048,
-			cd::IsoWriter::EdcEccForm1 );
-	}
-
-	writer->SetSubheader( cd::IsoWriter::SubData );
+	auto mpathTable2 = writer->GetSectorViewM2F1(currentHeaderLBA, pathTableSectors, cd::IsoWriter::EdcEccForm::Form1);
+	mpathTable2->WriteMemory(sectorBuff.get(), pathTableSize);
+	currentHeaderLBA += pathTableSectors;
 }
 
 unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, bool msb)

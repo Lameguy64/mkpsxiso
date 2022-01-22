@@ -21,13 +21,13 @@ public:
 	EDCECC();
 
 	// Computes the EDC of *src and returns the result
-	unsigned int	ComputeEdcBlockPartial(unsigned int edc, const unsigned char *src, int len);
+	unsigned int	ComputeEdcBlockPartial(unsigned int edc, const unsigned char *src, size_t len) const;
 
 	// Computes the EDC of *src and stores the result to an unsigned char array *dest
-	void	ComputeEdcBlock(const unsigned char *src, int len, unsigned char *dest);
+	void	ComputeEdcBlock(const unsigned char *src, size_t len, unsigned char *dest) const;
 
 	// Computes the ECC data of *src and stores the result to an unsigned char array *dest
-	void	ComputeEccBlock(const unsigned char *address, const unsigned char *src, unsigned int major_count, unsigned int minor_count, unsigned int major_mult, unsigned int minor_inc, unsigned char *dest);
+	void	ComputeEccBlock(const unsigned char *address, const unsigned char *src, unsigned int major_count, unsigned int minor_count, unsigned int major_mult, unsigned int minor_inc, unsigned char *dest) const;
 
 };
 

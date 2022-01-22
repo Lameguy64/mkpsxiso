@@ -40,6 +40,7 @@ target_include_directories(tinyxml2 PUBLIC tinyxml2)
 # Populate shared files
 add_library(iso_shared OBJECT
 	${shared_dir}/common.cpp
+	${shared_dir}/mmappedfile.cpp
 	${shared_dir}/platform.cpp
 )
 target_include_directories(iso_shared PUBLIC ${shared_dir})

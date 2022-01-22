@@ -3,11 +3,17 @@
 
 #include "cd.h"
 #include "edcecc.h"
+#include "mmappedfile.h"
 #include <filesystem>
+#include <forward_list>
+#include <future>
+#include <memory>
 
 namespace cd {
 
 class IsoWriter {
+
+		std::unique_ptr<MMappedFile> m_mmap;
 
 		FILE*			filePtr;
 		unsigned char	subHeadBuff[12];
@@ -26,11 +32,12 @@ class IsoWriter {
 		size_t			WriteSectorToDisc();
 
 	public:
-
-		enum {
-			EdcEccNone = 0,
-			EdcEccForm1,
-			EdcEccForm2,
+		enum class EdcEccForm
+		{
+			None = 0,
+			Form1,
+			Form2,
+			Autodetect,
 		};
 		
 		enum {
@@ -40,10 +47,57 @@ class IsoWriter {
 			SubEOF	= 0x00890000,
 		};
 
-		IsoWriter();
-		virtual	~IsoWriter();
+		class SectorView
+		{
+		public:
+			SectorView(MMappedFile* mappedFile, unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm);
+			virtual ~SectorView();
 
-		bool	Create(const std::filesystem::path& fileName);
+			virtual void WriteFile(FILE* file) = 0;
+			virtual void WriteMemory(const void* memory, size_t size) = 0;
+			virtual void WriteBlankSectors(unsigned int count) = 0;
+			virtual size_t GetSpaceInCurrentSector() const = 0;
+			virtual void NextSector() = 0;
+			virtual void SetSubheader(unsigned int subHead) = 0;
+
+			void WaitForChecksumJobs();
+
+		protected:		
+			void CalculateForm1();
+			void CalculateForm2();
+
+		protected:
+			void* m_currentSector = nullptr;
+			size_t m_offsetInSector = 0;
+			unsigned int m_endLBA = 0;
+			unsigned int m_currentLBA = 0;
+			EdcEccForm m_edcEccForm;
+
+		private:
+			std::forward_list<std::future<void>> m_checksumJobs;
+			MMappedFile::View m_view;
+		};
+
+		class RawSectorView
+		{
+		public:
+			RawSectorView(MMappedFile* mappedFile, unsigned int offsetLBA, unsigned int sizeLBA);
+
+			void* GetRawBuffer() const;
+			void WriteBlankSectors();
+
+		private:
+			MMappedFile::View m_view;
+			unsigned int m_endLBA;
+		};
+
+		IsoWriter();
+		~IsoWriter();
+
+		bool	Create(const std::filesystem::path& fileName, unsigned int sizeLBA);
+		std::unique_ptr<SectorView> GetSectorViewM2F1(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const;
+		std::unique_ptr<SectorView> GetSectorViewM2F2(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const;
+		std::unique_ptr<RawSectorView> GetRawSectorView(unsigned int offsetLBA, unsigned int sizeLBA) const;
 
 		int		SeekToSector(int sector);
 

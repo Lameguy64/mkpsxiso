@@ -107,7 +107,7 @@ namespace iso
 		DirTreeClass* parent = nullptr; // Non-owning
 		
 		/// Internal function for generating and writing directory records
-		int	WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const;
+		bool WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const;
 
 		/// Internal function for recursive path table generation
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
@@ -195,7 +195,7 @@ namespace iso
 		 *  parentLBA	   - Parent directory LBA
 		 *  currentDirDate - Timestamp to use for . and .. directories.
 		 */
-		int	WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir);
+		bool WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir);
 
 		void SortDirectoryEntries();
 

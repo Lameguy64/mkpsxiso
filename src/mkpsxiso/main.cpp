@@ -47,7 +47,7 @@ namespace global
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da);
 int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
 
-int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile);
+int PackFileAsCDDA(void* buffer, size_t bufSize, const std::filesystem::path& audioFile);
 
 bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const unsigned lba)
 {
@@ -696,7 +696,7 @@ int Main(int argc, char* argv[])
 			// Create ISO image for writing
 			cd::IsoWriter writer;
 
-			if ( !writer.Create( global::ImageName.c_str() ) ) {
+			if ( !writer.Create(global::ImageName, totalLenLBA ) ) {
 
 				if ( !global::QuietMode )
 				{
@@ -715,9 +715,6 @@ int Main(int argc, char* argv[])
 				printf( "    Building filesystem... " );
 			}
 
-			//unsigned char subHead[] = { 0x00, 0x00, 0x08, 0x00 };
-			writer.SetSubheader( cd::IsoWriter::SubData );
-
 			if ( !global::QuietMode )
 			{
 				printf( "\n" );
@@ -731,8 +728,8 @@ int Main(int argc, char* argv[])
 			// Write out the audio tracks
 			for (const cdtrack& track : audioTracks)
 			{
-				// TODO: This will not be needed soon
-				writer.SeekToSector(track.lba);
+				const uint32_t sizeInSectors = GetSizeInSectors(track.size, CD_SECTOR_SIZE);
+				auto sectorView = writer.GetRawSectorView(track.lba, sizeInSectors);
 
 				if (!track.source.empty())
 				{
@@ -742,7 +739,7 @@ int Main(int argc, char* argv[])
 						printf( "    Packing audio %s... ", track.source.c_str() );
 					}
 
-					if ( PackFileAsCDDA( &writer, std::filesystem::u8path(track.source) ) )
+					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), track.size, std::filesystem::u8path(track.source) ) )
 					{
 						if ( !global::QuietMode )
 						{
@@ -753,7 +750,7 @@ int Main(int argc, char* argv[])
 				else
 				{
 					// Write pregap
-					writer.WriteBlankSectors(track.size / CD_SECTOR_SIZE);
+					sectorView->WriteBlankSectors();
 				}
 			}
 						
@@ -1375,7 +1372,7 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 	return true;
 }
 
-int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile)
+int PackFileAsCDDA(void* buffer, size_t bufSize, const std::filesystem::path& audioFile)
 {
 	// open the decoder
     ma_decoder decoder;
@@ -1411,27 +1408,12 @@ int PackFileAsCDDA(cd::IsoWriter* writer, const std::filesystem::path& audioFile
         return false;
 	}
 
-	// read a sector and write a sector until done
-	const ma_uint64 framesToRead = (CD_SECTOR_SIZE/(2 * sizeof(int16_t))); // 2 channels 2 bytes per single channel sample (588 intrachannel pcm frames)
-	ma_uint64 framesRead;
-	ma_uint64 totalFramesProcessed = 0;
-	unsigned char buff[CD_SECTOR_SIZE];
-	while(totalFramesProcessed < expectedPCMFrames)
-	{
-		memset(buff, 0x00, CD_SECTOR_SIZE);
-		framesRead = ma_decoder_read_pcm_frames(&decoder, &buff, framesToRead);
-		writer->WriteBytesRaw( buff, CD_SECTOR_SIZE );
-		totalFramesProcessed += framesRead;
-		if((framesRead != framesToRead) && (totalFramesProcessed < expectedPCMFrames))
-		{
-			printf("\n    ERROR: unexpected short read\n");
-			return false;
-		}
-	}
+	ma_uint64 framesRead = ma_decoder_read_pcm_frames(&decoder, buffer, expectedPCMFrames);
 	ma_decoder_uninit(&decoder);
-	if(totalFramesProcessed != expectedPCMFrames)
+
+	if(framesRead != expectedPCMFrames)
 	{
-		printf("\n    ERROR: corrupt file? (totalFramesProcessed != expectedPCMFrames)\n");
+		printf("\n    ERROR: corrupt file? (framesRead != expectedPCMFrames)\n");
 		return false;
 	}
     return true;
