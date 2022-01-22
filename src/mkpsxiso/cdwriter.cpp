@@ -319,7 +319,8 @@ void IsoWriter::Close() {
 
 IsoWriter::SectorView::SectorView(MMappedFile* mappedFile, unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm)
 	: m_view(mappedFile->GetView(static_cast<uint64_t>(offsetLBA) * CD_SECTOR_SIZE, static_cast<size_t>(sizeLBA) * CD_SECTOR_SIZE))
-	, m_endLBA(sizeLBA)
+	, m_currentLBA(offsetLBA)
+	, m_endLBA(offsetLBA + sizeLBA)
 	, m_edcEccForm(edcEccForm)
 {
 	m_currentSector = m_view.GetBuffer();
@@ -328,6 +329,40 @@ IsoWriter::SectorView::SectorView(MMappedFile* mappedFile, unsigned int offsetLB
 IsoWriter::SectorView::~SectorView()
 {
 	WaitForChecksumJobs();
+}
+
+static uint8_t ToBCD8(uint8_t num)
+{
+	return ((num / 10) << 4) | (num % 10);
+}
+
+static void WriteSectorAddress(uint8_t* output, unsigned int lsn)
+{
+	unsigned int lba = lsn + 150;
+
+	const uint8_t frame = static_cast<uint8_t>(lba % 75);
+	lba /= 75;
+
+	const uint8_t second = static_cast<uint8_t>(lba % 60);
+	lba /= 60;
+
+	const uint8_t minute = static_cast<uint8_t>(lba);
+
+	output[0] = ToBCD8(minute);
+	output[1] = ToBCD8(second);
+	output[2] = ToBCD8(frame);
+}
+
+void IsoWriter::SectorView::PrepareSectorHeader() const
+{
+	SECTOR_M2F1* sector = static_cast<SECTOR_M2F1*>(m_currentSector);
+
+	static constexpr uint8_t SYNC_PATTERN[12] = { 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00 };
+	std::copy(std::begin(SYNC_PATTERN), std::end(SYNC_PATTERN), sector->sync);
+
+	WriteSectorAddress(sector->addr, m_currentLBA);
+
+	sector->mode = 2; // Mode 2
 }
 
 void IsoWriter::SectorView::CalculateForm1()
@@ -390,6 +425,7 @@ public:
 
 		while (m_currentLBA < m_endLBA)
 		{
+			PrepareSectorHeader();
 			SetSubHeader(sector->subHead, m_currentLBA != lastLBA ? m_subHeader : IsoWriter::SubEOF);
 
 			const size_t bytesRead = fread(sector->data, 1, sizeof(sector->data), file);
@@ -421,6 +457,7 @@ public:
 
 			if (m_offsetInSector == 0)
 			{
+				PrepareSectorHeader();
 				SetSubHeader(sector->subHead, m_currentLBA != lastLBA ? m_subHeader : IsoWriter::SubEOF);
 			}
 
@@ -445,6 +482,7 @@ public:
 
 		while (m_currentLBA < m_endLBA && count > 0)
 		{
+			PrepareSectorHeader();
 			SetSubHeader(sector->subHead, isForm2 ? 0x00200000 : 0);
 
 			std::fill(std::begin(sector->data), std::end(sector->data), 0);
@@ -531,6 +569,8 @@ public:
 
 		while (m_currentLBA < m_endLBA)
 		{
+			PrepareSectorHeader();
+
 			const size_t bytesRead = fread(sector->data, 1, sizeof(sector->data), file);
 			// Fill the remainder of the sector with zeroes if applicable
 			std::fill(std::begin(sector->data) + bytesRead, std::end(sector->data), 0);
@@ -573,6 +613,11 @@ public:
 
 		while (m_currentLBA < m_endLBA && size > 0)
 		{
+			if (m_offsetInSector == 0)
+			{
+				PrepareSectorHeader();
+			}
+
 			SectorType* sector = static_cast<SectorType*>(m_currentSector);
 
 			const size_t memToCopy = std::min(GetSpaceInCurrentSector(), size);
@@ -596,6 +641,8 @@ public:
 
 		while (m_currentLBA < m_endLBA && count > 0)
 		{
+			PrepareSectorHeader();
+
 			std::fill(std::begin(sector->data), std::end(sector->data), 0);
 			if (m_edcEccForm == IsoWriter::EdcEccForm::Form1)
 			{

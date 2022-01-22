@@ -62,16 +62,19 @@ class IsoWriter {
 
 			void WaitForChecksumJobs();
 
-		protected:		
+		protected:
+			void PrepareSectorHeader() const;
+
 			void CalculateForm1();
 			void CalculateForm2();
 
 		protected:
 			void* m_currentSector = nullptr;
 			size_t m_offsetInSector = 0;
-			unsigned int m_endLBA = 0;
 			unsigned int m_currentLBA = 0;
-			EdcEccForm m_edcEccForm;
+
+			const unsigned int m_endLBA = 0;
+			const EdcEccForm m_edcEccForm = EdcEccForm::None;
 
 		private:
 			std::forward_list<std::future<void>> m_checksumJobs;
