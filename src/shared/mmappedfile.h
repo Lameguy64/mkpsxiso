@@ -19,6 +19,7 @@ public:
 	private:
 		void* m_mapping = nullptr; // Aligned down to allocation granularity
 		void* m_data = nullptr;
+		size_t m_size = 0; // Real size, with adjustments to granularity
 	};
 
 	MMappedFile();
@@ -28,5 +29,5 @@ public:
 	View GetView(uint64_t offset, size_t size) const;
 
 private:
-	void* m_handle; // Opaque, platform-specific
+	void* m_handle = nullptr; // Opaque, platform-specific
 };

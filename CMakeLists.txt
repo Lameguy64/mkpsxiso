@@ -12,7 +12,7 @@ project(
 )
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-set(CMAKE_C_STANDARD           17)
+set(CMAKE_C_STANDARD           11)
 set(CMAKE_CXX_STANDARD         17)
 
 # Useful paths
@@ -46,6 +46,8 @@ add_library(iso_shared OBJECT
 target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
 
+find_package(Threads REQUIRED)
+
 ## Executables
 
 add_executable(mkpsxiso
@@ -55,7 +57,7 @@ add_executable(mkpsxiso
 	${mkpsxiso_dir}/main.cpp
 )
 target_include_directories(mkpsxiso PUBLIC "miniaudio")
-target_link_libraries(mkpsxiso tinyxml2 iso_shared)
+target_link_libraries(mkpsxiso tinyxml2 iso_shared Threads::Threads)
 if(MINGW)
 	target_link_libraries(mkpsxiso "-municode")
 endif()

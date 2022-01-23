@@ -1,12 +1,15 @@
 #include "mmappedfile.h"
 
 #ifdef _WIN32
-#define NOMINMAX
 #include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #endif
 
 MMappedFile::MMappedFile()
-	: m_handle(nullptr)
 {
 }
 
@@ -18,7 +21,10 @@ MMappedFile::~MMappedFile()
 		CloseHandle(reinterpret_cast<HANDLE>(m_handle));
 	}
 #else
-	// TODO: Do
+	if (m_handle != nullptr)
+	{
+		close(static_cast<int>(reinterpret_cast<intptr_t>(m_handle)));
+	}
 #endif
 }
 
@@ -43,7 +49,19 @@ bool MMappedFile::Create(const std::filesystem::path& filePath, uint64_t size)
 		CloseHandle(file);
 	}
 #else
-	// TODO: Do
+	int file = open(filePath.c_str(), O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+	if (file != -1)
+	{
+		if (ftruncate(file, size) == 0)
+		{
+			m_handle = reinterpret_cast<void*>(file);
+			result = true;
+		}
+		else
+		{
+			close(file);
+		}
+	}
 #endif
 	return result;
 }
@@ -59,22 +77,28 @@ MMappedFile::View::View(void* handle, uint64_t offset, size_t size)
 	SYSTEM_INFO SysInfo;
 	GetSystemInfo(&SysInfo);
 	const DWORD allocGranularity = SysInfo.dwAllocationGranularity;
+#else
+	const long allocGranularity = sysconf(_SC_PAGE_SIZE);
+#endif
 
 	const uint64_t mapStartOffset = (offset / allocGranularity) * allocGranularity;
 	const uint64_t viewDelta = offset - mapStartOffset;
 	size += viewDelta;
 
+#ifdef _WIN32
 	ULARGE_INTEGER ulOffset;
 	ulOffset.QuadPart = mapStartOffset;
-	m_mapping = MapViewOfFile(reinterpret_cast<HANDLE>(handle), FILE_MAP_ALL_ACCESS, ulOffset.HighPart, ulOffset.LowPart, size);
-	if (m_mapping != nullptr)
-	{
-		m_data = static_cast<char*>(m_mapping) + viewDelta;
-	}
-
+	void* mapping = MapViewOfFile(reinterpret_cast<HANDLE>(handle), FILE_MAP_ALL_ACCESS, ulOffset.HighPart, ulOffset.LowPart, size);
+	if (mapping != nullptr)
 #else
-	// TODO: Do
+	void* mapping = mmap(nullptr, size, PROT_READ|PROT_WRITE, MAP_SHARED, static_cast<int>(reinterpret_cast<intptr_t>(handle)), mapStartOffset);
+	if (mapping != MAP_FAILED)
 #endif
+	{
+		m_mapping = mapping;
+		m_data = static_cast<char*>(m_mapping) + viewDelta;
+		m_size = size;
+	}
 }
 
 MMappedFile::View::~View()
@@ -85,6 +109,9 @@ MMappedFile::View::~View()
 		UnmapViewOfFile(m_mapping);
 	}
 #else
-
+	if (m_mapping != nullptr)
+	{
+		munmap(m_mapping, m_size);
+	}
 #endif
 }
