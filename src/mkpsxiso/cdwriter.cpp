@@ -11,6 +11,7 @@
 #include "cdwriter.h"
 #include "edcecc.h"
 #include "platform.h"
+#include <algorithm>
 
 using namespace cd;
 
@@ -369,13 +370,11 @@ void IsoWriter::SectorView::CalculateForm1()
 {
 	SECTOR_M2F1* sector = static_cast<SECTOR_M2F1*>(m_currentSector);
 
-	// Encode EDC data
-	m_checksumJobs.emplace_front(std::async(std::launch::async, &EDCECC::ComputeEdcBlock, &EDC_ECC_GEN,
-		sector->subHead, sizeof(sector->subHead) + sizeof(sector->data), sector->edc));
-
-	// Encode ECC data
 	m_checksumJobs.emplace_front(std::async(std::launch::async, [](SECTOR_M2F1* sector)
 		{
+			// Encode EDC data
+			EDC_ECC_GEN.ComputeEdcBlock(sector->subHead, sizeof(sector->subHead) + sizeof(sector->data), sector->edc);
+
 			// Compute ECC P code
 			static const unsigned char zeroaddress[4] = { 0, 0, 0, 0 };
 			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->subHead, 86, 24, 2, 86, sector->ecc);
