@@ -1,21 +1,12 @@
-#ifdef _WIN32
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
-#include <string.h>
-#include <cassert>
-#include "common.h"
 #include "cdwriter.h"
+#include "common.h"
 #include "edcecc.h"
 #include "platform.h"
+
 #include <algorithm>
+#include <cstring>
 
 using namespace cd;
-
-
 
 static const EDCECC EDC_ECC_GEN;
 
@@ -27,74 +18,6 @@ ISO_UINT_PAIR cd::SetPair32(unsigned int val) {
 	return { val, SwapBytes32(val) };
 }
 
-
-IsoWriter::IsoWriter() {
-
-	IsoWriter::filePtr			= nullptr;
-	IsoWriter::sectorM2F1		= nullptr;
-	IsoWriter::sectorM2F2		= nullptr;
-	IsoWriter::currentByte		= 0;
-	IsoWriter::currentSector	= 0;
-	IsoWriter::bytesWritten		= 0;
-	IsoWriter::lastSectorType	= 0;
-
-	memset(IsoWriter::sectorBuff, 0, CD_SECTOR_SIZE);
-
-}
-
-IsoWriter::~IsoWriter() {
-
-	Close();
-}
-
-void IsoWriter::PrepSector(int edcEccMode) {
-
-    memset(IsoWriter::sectorM2F1->sync, 0xff, 12);
-    IsoWriter::sectorM2F1->sync[0]	= 0x00;
-    IsoWriter::sectorM2F1->sync[11]	= 0x00;
-
-	int taddr,addr = 150+IsoWriter::currentSector;	// Sector addresses always start at LBA 150
-
-	taddr = addr%75;
-	IsoWriter::sectorM2F1->addr[2] = (16*(taddr/10))+(taddr%10);
-
-	taddr = (addr/75)%60;
-	IsoWriter::sectorM2F1->addr[1] = (16*(taddr/10))+(taddr%10);
-
-	taddr = (addr/75)/60;
-	IsoWriter::sectorM2F1->addr[0] = (16*(taddr/10))+(taddr%10);
-
-	IsoWriter::sectorM2F1->mode = 0x02;
-
-	/*if (edcEccMode == IsoWriter::EdcEccForm1) {
-
-		// Encode EDC data
-		edcEccGen.ComputeEdcBlock(IsoWriter::sectorM2F1->subHead, 0x808, IsoWriter::sectorM2F1->edc);
-
-		// Encode ECC data
-
-		// Compute ECC P code
-		static const unsigned char zeroaddress[4] = { 0, 0, 0, 0 };
-		edcEccGen.ComputeEccBlock(zeroaddress, IsoWriter::sectorBuff+0x10, 86, 24, 2, 86, IsoWriter::sectorBuff+0x81C);
-		// Compute ECC Q code
-		edcEccGen.ComputeEccBlock(zeroaddress, IsoWriter::sectorBuff+0x10, 52, 43, 86, 88, IsoWriter::sectorBuff+0x8C8);
-
-	} else if (edcEccMode == IsoWriter::EdcEccForm2) {
-
-		edcEccGen.ComputeEdcBlock(IsoWriter::sectorM2F1->subHead, 0x91C, &IsoWriter::sectorM2F2->data[2332]);
-
-	}*/
-
-}
-
-size_t IsoWriter::WriteSectorToDisc()
-{
-	const size_t bytesRead = fwrite(sectorBuff, CD_SECTOR_SIZE, 1, filePtr);
-	currentByte = 0;
-	memset(sectorBuff, 0, CD_SECTOR_SIZE);
-	return bytesRead;
-}
-
 bool IsoWriter::Create(const std::filesystem::path& fileName, unsigned int sizeLBA)
 {
 	const uint64_t sizeBytes = static_cast<uint64_t>(sizeLBA) * CD_SECTOR_SIZE;
@@ -103,217 +26,9 @@ bool IsoWriter::Create(const std::filesystem::path& fileName, unsigned int sizeL
 	return m_mmap->Create(fileName, sizeBytes);
 }
 
-int IsoWriter::SeekToSector(int sector) {
-
-	assert(!"Dead code");
-
-	return 0;
-
-}
-
-int IsoWriter::SeekToEnd() {
-
-	assert(!"Dead code");
-
-	return 0;
-
-}
-
-size_t IsoWriter::WriteBytes(void* data, size_t bytes, int edcEccEncode) {
-
-    size_t writeBytes = 0;
-
-	char*  	dataPtr = (char*)data;
-    int		toWrite;
-
-	memcpy(IsoWriter::sectorM2F1->subHead, IsoWriter::subHeadBuff, 8);
-
-	IsoWriter::lastSectorType = edcEccEncode;
-
-    while(bytes > 0) {
-
-        if (bytes > 2048)
-			toWrite = 2048;
-		else
-			toWrite = bytes;
-
-		memcpy(&IsoWriter::sectorM2F1->data[IsoWriter::currentByte], dataPtr, toWrite);
-
-		IsoWriter::currentByte += toWrite;
-
-		dataPtr += toWrite;
-		bytes -= toWrite;
-
-		if (IsoWriter::currentByte >= 2048) {
-
-			IsoWriter::PrepSector(edcEccEncode);
-
-            if (WriteSectorToDisc() == 0) {
-
-				IsoWriter::currentByte = 0;
-				return(writeBytes);
-
-            }
-
-            IsoWriter::currentByte = 0;
-            IsoWriter::currentSector++;
-
-            IsoWriter::sectorM2F1 = (SECTOR_M2F1*)sectorBuff;
-			IsoWriter::sectorM2F2 = (SECTOR_M2F2*)sectorBuff;
-
-		}
-
-		writeBytes += toWrite;
-
-    }
-
-	return(writeBytes);
-
-}
-
-size_t IsoWriter::WriteBytesXA(void* data, size_t bytes, int edcEccEncode) {
-
-    size_t writeBytes = 0;
-
-	char*  	dataPtr = (char*)data;
-    int		toWrite;
-
-	IsoWriter::lastSectorType = edcEccEncode;
-
-    while(bytes > 0) {
-
-        if (bytes > 2336)
-			toWrite = 2336;
-		else
-			toWrite = bytes;
-
-		memcpy(&IsoWriter::sectorM2F2->data[IsoWriter::currentByte], dataPtr, toWrite);
-
-		IsoWriter::currentByte += toWrite;
-
-		dataPtr += toWrite;
-		bytes -= toWrite;
-
-		if (IsoWriter::currentByte >= 2336) {
-
-			IsoWriter::PrepSector(edcEccEncode);
-
-            if (WriteSectorToDisc() == 0) {
-
-				IsoWriter::currentByte = 0;
-				return(writeBytes);
-
-            }
-
-            IsoWriter::currentByte = 0;
-            IsoWriter::currentSector++;
-
-            IsoWriter::sectorM2F1 = (SECTOR_M2F1*)sectorBuff;
-			IsoWriter::sectorM2F2 = (SECTOR_M2F2*)sectorBuff;
-
-		}
-
-		writeBytes += toWrite;
-
-    }
-
-	return(writeBytes);
-
-}
-
-size_t IsoWriter::WriteBytesRaw(const void* data, size_t bytes) {
-
-    size_t writeBytes = 0;
-
-	char*  	dataPtr = (char*)data;
-    int		toWrite;
-
-	//IsoWriter::lastSectorType = EdcEccNone;
-
-    while(bytes > 0) {
-
-        if (bytes > 2352)
-			toWrite = 2352;
-		else
-			toWrite = bytes;
-
-		memcpy(&IsoWriter::sectorBuff[IsoWriter::currentByte], dataPtr, toWrite);
-
-		IsoWriter::currentByte += toWrite;
-
-		dataPtr += toWrite;
-		bytes -= toWrite;
-
-		if (IsoWriter::currentByte >= 2352) {
-
-            if (WriteSectorToDisc() == 0) {
-
-				IsoWriter::currentByte = 0;
-				return(writeBytes);
-
-            }
-
-            IsoWriter::currentByte = 0;
-            IsoWriter::currentSector++;
-
-            IsoWriter::sectorM2F1 = (SECTOR_M2F1*)sectorBuff;
-			IsoWriter::sectorM2F2 = (SECTOR_M2F2*)sectorBuff;
-
-		}
-
-		writeBytes += toWrite;
-
-    }
-
-	return(writeBytes);
-
-}
-
-size_t  IsoWriter::WriteBlankSectors(const size_t count)
+void IsoWriter::Close()
 {
-	const char blank[CD_SECTOR_SIZE] {};
-	
-	size_t bytesWritten = 0;
-	for(size_t i = 0; i < count; i++)
-	{
-		bytesWritten += WriteBytesRaw( blank, CD_SECTOR_SIZE );
-	}
-	return bytesWritten;
-}
-
-int IsoWriter::CurrentSector() {
-
-	return currentSector;
-
-}
-
-void IsoWriter::SetSubheader(unsigned char* data) {
-
-	assert(!"Dead code");
-
-}
-
-void IsoWriter::SetSubheader(unsigned int data) {
-
-	assert(!"Dead code");
-
-}
-
-void IsoWriter::Close() {
-
-	if (IsoWriter::filePtr != nullptr) {
-
-		if (IsoWriter::currentByte > 0) {
-			IsoWriter::PrepSector(IsoWriter::lastSectorType);
-			WriteSectorToDisc();
-		}
-
-		fclose(IsoWriter::filePtr);
-
-	}
-
-	IsoWriter::filePtr = nullptr;
-
+	m_mmap.reset();
 }
 
 // ======================================================
@@ -713,11 +428,6 @@ auto IsoWriter::GetSectorViewM2F2(unsigned int offsetLBA, unsigned int sizeLBA, 
 
 // ======================================================
 
-auto IsoWriter::GetRawSectorView(unsigned int offsetLBA, unsigned int sizeLBA) const -> std::unique_ptr<RawSectorView>
-{
-	return std::make_unique<RawSectorView>(m_mmap.get(), offsetLBA, sizeLBA);
-}
-
 IsoWriter::RawSectorView::RawSectorView(MMappedFile* mappedFile, unsigned int offsetLBA, unsigned int sizeLBA)
 	: m_view(mappedFile->GetView(static_cast<uint64_t>(offsetLBA) * CD_SECTOR_SIZE, static_cast<size_t>(sizeLBA) * CD_SECTOR_SIZE))
 	, m_endLBA(sizeLBA)
@@ -733,4 +443,9 @@ void IsoWriter::RawSectorView::WriteBlankSectors()
 {
 	char* buf = static_cast<char*>(m_view.GetBuffer());
 	std::fill_n(buf, static_cast<size_t>(m_endLBA) * CD_SECTOR_SIZE, 0);
+}
+
+auto IsoWriter::GetRawSectorView(unsigned int offsetLBA, unsigned int sizeLBA) const -> std::unique_ptr<RawSectorView>
+{
+	return std::make_unique<RawSectorView>(m_mmap.get(), offsetLBA, sizeLBA);
 }

@@ -101,7 +101,6 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.date		= volumeDate;
 	entry.length	= entry.subdir->CalculateDirEntryLen();
 
-	// TODO: Verify
 	const EntryAttributes attributes = EntryAttributes::MakeDefault();
 	entry.attribs	= attributes.XAAttrib.value();
 	entry.perms		= attributes.XAPerm.value();
@@ -626,8 +625,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		// Write files as regular data sectors
 		if ( entry.type == EntryType::EntryFile )
 		{
-			char buff[2048];
-
 			if ( !entry.srcfile.empty() )
 			{
 				if ( !global::QuietMode )
@@ -650,32 +647,12 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				}
 
 			}
-			else
-			{
-				// TODO: DO
-				memset( buff, 0x00, 2048 );
-
-				writer->SetSubheader( cd::IsoWriter::SubData );
-
-				size_t totalBytesRead = 0;
-				while( totalBytesRead < entry.length )
-				{
-					totalBytesRead += 2048;
-					if ( totalBytesRead >= entry.length )
-					{
-						writer->SetSubheader( cd::IsoWriter::SubEOF );
-					}
-					writer->WriteBytes( buff, 2048, /*cd::IsoWriter::EdcEccForm1*/0 );
-				}
-			}
 
 		// Write XA/STR video streams as Mode 2 Form 1 (video sectors) and Mode 2 Form 2 (XA audio sectors)
 		// Video sectors have EDC/ECC while XA does not
 		}
 		else if ( entry.type == EntryType::EntryXA )
 		{
-			char buff[2336];
-
 			if ( !global::QuietMode )
 			{
 				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
@@ -688,29 +665,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				sectorView->WriteFile(fp);
 
 				fclose( fp );
-			}
-
-			/*while ( !feof( fp ) )
-			{
-				memset( buff, 0x00, 2336 );
-				fread( buff, 1, 2336, fp );
-
-				// Check submode if sector is mode 2 form 2
-				if ( buff[2]&0x20 )
-				{
-				    // If so, write it as an XA sector
-					writer->WriteBytesXA( buff, 2336, cd::IsoWriter::EdcEccForm2 );
-
-				}
-				else
-				{
-					// Otherwise, write it as Mode 2 Form 1
-					writer->WriteBytesXA( buff, 2336, cd::IsoWriter::EdcEccForm1 );
-				}
-
-			}*/
-
-			
+			}			
 
 			if (!global::QuietMode)
 			{
@@ -721,9 +676,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		}
 		else if ( entry.type == EntryType::EntryXA_DO )
 		{
-			// TODO: DO
-			char buff[2048];
-
 			if ( !entry.srcfile.empty() )
 			{
 				if ( !global::QuietMode )
@@ -732,20 +684,14 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
-
-				writer->SetSubheader( cd::IsoWriter::SubSTR );
-
-				while( !feof( fp ) )
+				if (fp != nullptr)
 				{
-					memset( buff, 0x00, 2048 );
-					fread( buff, 1, 2048, fp );
+					auto sectorView = writer->GetSectorViewM2F1(entry.lba, GetSizeInSectors(entry.length), cd::IsoWriter::EdcEccForm::Form1);
+					sectorView->SetSubheader(cd::IsoWriter::SubSTR);
+					sectorView->WriteFile(fp);
 
-					writer->WriteBytes( buff, 2048, /*cd::IsoWriter::EdcEccForm1*/0 );
+					fclose(fp);
 				}
-
-				fclose( fp );
-
-				writer->SetSubheader(0x00080000);
 
 				if ( !global::QuietMode )
 				{
@@ -753,34 +699,12 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				}
 
 			}
-			else
-			{
-				memset( buff, 0x00, 2048 );
-
-				writer->SetSubheader( cd::IsoWriter::SubData );
-
-				size_t totalBytesRead = 0;
-				while( totalBytesRead < entry.length )
-				{
-					totalBytesRead += 2048;
-					if ( totalBytesRead >= entry.length )
-					{
-						writer->SetSubheader( cd::IsoWriter::SubEOF );
-					}
-					writer->WriteBytes( buff, 2048, /*cd::IsoWriter::EdcEccForm1*/0 );
-				}
-			}
-
 		// Write DA files as audio tracks
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
 			continue;
 		}
-		/*else if ( entry.type == EntryDir )
-		{
-			entry.subdir->WriteFiles( writer );
-		}*/
 		// Write dummies as gaps without data
 		else if ( entry.type == EntryType::EntryDummy )
 		{
