@@ -7,18 +7,9 @@ on:   [ push, pull_request ]
 jobs:
   build-windows:
     name:    Build mkpsxiso on Windows
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
-    - name: Add MSys2 to PATH
-      run: |
-        echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-    - name: Install prerequisites
-      run: |
-        pacman -S --noconfirm mingw-w64-x86_64-ninja mingw-w64-x86_64-gcc
-
     - name: Fetch repo contents
       uses: actions/checkout@v2
       with:
@@ -31,9 +22,8 @@ jobs:
 
     - name: Build and package mkpsxiso
       run: |
-        cmake --preset ci -S mkpsxiso
-        cmake --build build
-        cmake --build build -t package
+        cmake --preset ci -S mkpsxiso -G "Visual Studio 17 2022"
+        cmake --build build --config Release -t package
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v2
@@ -66,7 +56,6 @@ jobs:
     - name: Build and package mkpsxiso
       run: |
         cmake --preset ci -S mkpsxiso
-        cmake --build build
         cmake --build build -t package
 
     - name: Upload build artifacts

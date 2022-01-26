@@ -75,8 +75,6 @@ endif()
 
 install(TARGETS mkpsxiso dumpsxiso)
 
-include(InstallRequiredSystemLibraries)
-
 ## CPack (used by GitHub Actions to package releases)
 
 if(NOT DEFINED CPACK_GENERATOR)

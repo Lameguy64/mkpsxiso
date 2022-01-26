@@ -20,8 +20,7 @@
 			"generator":   "Ninja",
 			"binaryDir":   "${sourceDir}/../build",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release",
-				"BUILD_INFO":       "Built by GitHub Actions ($env{GITHUB_REF_NAME} $env{GITHUB_SHA})"
+				"CMAKE_BUILD_TYPE": "Release"
 			}
 		}
 	]
