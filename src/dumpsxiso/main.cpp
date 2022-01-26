@@ -607,6 +607,11 @@ void ParseISO(cd::IsoReader& reader) {
 				setAttributeIfNotEmpty(xml::attrib::PUBLISHER, CleanDescElement(descriptor.publisherIdentifier));
 				setAttributeIfNotEmpty(xml::attrib::DATA_PREPARER, CleanDescElement(descriptor.dataPreparerIdentifier));
 				newElement->SetAttribute(xml::attrib::CREATION_DATE, LongDateToString(descriptor.volumeCreateDate).c_str());
+				if (auto ZERO_DATE = GetUnspecifiedLongDate(); memcmp(&descriptor.volumeModifyDate, &ZERO_DATE, sizeof(descriptor.volumeModifyDate)) != 0)
+				{
+					// Set only if not zero
+					newElement->SetAttribute(xml::attrib::MODIFICATION_DATE, LongDateToString(descriptor.volumeModifyDate).c_str());
+				}
 			}
 
 			{
