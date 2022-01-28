@@ -103,7 +103,10 @@ void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP
 	if (file != INVALID_HANDLE_VALUE)
 	{
 		const FILETIME ft = TimetToFileTime(time);
-		SetFileTime(file, &ft, nullptr, &ft);
+		if(0 == SetFileTime(file, &ft, nullptr, &ft))
+		{
+			printf("ERROR: unable to update timestamps for %ls\n", path.c_str());
+		}
 
 		CloseHandle(file);
 	}
@@ -113,7 +116,10 @@ void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP
 
 	times[1].tv_sec = time;
 	times[1].tv_nsec = 0;
-	utimensat(AT_FDCWD, path.c_str(), times, 0);
+	if(0 != utimensat(AT_FDCWD, path.c_str(), times, 0))
+	{
+		printf("ERROR: unable to update timestamps for %s\n", path.c_str());
+	}
 #endif
 }
 

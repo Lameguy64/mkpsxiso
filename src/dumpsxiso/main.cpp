@@ -66,6 +66,29 @@ namespace param {
 	EncoderAudioFormats encodingFormat = EAF_WAV;
 }
 
+std::filesystem::path GetRealDAFilePath(const std::filesystem::path& inputPath)
+{
+	std::filesystem::path outputPath(inputPath); 
+	if(param::encodingFormat == EAF_WAV)
+	{
+		outputPath.replace_extension(".WAV");
+	}
+	else if(param::encodingFormat == EAF_FLAC)
+	{
+		outputPath.replace_extension(".FLAC");
+	}
+	else if(param::encodingFormat == EAF_PCM)
+	{
+		outputPath.replace_extension(".PCM");
+	}
+	else
+	{
+		printf("ERROR: support for encoding format is not implemented, not changing name\n");
+		return inputPath;
+	}
+	return outputPath;
+}
+
 template<size_t N>
 void PrintId(char (&id)[N])
 {
@@ -481,10 +504,11 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n");
 				}
 
-				auto outFile = OpenScopedFile(outputPath, "wb");
+                auto daOutPath = GetRealDAFilePath(outputPath);
+				auto outFile = OpenScopedFile(daOutPath, "wb");
 
 				if (!outFile) {
-					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
+					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", daOutPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -556,9 +580,14 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 	// else directories will have their timestamps discarded when files are being unpacked into them!
 	for (const auto& entry : files)
 	{
-		UpdateTimestamps(rootPath / entry.virtualPath / CleanIdentifier(entry.identifier), entry.entry.entryDate);
+		std::filesystem::path toChange(rootPath / entry.virtualPath / CleanIdentifier(entry.identifier));
+		const EntryType type = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
+		if(type == EntryType::EntryDA)
+		{
+			toChange = GetRealDAFilePath(toChange);
+		}
+		UpdateTimestamps(toChange, entry.entry.entryDate);
 	}
-
 }
 
 tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement* dirElement, std::filesystem::path* currentVirtualPath,
@@ -840,11 +869,13 @@ void ParseISO(cd::IsoReader& reader) {
 			std::vector<cdtrack> tracks;
 			for(const auto& dafile : dafiles)
 			{
+				auto tracksource = GetRealDAFilePath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier));
+
 				// add to make track element later
 				tracks.emplace_back(
 					dafile->entry.entryOffs.lsb,
 					dafile->entry.entrySize.lsb,
-					(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier)).generic_u8string()
+					tracksource.generic_u8string()
 				);
 
 				// add back in to the rest of the files
