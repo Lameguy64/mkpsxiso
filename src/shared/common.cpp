@@ -139,12 +139,14 @@ bool CompareICase(std::string_view strLeft, std::string_view strRight)
 bool ParseArgument(char** argv, std::string_view command, std::string_view longCommand)
 {
 	const std::string_view arg(*argv);
-	// Try the long command first
+	// Try the long command first, case insensitively
 	if (!longCommand.empty() && arg.length() > 2 && arg[0] == '-' && arg[1] == '-' && CompareICase(arg.substr(2), longCommand))
 	{
 		return true;
 	}
-	if (!command.empty() && arg.length() > 1 && arg[0] == '-' && CompareICase(arg.substr(1), command))
+	
+	// Short commands are case sensitive
+	if (!command.empty() && arg.length() > 1 && arg[0] == '-' && arg.substr(1) == command)
 	{
 		return true;
 	}

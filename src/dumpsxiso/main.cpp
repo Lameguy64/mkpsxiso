@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #ifdef _WIN32
+#define NOMINMAX
 #include <windows.h>
 
 #else
@@ -27,6 +28,7 @@ namespace param {
     std::filesystem::path isoFile;
     std::filesystem::path outPath;
     std::filesystem::path xmlFile;
+    bool outputSortedByDir = false;
 }
 
 template<size_t N>
@@ -424,34 +426,23 @@ void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement)
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 }
 
-void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath,
-	const unsigned int startLBA, const unsigned int sizeInSectors, const bool onlyDA, unsigned int& expectedLBA)
+void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, unsigned int& expectedLBA)
 {
 	std::filesystem::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
-	expectedLBA = startLBA;
 	unsigned tracknum = 2;
 	for (const auto& entry : files)
 	{
 		const bool isDA = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA;
-		if (onlyDA)
+
+		// only check for gaps, update LBA if it's inside the iso filesystem
+		if(!isDA)
 		{
-			if (!isDA)
+			if (entry.entry.entryOffs.lsb > expectedLBA)
 			{
-				continue;
+				// if this is a DA file we are at the end of filesystem, flag to write the gap after DA files
+				WriteXMLGap(entry.entry.entryOffs.lsb - expectedLBA, dirElement);
 			}
-		}
-		else
-		{
-			// only check for gaps, update LBA if it's inside the iso filesystem
-			if(!isDA)
-			{
-				if (entry.entry.entryOffs.lsb > expectedLBA)
-				{
-					// if this is a DA file we are at the end of filesystem, flag to write the gap after DA files
-					WriteXMLGap(entry.entry.entryOffs.lsb - expectedLBA, dirElement);
-				}
-				expectedLBA = entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb);
-			}
+			expectedLBA = entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb);
 		}
 
 		// add a trackid to DA tracks
@@ -459,9 +450,8 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 		if (isDA)
 		{
 			char tidbuf[3];
-			snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum);
+			snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum++);
 			trackid = tidbuf;
-			tracknum++;
 		}
 
 		// Work out the relative position between the current directory and the element to create
@@ -492,19 +482,31 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 	}
 }
 
-// Writes all entries BUT DA! Those must not be "pretty printed"
-void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath)
+void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, unsigned int& expectedLBA)
 {
+	unsigned tracknum = 2;
 	for (const auto& e : directory->dirEntryList.GetView())
 	{
 		const auto& entry = e.get();
-		if (GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA) continue;
 
-		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath, "");
+		std::string trackid;
+		if (GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA)
+		{
+			char tidbuf[3];
+			snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum++);
+			trackid = tidbuf;
+		}
+		else
+		{
+			// Update the LBA to the max encountered value
+			expectedLBA = std::max(expectedLBA, entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb));
+		}
+
+		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath, trackid);
 		// Recursively write children if there are any
 		if (const cd::IsoDirEntries* subdir = entry.subdir.get(); subdir != nullptr)
 		{
-			WriteXMLByDirectories(subdir, child, sourcePath);
+			WriteXMLByDirectories(subdir, child, sourcePath, expectedLBA);
 		}
 	}
 }
@@ -623,60 +625,47 @@ void ParseISO(cd::IsoReader& reader) {
 			const std::filesystem::path sourcePath = param::outPath.lexically_proximate(param::xmlFile.parent_path());
 
 			// process DA "files" to tracks and add to the dirs so the XML looks nicer
-			std::list<cd::IsoDirEntries::Entry> dafiles;
-			for(auto it = entries.begin(); it != entries.end();)
+			std::vector<std::list<cd::IsoDirEntries::Entry>::const_iterator> dafiles;
+			for(auto it = entries.begin(); it != entries.end(); ++it)
 			{
 				if(GetXAEntryType(((*it).extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA)
 				{
-					dafiles.push_back(std::move(*it));
-					it = entries.erase(it);
-				}
-				else
-				{
-					it++;
+					dafiles.emplace_back(it);
 				}
 			}
 			std::vector<cdtrack> tracks;
-			for(auto& dafile : dafiles)
+			for(const auto& dafile : dafiles)
 			{
 				// add to make track element later
 				tracks.emplace_back(
-					dafile.entry.entryOffs.lsb,
-					dafile.entry.entrySize.lsb,
-					(sourcePath / dafile.virtualPath / CleanIdentifier(dafile.identifier)).generic_u8string()
+					dafile->entry.entryOffs.lsb,
+					dafile->entry.entrySize.lsb,
+					(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier)).generic_u8string()
 				);
 
 				// add back in to the rest of the files
-				for(auto it = entries.begin(); it != entries.end(); it++)
+				for(auto it = entries.begin(); it != entries.end(); ++it)
 				{
 				    std::filesystem::path vpath = (*it).virtualPath / CleanIdentifier((*it).identifier);
-					if(dafile.virtualPath == vpath)
+					if(dafile->virtualPath == vpath)
 					{
 						do {
-							it++;
-						} while((it != entries.end()) && ((*it).virtualPath == dafile.virtualPath));
-						auto newitem = entries.emplace(it);
-						(*newitem) = std::move(dafile);
+							++it;
+						} while((it != entries.end()) && ((*it).virtualPath == dafile->virtualPath));
+						entries.splice(it, entries, dafile);
 						break;
 					}
 				}
 			}
 
-
-			// TODO: Commandline switch
-			bool preserveLBA = true;
-			unsigned currentLBA;
-			if (preserveLBA)
+			unsigned currentLBA = descriptor.rootDirRecord.entryOffs.lsb;
+			if (param::outputSortedByDir)
 			{
-				WriteXMLByLBA(entries, trackElement, sourcePath, descriptor.rootDirRecord.entryOffs.lsb, descriptor.volumeSize.lsb, false, currentLBA);
+				WriteXMLByDirectories(rootDir.get(), trackElement, sourcePath, currentLBA);		
 			}
 			else
 			{
-				// All this to get contents of a "root dir"...
-				WriteXMLByDirectories(rootDir->dirEntryList.GetView().front().get().subdir.get(), trackElement, sourcePath);
-
-				// Write DAs by LBA
-				WriteXMLByLBA(entries, trackElement, sourcePath, descriptor.rootDirRecord.entryOffs.lsb, descriptor.volumeSize.lsb, true, currentLBA);
+				WriteXMLByLBA(entries, trackElement, sourcePath, currentLBA);
 			}
 
 			// write CDDA tracks
@@ -684,7 +673,7 @@ void ParseISO(cd::IsoReader& reader) {
 			tinyxml2::XMLElement *addAfter = trackElement;
 			tinyxml2::XMLElement *dirtree  = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
 			unsigned tracknum = 2;
-			for(auto& track : tracks)
+			for(const auto& track : tracks)
 			{
 				unsigned pregap_sectors = 0;
 				if(track.lba != currentLBA)
@@ -732,6 +721,7 @@ int Main(int argc, char *argv[])
 		"  <isofile>  - File name of ISO file (supports any 2352 byte/sector images).\n"
 		"  -x <path>  - Specified destination directory of extracted files.\n"
 		"  -s <path>  - Outputs an MKPSXISO compatible XML script for later rebuilding.\n"
+		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
 		"  -h|--help  - Show this help text\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
@@ -763,6 +753,11 @@ int Main(int argc, char *argv[])
 			if (auto xmlPath = ParsePathArgument(args, "s"); xmlPath.has_value())
 			{
 				param::xmlFile = *xmlPath;
+				continue;
+			}
+			if (ParseArgument(args, "S", "sort-by-dir"))
+			{
+				param::outputSortedByDir = true;
 				continue;
 			}
 
