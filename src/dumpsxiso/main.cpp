@@ -39,7 +39,7 @@ typedef struct {
 	const char *notcompiledmessage;
 } EncodingCodec;
 
-EncodingCodec EncodingCodecs[] = {
+static const EncodingCodec EncodingCodecs[] = {
 	{"wave", EAF_WAV, ""},
 	{"flac", EAF_FLAC, "ERROR: dumpsxiso was NOT built with libFLAC support!\n"},
 	{"pcm",  EAF_PCM, ""}
