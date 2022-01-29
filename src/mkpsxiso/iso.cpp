@@ -7,6 +7,7 @@
 #include "miniaudio_helpers.h"
 
 #include <algorithm>
+#include <cinttypes>
 #include <cstring>
 #include <cstdarg>
 
@@ -130,13 +131,20 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::
 	if ( type == EntryType::EntryXA )
 	{
 		// Check header
-		char buff[4];
+		bool validHeader = false;
 		FILE* fp = OpenFile(srcfile, "rb");
-		fread(buff, 1, 4, fp);
-		fclose(fp);
+		if (fp != nullptr)
+		{
+			char buff[4];
+			if (fread(buff, 1, std::size(buff), fp) == std::size(buff))
+			{
+				validHeader = strncmp(buff, "RIFF", std::size(buff)) != 0;
+			}
+			fclose(fp);
+		}
 
 		// Check if its a RIFF (WAV container)
-		if ( strncmp(buff, "RIFF", 4) == 0 )
+		if (!validHeader)
 		{
 			if (!global::QuietMode)
 			{
@@ -811,7 +819,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write size in sector units
 		if (entry.type != EntryType::EntryDir)
 		{
-			fprintf( fp, "%-10u", GetSizeInSectors(entry.length) );
+			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length) );
 		}
 		else
 		{
@@ -827,7 +835,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write size in byte units
 		if (entry.type != EntryType::EntryDir)
 		{
-			fprintf( fp, "%-10lld", entry.length );
+			fprintf( fp, "%-10" PRId64, entry.length );
 		}
 		else
 		{

@@ -46,7 +46,7 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 	ISO_DATESTAMP result {};
 
 	short int year;
-	const int argsRead = sscanf( str, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%*02hhu%hhd",
+	const int argsRead = sscanf( str, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%*02u%hhd",
 		&year, &result.month, &result.day,
 		&result.hour, &result.minute, &result.second, &result.GMToffs );
 	if (argsRead >= 6)
