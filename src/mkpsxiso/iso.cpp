@@ -102,11 +102,11 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.date		= volumeDate;
 	entry.length	= entry.subdir->CalculateDirEntryLen();
 
-	const EntryAttributes attributes = EntryAttributes::MakeDefault();
-	entry.attribs	= attributes.XAAttrib.value();
-	entry.perms		= attributes.XAPerm.value();
-	entry.GID		= attributes.GID.value();
-	entry.UID		= attributes.UID.value();
+	const EntryAttributes attributes; // Leave defaults
+	entry.attribs	= attributes.XAAttrib;
+	entry.perms		= attributes.XAPerm;
+	entry.GID		= attributes.GID;
+	entry.UID		= attributes.UID;
 
 	entries.emplace_back( std::move(entry) );
 
@@ -217,10 +217,10 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::
 	entry.id = std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
-	entry.attribs	= attributes.XAAttrib.value();
-	entry.perms		= attributes.XAPerm.value();
-	entry.GID		= attributes.GID.value();
-	entry.UID		= attributes.UID.value();
+	entry.attribs	= attributes.XAAttrib;
+	entry.perms		= attributes.XAPerm;
+	entry.GID		= attributes.GID;
+	entry.UID		= attributes.UID;
 
 	if ( !srcfile.empty() )
 	{
@@ -242,7 +242,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::
 		entry.length = fileAttrib->st_size;
 	}
 
-    entry.date = GetISODateStamp( fileAttrib->st_mtime, attributes.GMTOffs.value() );
+    entry.date = GetISODateStamp( fileAttrib->st_mtime, attributes.GMTOffs );
 
 	entries.emplace_back(std::move(entry));
 	entriesInDir.emplace_back(entries.back());
@@ -315,11 +315,11 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::
 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries, this);
-	entry.attribs	= attributes.XAAttrib.value();
-	entry.perms		= attributes.XAPerm.value();
-	entry.GID		= attributes.GID.value();
-	entry.UID		= attributes.UID.value();
-	entry.date		= GetISODateStamp( dirTime, attributes.GMTOffs.value() );
+	entry.attribs	= attributes.XAAttrib;
+	entry.perms		= attributes.XAPerm;
+	entry.GID		= attributes.GID;
+	entry.UID		= attributes.UID;
+	entry.date		= GetISODateStamp( dirTime, attributes.GMTOffs );
 	entry.length = entry.subdir->CalculateDirEntryLen();
 
 	entries.emplace_back(std::move(entry));
@@ -1182,42 +1182,4 @@ unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, bool msb)
 
 	return buff;
 
-}
-
-iso::EntryAttributes iso::EntryAttributes::MakeDefault()
-{
-	EntryAttributes result;
-
-	result.GMTOffs = DEFAULT_GMFOFFS;
-	result.XAAttrib = DEFAULT_XAATRIB;
-	result.XAPerm = DEFAULT_XAPERM;
-	result.GID = result.UID = DEFAULT_OWNER_ID;
-
-	return result;
-}
-
-iso::EntryAttributes iso::EntryAttributes::Overlay(EntryAttributes base, const EntryAttributes& derived)
-{
-	if (derived.GMTOffs.has_value())
-	{
-		base.GMTOffs = derived.GMTOffs;
-	}
-	if (derived.XAAttrib.has_value())
-	{
-		base.XAAttrib = derived.XAAttrib;
-	}
-	if (derived.XAPerm.has_value())
-	{
-		base.XAPerm = derived.XAPerm;
-	}
-	if (derived.GID.has_value())
-	{
-		base.GID = derived.GID;
-	}
-	if (derived.UID.has_value())
-	{
-		base.UID = derived.UID;
-	}
-
-	return base;
 }

@@ -44,7 +44,7 @@ namespace global
 };
 
 
-bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da);
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const EntryAttributes& parentAttribs, bool& found_da);
 int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
 
 int PackFileAsCDDA(void* buffer, size_t bufSize, const std::filesystem::path& audioFile);
@@ -819,41 +819,31 @@ int Main(int argc, char* argv[])
     return 0;
 }
 
-iso::EntryAttributes ReadEntryAttributes( const tinyxml2::XMLElement* dirElement )
+EntryAttributes ReadEntryAttributes(EntryAttributes current, const tinyxml2::XMLElement* dirElement)
 {
-	iso::EntryAttributes result;
-
-	const char* GMToffs = dirElement->Attribute(xml::attrib::GMT_OFFSET);
-	if ( GMToffs != nullptr )
+	if (dirElement != nullptr)
 	{
-		result.GMTOffs = static_cast<signed char>(strtol(GMToffs, nullptr, 0));
+		auto getAttributeIfExists = [dirElement](auto& value, const char* name)
+		{
+			using type = std::decay_t<decltype(value)>;
+			if constexpr (std::is_unsigned_v<type>)
+			{
+				value = static_cast<type>(dirElement->UnsignedAttribute(name, value));
+			}
+			else
+			{
+				value = static_cast<type>(dirElement->IntAttribute(name, value));
+			}
+		};
+
+		getAttributeIfExists(current.GMTOffs, xml::attrib::GMT_OFFSET);
+		getAttributeIfExists(current.XAAttrib, xml::attrib::XA_ATTRIBUTES);
+		getAttributeIfExists(current.XAPerm, xml::attrib::XA_PERMISSIONS);
+		getAttributeIfExists(current.GID, xml::attrib::XA_GID);
+		getAttributeIfExists(current.UID, xml::attrib::XA_UID);
 	}
 
-	const char* XAAttrib = dirElement->Attribute(xml::attrib::XA_ATTRIBUTES);
-	if ( XAAttrib != nullptr )
-	{
-		result.XAAttrib = static_cast<unsigned char>(strtoul(XAAttrib, nullptr, 0));
-	}
-
-	const char* XAPerm = dirElement->Attribute(xml::attrib::XA_PERMISSIONS);
-	if ( XAPerm != nullptr )
-	{
-		result.XAPerm = static_cast<unsigned short>(strtoul(XAPerm, nullptr, 0));
-	}
-
-	const char* GID = dirElement->Attribute(xml::attrib::XA_GID);
-	if ( GID != nullptr )
-	{
-		result.GID = static_cast<unsigned short>(strtoul(GID, nullptr, 0));
-	}
-
-	const char* UID = dirElement->Attribute(xml::attrib::XA_UID);
-	if ( UID != nullptr )
-	{
-		result.UID = static_cast<unsigned short>(strtoul(UID, nullptr, 0));
-	}
-
-	return result;
+	return current;
 };
 
 int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen)
@@ -1061,8 +1051,8 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 	}
 
 	bool found_da = false;
-	const iso::EntryAttributes rootAttributes = iso::EntryAttributes::Overlay(iso::EntryAttributes::MakeDefault(), ReadEntryAttributes(directoryTree));
-	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, rootAttributes, found_da) )
+	const EntryAttributes defaultAttributes = ReadEntryAttributes(EntryAttributes{}, trackElement->FirstChildElement(xml::elem::DEFAULT_ATTRIBUTES));
+	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, defaultAttributes, found_da) )
 	{
 		return false;
 	}
@@ -1094,7 +1084,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 	return true;
 }
 
-static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da)
+static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const std::filesystem::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
 {
 	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
 	const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE);
@@ -1262,7 +1252,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 
 	}
 
-	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement)), trackid);
+	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, ReadEntryAttributes(defaultAttributes, dirElement), trackid);
 }
 
 static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
@@ -1298,7 +1288,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	return true;
 }
 
-static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da)
+static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const std::filesystem::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
 {
 	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
 	if ( strlen( nameElement ) > 12 )
@@ -1309,8 +1299,6 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 		return false;
 	}
 
-	const iso::EntryAttributes attribs = iso::EntryAttributes::Overlay(parentAttribs, ReadEntryAttributes(dirElement));
-
 	std::filesystem::path srcDir;
 	if (const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE); sourceElement != nullptr)
 	{
@@ -1319,7 +1307,7 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 
 	bool alreadyExists = false;
 	iso::DirTreeClass* subdir = dirTree->AddSubDirEntry(
-		nameElement, srcDir, attribs, alreadyExists );
+		nameElement, srcDir, ReadEntryAttributes(defaultAttributes, dirElement), alreadyExists );
 
 	if ( subdir == nullptr )
 	{
@@ -1339,16 +1327,16 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 	//	return false;
 	//}
 
-	return ParseDirectory(subdir, dirElement, xmlPath, attribs, found_da);
+	return ParseDirectory(subdir, dirElement, xmlPath, defaultAttributes, found_da);
 }
 
-bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const iso::EntryAttributes& parentAttribs, bool& found_da)
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
 {
 	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
         if ( CompareICase( "file", dirElement->Name() ))
 		{
-			if (!ParseFileEntry(dirTree, dirElement, xmlPath, parentAttribs, found_da))
+			if (!ParseFileEntry(dirTree, dirElement, xmlPath, defaultAttributes, found_da))
 			{
 				return false;
 			}
@@ -1362,7 +1350,7 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
         }
 		else if ( CompareICase( "dir", dirElement->Name() ))
 		{
-			if (!ParseDirEntry(dirTree, dirElement, xmlPath, parentAttribs, found_da))
+			if (!ParseDirEntry(dirTree, dirElement, xmlPath, defaultAttributes, found_da))
 			{
 				return false;
 			}

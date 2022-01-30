@@ -11,6 +11,7 @@
 
 #include <string>
 #include <filesystem>
+#include <map>
 #include <memory>
 
 #include "platform.h"
@@ -115,23 +116,93 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
     fclose(outFile);
 }
 
-static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::IsoDirEntries::Entry& entry, EntryType type)
+// XML attribute stuff
+struct EntryAttributeCounters
+{
+	std::map<int, unsigned int> GMTOffs;
+	std::map<int, unsigned int> XAAttrib;
+	std::map<int, unsigned int> XAPerm;
+	std::map<int, unsigned int> GID;
+	std::map<int, unsigned int> UID;
+};
+
+static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::IsoDirEntries::Entry& entry, EntryType type, EntryAttributeCounters& attributeCounters)
 {
 	element->SetAttribute(xml::attrib::GMT_OFFSET, entry.entry.entryDate.GMToffs);
+	++attributeCounters.GMTOffs[entry.entry.entryDate.GMToffs];
 
-	// Don't output XA attributes on directories yet
-	// TODO: Might need something to allow those to propagate upwards with a file/directory distinction
-	if (type != EntryType::EntryDir)
+	// xa_attrib only makes sense on XA files
+	if (type == EntryType::EntryXA)
 	{
-		// xa_attrib only makes sense on XA files
-		if (type == EntryType::EntryXA)
-		{
-			element->SetAttribute(xml::attrib::XA_ATTRIBUTES, (entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
-		}
-		element->SetAttribute(xml::attrib::XA_PERMISSIONS, entry.extData.attributes & cdxa::XA_PERMISSIONS_MASK);
+		const auto XAAtrib = (entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8;
+		element->SetAttribute(xml::attrib::XA_ATTRIBUTES, XAAtrib);
+		++attributeCounters.XAAttrib[XAAtrib];
+	}
+	const auto XAPerm = entry.extData.attributes & cdxa::XA_PERMISSIONS_MASK;
+	element->SetAttribute(xml::attrib::XA_PERMISSIONS, XAPerm);
+	++attributeCounters.XAPerm[XAPerm];
 
-		element->SetAttribute(xml::attrib::XA_GID, entry.extData.ownergroupid);
-		element->SetAttribute(xml::attrib::XA_UID, entry.extData.owneruserid);
+	element->SetAttribute(xml::attrib::XA_GID, entry.extData.ownergroupid);
+	element->SetAttribute(xml::attrib::XA_UID, entry.extData.owneruserid);
+	++attributeCounters.GID[entry.extData.ownergroupid];
+	++attributeCounters.UID[entry.extData.owneruserid];
+}
+
+static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defaultAttributesElement, const EntryAttributeCounters& attributeCounters)
+{
+	// First establish "defaults" - that is, the most commonly occurring attributes
+	auto findMaxElement = [](const auto& map)
+	{
+		return std::max_element(map.begin(), map.end(), [](const auto& left, const auto& right) { return left.second < right.second; })->first;
+	};
+
+	EntryAttributes defaultAttributes;
+	defaultAttributes.GMTOffs = static_cast<signed char>(findMaxElement(attributeCounters.GMTOffs));
+	defaultAttributes.XAAttrib = static_cast<unsigned char>(findMaxElement(attributeCounters.XAAttrib));
+	defaultAttributes.XAPerm = static_cast<unsigned short>(findMaxElement(attributeCounters.XAPerm));
+	defaultAttributes.GID = static_cast<unsigned short>(findMaxElement(attributeCounters.GID));
+	defaultAttributes.UID = static_cast<unsigned short>(findMaxElement(attributeCounters.UID));
+
+	// Write them out to the XML
+	defaultAttributesElement->SetAttribute(xml::attrib::GMT_OFFSET, defaultAttributes.GMTOffs);
+	defaultAttributesElement->SetAttribute(xml::attrib::XA_ATTRIBUTES, defaultAttributes.XAAttrib);
+	defaultAttributesElement->SetAttribute(xml::attrib::XA_PERMISSIONS, defaultAttributes.XAPerm);
+	defaultAttributesElement->SetAttribute(xml::attrib::XA_GID, defaultAttributes.GID);
+	defaultAttributesElement->SetAttribute(xml::attrib::XA_UID, defaultAttributes.UID);
+
+	return defaultAttributes;
+}
+
+static void SimplifyDefaultXMLAttributes(tinyxml2::XMLElement* element, const EntryAttributes& defaults)
+{
+	// DeleteAttribute can be safely called even if that attribute doesn't exist, so treating failure and default values
+	// as equal simplifies logic
+	auto deleteAttribute = [element](const char* name, auto defaultValue)
+	{
+		bool deleteAttribute = false;
+		if constexpr (std::is_unsigned_v<decltype(defaultValue)>)
+		{
+			deleteAttribute = element->UnsignedAttribute(name, defaultValue) == defaultValue;
+		}
+		else
+		{
+			deleteAttribute = element->IntAttribute(name, defaultValue) == defaultValue;
+		}
+		if (deleteAttribute)
+		{
+			element->DeleteAttribute(name);
+		}
+	};
+
+	deleteAttribute(xml::attrib::GMT_OFFSET, defaults.GMTOffs);
+	deleteAttribute(xml::attrib::XA_ATTRIBUTES, defaults.XAAttrib);
+	deleteAttribute(xml::attrib::XA_PERMISSIONS, defaults.XAPerm);
+	deleteAttribute(xml::attrib::XA_GID, defaults.GID);
+	deleteAttribute(xml::attrib::XA_UID, defaults.UID);
+
+	for (tinyxml2::XMLElement* child = element->FirstChildElement(); child != nullptr; child = child->NextSiblingElement())
+	{
+		SimplifyDefaultXMLAttributes(child, defaults);
 	}
 }
 
@@ -363,7 +434,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 }
 
 tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement* dirElement, std::filesystem::path* currentVirtualPath,
-	const std::filesystem::path& sourcePath, const std::string& trackid)
+	const std::filesystem::path& sourcePath, const std::string& trackid, EntryAttributeCounters& attributeCounters)
 {
 	tinyxml2::XMLElement* newelement;
 
@@ -415,7 +486,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
 		}
 	}
-	WriteOptionalXMLAttribs(newelement, entry, entryType);
+	WriteOptionalXMLAttribs(newelement, entry, entryType, attributeCounters);
 	return dirElement;
 }
 
@@ -426,7 +497,8 @@ void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement)
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 }
 
-void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, unsigned int& expectedLBA)
+void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, unsigned int& expectedLBA,
+	EntryAttributeCounters& attributeCounters)
 {
 	std::filesystem::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
 	unsigned tracknum = 2;
@@ -478,11 +550,12 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 			currentVirtualPath /= part;
 		}
 
-		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath, trackid);
+		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath, trackid, attributeCounters);
 	}
 }
 
-void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, unsigned int& expectedLBA)
+void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, unsigned int& expectedLBA,
+	EntryAttributeCounters& attributeCounters)
 {
 	unsigned tracknum = 2;
 	for (const auto& e : directory->dirEntryList.GetView())
@@ -502,11 +575,11 @@ void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElem
 			expectedLBA = std::max(expectedLBA, entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb));
 		}
 
-		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath, trackid);
+		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath, trackid, attributeCounters);
 		// Recursively write children if there are any
 		if (const cd::IsoDirEntries* subdir = entry.subdir.get(); subdir != nullptr)
 		{
-			WriteXMLByDirectories(subdir, child, sourcePath, expectedLBA);
+			WriteXMLByDirectories(subdir, child, sourcePath, expectedLBA, attributeCounters);
 		}
 	}
 }
@@ -622,6 +695,9 @@ void ParseISO(cd::IsoReader& reader) {
 					(param::outPath / "license_data.dat").lexically_proximate(param::xmlFile.parent_path()).generic_u8string().c_str());
 			}
 
+			// Create <default_attributes> now so it lands before the directory tree
+			tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
+
 			const std::filesystem::path sourcePath = param::outPath.lexically_proximate(param::xmlFile.parent_path());
 
 			// process DA "files" to tracks and add to the dirs so the XML looks nicer
@@ -658,20 +734,23 @@ void ParseISO(cd::IsoReader& reader) {
 				}
 			}
 
+			EntryAttributeCounters attributeCounters;
 			unsigned currentLBA = descriptor.rootDirRecord.entryOffs.lsb;
 			if (param::outputSortedByDir)
 			{
-				WriteXMLByDirectories(rootDir.get(), trackElement, sourcePath, currentLBA);		
+				WriteXMLByDirectories(rootDir.get(), trackElement, sourcePath, currentLBA, attributeCounters);		
 			}
 			else
 			{
-				WriteXMLByLBA(entries, trackElement, sourcePath, currentLBA);
+				WriteXMLByLBA(entries, trackElement, sourcePath, currentLBA, attributeCounters);
 			}
+
+			tinyxml2::XMLElement *dirtree = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
+			SimplifyDefaultXMLAttributes(dirtree, EstablishXMLAttributeDefaults(defaultAttributesElement, attributeCounters));
 
 			// write CDDA tracks
 			tinyxml2::XMLNode *modifyProject = trackElement->Parent();
 			tinyxml2::XMLElement *addAfter = trackElement;
-			tinyxml2::XMLElement *dirtree  = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
 			unsigned tracknum = 2;
 			for(const auto& track : tracks)
 			{

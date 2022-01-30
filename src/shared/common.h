@@ -28,6 +28,22 @@ struct cdtrack
 	std::string source;
 };
 
+class EntryAttributes
+{
+private:
+	static constexpr signed char DEFAULT_GMTOFFS = 0;
+	static constexpr unsigned char DEFAULT_XAATRIB = 0xFF;
+	static constexpr unsigned short DEFAULT_XAPERM = 0x555; // rx
+	static constexpr unsigned short	DEFAULT_OWNER_ID = 0;
+
+public:
+	signed char GMTOffs = DEFAULT_GMTOFFS;
+	unsigned char XAAttrib = DEFAULT_XAATRIB;
+	unsigned short XAPerm = DEFAULT_XAPERM;
+	unsigned short GID = DEFAULT_OWNER_ID;
+	unsigned short UID = DEFAULT_OWNER_ID;
+};
+
 // Helper functions for datestamp manipulation
 cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
 

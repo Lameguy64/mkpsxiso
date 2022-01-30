@@ -49,36 +49,6 @@ namespace iso
 
 	// EntryList must have stable references!
 	using EntryList = std::list<DIRENTRY>;
-
-
-	// Inheritable attributes of files and/or directories
-	// They are applied in the following order:
-	// 1. mkpsxiso defaults
-	// 2. directory_tree attributes
-	// 3. dir attributes
-	// 4. file attributes
-	class EntryAttributes
-	{
-	private:
-		static constexpr signed char DEFAULT_GMFOFFS = 0;
-		static constexpr unsigned char DEFAULT_XAATRIB = 0xFF;
-		static constexpr unsigned short DEFAULT_XAPERM = 0x555; // rx
-		static constexpr unsigned short	DEFAULT_OWNER_ID = 0;
-
-	public:
-		std::optional<signed char> GMTOffs;
-		std::optional<unsigned char> XAAttrib;
-		std::optional<unsigned short> XAPerm;
-		std::optional<unsigned short> GID;
-		std::optional<unsigned short> UID;
-
-	public:
-		// Default attributes, specified above
-		static EntryAttributes MakeDefault();
-
-		// "Overlay" the derived attributes (if they exist) on the base ones
-		static EntryAttributes Overlay(EntryAttributes base, const EntryAttributes& derived);
-	};
 	
 	class PathEntryClass {
 	public:
