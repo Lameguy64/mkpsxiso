@@ -17,19 +17,19 @@ namespace cd {
     class IsoReader {
 
         // File pointer to opened ISO file
-        FILE*		filePtr;
+        FILE*		filePtr = nullptr;
         // Sector buffer size
-        unsigned char sectorBuff[CD_SECTOR_SIZE];
+        unsigned char sectorBuff[CD_SECTOR_SIZE] {};
         // Mode 2 Form 1 sector struct for simplified reading of sectors (usually points to sectorBuff[])
-        SECTOR_M2F1* sectorM2F1;
+        SECTOR_M2F1* sectorM2F1 = nullptr;
         // Mode 2 Form 2 sector struct for simplified reading of sectors (usually points to sectorBuff[])
-        SECTOR_M2F2* sectorM2F2;
+        SECTOR_M2F2* sectorM2F2 = nullptr;
         // Current sector number
-        int			currentSector;
+        int			currentSector = 0;
         // Current data offset in current sector
-        int			currentByte;
+        size_t		currentByte = 0;
 		// Total number of sectors in the iso
-		int totalSectors;
+		int totalSectors = 0;
     public:
 
         // Initializer
@@ -41,14 +41,14 @@ namespace cd {
         bool Open(const std::filesystem::path& fileName);
 
         // Read data sectors in bytes (supports sequential reading)
-        size_t ReadBytes(void* ptr, size_t bytes);
+        size_t ReadBytes(void* ptr, size_t bytes, bool singleSector = false);
 
-        size_t ReadBytesXA(void* ptr, size_t bytes);
+        size_t ReadBytesXA(void* ptr, size_t bytes, bool singleSector = false);
 
-        size_t ReadBytesDA(void* ptr, size_t bytes);
+        size_t ReadBytesDA(void* ptr, size_t bytes, bool singleSector = false);
 
         // Skip bytes in data sectors (supports sequential skipping)
-        void SkipBytes(size_t bytes);
+        void SkipBytes(size_t bytes, bool singleSector = false);
 
         // Seek to a sector in the ISO image in sector units
         int SeekToSector(int sector);
@@ -57,10 +57,13 @@ namespace cd {
         size_t SeekToByte(size_t offs);
 
         // Get current offset in byte units
-        size_t GetPos();
+        size_t GetPos() const;
 
         // Close ISO file
         void Close();
+
+    private:
+        bool PrepareNextSector();
 
     };
 
