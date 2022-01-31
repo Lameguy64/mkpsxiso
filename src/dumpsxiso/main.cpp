@@ -603,7 +603,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 		{
 			newelement = dirElement->InsertNewChildElement("dir");
 			newelement->SetAttribute(xml::attrib::ENTRY_NAME, entry.identifier.c_str());
-			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.generic_u8string().c_str());
+			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_u8string().c_str());
 		}
 		else
 		{
@@ -623,7 +623,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
         newelement->SetAttribute(xml::attrib::ENTRY_NAME, std::string(CleanIdentifier(entry.identifier)).c_str());
 		if(entryType != EntryType::EntryDA)
 		{
-			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.generic_u8string().c_str());
+			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_u8string().c_str());
 		}
 		else
 		{
@@ -846,16 +846,18 @@ void ParseISO(cd::IsoReader& reader) {
 				}
 			}
 
+			const std::filesystem::path xmlPath = param::xmlFile.parent_path().lexically_normal();
+
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
 				newElement->SetAttribute(xml::attrib::LICENSE_FILE,
-					(param::outPath / "license_data.dat").lexically_proximate(param::xmlFile.parent_path()).generic_u8string().c_str());
+					(param::outPath / "license_data.dat").lexically_proximate(xmlPath).generic_u8string().c_str());
 			}
 
 			// Create <default_attributes> now so it lands before the directory tree
 			tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
 
-			const std::filesystem::path sourcePath = param::outPath.lexically_proximate(param::xmlFile.parent_path());
+			const std::filesystem::path sourcePath = param::outPath.lexically_proximate(xmlPath);
 
 			// process DA "files" to tracks and add to the dirs so the XML looks nicer
 			std::vector<std::list<cd::IsoDirEntries::Entry>::const_iterator> dafiles;
@@ -869,7 +871,7 @@ void ParseISO(cd::IsoReader& reader) {
 			std::vector<cdtrack> tracks;
 			for(const auto& dafile : dafiles)
 			{
-				auto tracksource = GetRealDAFilePath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier));
+				auto tracksource = GetRealDAFilePath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier)).lexically_normal();
 
 				// add to make track element later
 				tracks.emplace_back(

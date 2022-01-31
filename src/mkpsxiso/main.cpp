@@ -536,7 +536,7 @@ int Main(int argc, char* argv[])
 				}
 
 				// Write track information to the CUE sheet
-				if ( const char* track_source = trackElement->Attribute(xml::attrib::TRACK_SOURCE); track_source == nullptr )
+				if ( const char* trackRelativeSource = trackElement->Attribute(xml::attrib::TRACK_SOURCE); trackRelativeSource == nullptr )
 				{
 					if ( !global::QuietMode )
 					{
@@ -550,6 +550,7 @@ int Main(int argc, char* argv[])
 				}
 				else
 				{
+					std::filesystem::path trackSource = (global::XMLscript.parent_path() / trackRelativeSource);
 					fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
 
 					// pregap
@@ -597,8 +598,8 @@ int Main(int argc, char* argv[])
 						}
 					}
 
-					const unsigned int audioSize = iso::DirTreeClass::GetAudioSize(track_source);
-					audioTracks.emplace_back(totalLenLBA, audioSize, track_source);
+					const unsigned int audioSize = iso::DirTreeClass::GetAudioSize(trackSource);
+					audioTracks.emplace_back(totalLenLBA, audioSize, trackSource.generic_u8string());
 
 					totalLenLBA += audioSize/CD_SECTOR_SIZE;
 				}
