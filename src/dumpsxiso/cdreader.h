@@ -104,7 +104,7 @@ namespace cd {
         void ReadRootDir(cd::IsoReader* reader, int lba);
 
     private:
-        std::optional<Entry> ReadEntry(cd::IsoReader* reader, size_t* bytesRead) const;
+        std::optional<Entry> ReadEntry(cd::IsoReader* reader) const;
     };
 
 }

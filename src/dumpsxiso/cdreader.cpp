@@ -297,19 +297,13 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 	size_t numEntries = 0; // Used to skip the first two entries, . and ..
     for (int sec = 0; sec < sectors; sec++)
     {
-        size_t sectorBytesRead = 0;
         reader->SeekToSector(lba + sec);
 		while (true)
 		{
-            //check if there is enough data to read in the current sector. In case there is not, we must move to next sector.
-			if (2048 - sectorBytesRead < sizeof(Entry))
-			{
-                break;
-			}
-
-			auto entry = ReadEntry(reader, &sectorBytesRead);
+			auto entry = ReadEntry(reader);
 			if (!entry)
 			{
+				// Either end of the table, or end of sector
 				break;
 			}
 
@@ -327,20 +321,25 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 		});
 }
 
-std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoReader* reader, size_t* bytesRead) const
+std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoReader* reader) const
 {
 	Entry entry;
 
 	// Read 33 byte directory entry
-	size_t read = reader->ReadBytes(&entry.entry, sizeof(entry.entry));
+	size_t bytesRead = reader->ReadBytes(&entry.entry, sizeof(entry.entry), true);
 
 	// The file entry table usually ends with null bytes so break if we reached that area
-	if (entry.entry.entryLength == 0)
+	if (bytesRead != sizeof(entry.entry) || entry.entry.entryLength == 0)
 		return std::nullopt;
 
 	// Read identifier string
 	entry.identifier.resize(entry.entry.identifierLen);
-	read += reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen);
+	reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen, true);
+
+	if (entry.identifier == "ST0D_00D.BIN;1")
+	{
+		int i = 0;
+	}
 
 	// Strip trailing zeroes, if any
 	entry.identifier.resize(strlen(entry.identifier.c_str()));
@@ -349,21 +348,15 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	if ((entry.entry.identifierLen % 2) == 0)
     {
         reader->SkipBytes(1);
-        read++;
     }
 
 	// Read XA attribute data
-	read += reader->ReadBytes(&entry.extData, sizeof(entry.extData));
+	reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);
 
 	// XA attributes are big endian, swap them
 	entry.extData.attributes = SwapBytes16(entry.extData.attributes);
 	entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
 	entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
-
-	if (bytesRead != nullptr)
-	{
-		*bytesRead += read;
-	}
 
 	return entry;
 }
@@ -371,7 +364,7 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 void cd::IsoDirEntries::ReadRootDir(cd::IsoReader* reader, int lba)
 {
 	reader->SeekToSector(lba);
-	auto entry = ReadEntry(reader, nullptr);
+	auto entry = ReadEntry(reader);
 	if (entry)
 	{
 		dirEntryList.emplace(std::move(entry.value()));

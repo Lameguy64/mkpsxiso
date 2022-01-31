@@ -100,7 +100,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries);
 	entry.date		= volumeDate;
-	entry.length	= entry.subdir->CalculateDirEntryLen();
+	entry.length	= 0; // Length is meaningless for directories
 
 	const EntryAttributes attributes; // Leave defaults
 	entry.attribs	= attributes.XAAttrib;
@@ -320,7 +320,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
 	entry.date		= GetISODateStamp( dirTime, attributes.GMTOffs );
-	entry.length = entry.subdir->CalculateDirEntryLen();
+	entry.length	= 0; // Length is meaningless for directories
 
 	entries.emplace_back(std::move(entry));
 	entriesInDir.emplace_back(entries.back());
@@ -385,15 +385,6 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			{
 				// DA files don't take up any space in the ISO filesystem, they are just links to CD tracks
 				entry.lba = iso::DA_FILE_PLACEHOLDER_LBA; // we will write the lba into the filesystem when writing the CDDA track
-				continue;
-				lba += GetSizeInSectors(entry.length, 2352);
-
-				// TODO: Configurable pregap
-				if (!firstDAWritten)
-				{
-					lba += 150;
-					//firstDAWritten = true;
-				}
 			}
 		}
 	}
@@ -430,7 +421,8 @@ int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
 
 		if ( ((dirEntryLen%2048)+dataLen) > 2048 )
 		{
-			dirEntryLen = (2048*(dirEntryLen/2048))+(dirEntryLen%2048);
+			// Round dirEntryLen to the nearest multiple of 2048 as the rest of that sector is "unusable"
+			dirEntryLen = ((dirEntryLen + 2047) / 2048) * 2048;
 		}
 
 		dirEntryLen += dataLen;
@@ -511,6 +503,10 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 				printf("ERROR: DA file still has placeholder value 0x%X\n", iso::DA_FILE_PLACEHOLDER_LBA);
 			}
 			length = 2048 * GetSizeInSectors(entry.length, 2352);
+		}
+		else if (entry.type == EntryType::EntryDir)
+		{
+			length = entry.subdir->CalculateDirEntryLen();
 		}
 		else
 		{
@@ -1083,7 +1079,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	isoDescriptor.rootDirRecord.entryOffs = cd::SetPair32(
 		18+(pathTableSectors*4) );
 	isoDescriptor.rootDirRecord.entrySize = cd::SetPair32(
-		2048 * GetSizeInSectors(dirTree->CalculateDirEntryLen()) );
+		dirTree->CalculateDirEntryLen() );
 	isoDescriptor.rootDirRecord.flags = 0x02;
 	isoDescriptor.rootDirRecord.volSeqNum = cd::SetPair16( 1 );
 	isoDescriptor.rootDirRecord.identifierLen = 1;
