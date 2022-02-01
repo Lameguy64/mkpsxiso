@@ -458,7 +458,10 @@ int Main(int argc, char* argv[])
 		const tinyxml2::XMLElement* dataTrack = nullptr;
 
 		// Parse tracks
-		printf("Scanning tracks...\n\n");
+		if ( !global::QuietMode )
+		{
+			printf("Scanning tracks...\n\n");
+		}
 		for ( const tinyxml2::XMLElement* trackElement = projectElement->FirstChildElement(xml::elem::TRACK);
 			trackElement != nullptr; trackElement = trackElement->NextSiblingElement(xml::elem::TRACK) )
 		{
@@ -552,10 +555,6 @@ int Main(int argc, char* argv[])
 				else
 				{
 					std::filesystem::path trackSource = (global::XMLscript.parent_path() / trackRelativeSource);
-					if ( !global::QuietMode )
-					{
-						//printf("    source %s\n", trackSource.generic_u8string().c_str());
-					}
 					fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
 
 					// pregap
