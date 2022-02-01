@@ -60,6 +60,11 @@ bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const un
 			return false;
 		}
 		entry.lba = lba;
+		if ( !global::QuietMode )
+		{
+			std::string_view id(entry.id);
+			printf("    DA File %s\n", std::string(id.substr(0, id.find_last_of(';'))).c_str());
+		}
 		return true;
 	}
 
@@ -453,6 +458,7 @@ int Main(int argc, char* argv[])
 		const tinyxml2::XMLElement* dataTrack = nullptr;
 
 		// Parse tracks
+		printf("Scanning tracks...\n\n");
 		for ( const tinyxml2::XMLElement* trackElement = projectElement->FirstChildElement(xml::elem::TRACK);
 			trackElement != nullptr; trackElement = trackElement->NextSiblingElement(xml::elem::TRACK) )
 		{
@@ -511,11 +517,6 @@ int Main(int argc, char* argv[])
 					break;
 				}
 
-				if ( !global::QuietMode )
-				{
-					printf("\n");
-				}
-
 			// Add audio track
 			}
 			else if ( CompareICase( "audio", track_type ) )
@@ -551,6 +552,10 @@ int Main(int argc, char* argv[])
 				else
 				{
 					std::filesystem::path trackSource = (global::XMLscript.parent_path() / trackRelativeSource);
+					if ( !global::QuietMode )
+					{
+						//printf("    source %s\n", trackSource.generic_u8string().c_str());
+					}
 					fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
 
 					// pregap
@@ -653,7 +658,7 @@ int Main(int argc, char* argv[])
 
 				if ( !global::QuietMode )
 				{
-					printf( "    Wrote file LBA log %" PRFILESYSTEM_PATH ".\n\n",
+					printf( "Wrote file LBA log %" PRFILESYSTEM_PATH ".\n\n",
 						global::LBAfile.lexically_normal().c_str() );
 				}
 			}
@@ -661,7 +666,7 @@ int Main(int argc, char* argv[])
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "    Failed to write LBA log %" PRFILESYSTEM_PATH "!\n\n",
+					printf( "Failed to write LBA log %" PRFILESYSTEM_PATH "!\n\n",
 						global::LBAfile.lexically_normal().c_str() );
 				}
 			}
@@ -678,7 +683,7 @@ int Main(int argc, char* argv[])
 
 				if ( !global::QuietMode )
 				{
-					printf( "    Wrote file LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
+					printf( "Wrote file LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
 						global::LBAheaderFile.lexically_normal().c_str() );
 				}
 			}
@@ -686,7 +691,7 @@ int Main(int argc, char* argv[])
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "    Failed to write LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
+					printf( "Failed to write LBA listing header %" PRFILESYSTEM_PATH ".\n\n",
 						global::LBAheaderFile.lexically_normal().c_str() );
 				}
 			}
@@ -713,18 +718,20 @@ int Main(int argc, char* argv[])
 			// Write the file system
 			if ( !global::QuietMode )
 			{
-				printf( "    Building filesystem... " );
-			}
-
-			if ( !global::QuietMode )
-			{
-				printf( "\n" );
+				printf("Writing ISO\n");
+				printf( "    Writing files...\n" );
 			}
 
 			// Copy the files into the disc image
 			iso::DIRENTRY& root = entries.front();
 			iso::DirTreeClass* dirTree = root.subdir.get();
 			dirTree->WriteFiles( &writer );
+
+			if ( !global::QuietMode )
+			{
+				printf("\n");
+				printf("    Writing CDDA tracks...\n");
+			}
 
 			// Write out the audio tracks
 			for (const cdtrack& track : audioTracks)
@@ -737,7 +744,7 @@ int Main(int argc, char* argv[])
 					// Pack the audio file
 					if ( !global::QuietMode )
 					{
-						printf( "    Packing audio %s... ", track.source.c_str() );
+						printf( "      Packing audio %s... ", track.source.c_str() );
 					}
 
 					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), track.size, std::filesystem::u8path(track.source) ) )
@@ -754,6 +761,11 @@ int Main(int argc, char* argv[])
 					sectorView->WriteBlankSectors();
 				}
 			}
+
+			if ( !global::QuietMode )
+			{
+				printf( "\n" );
+			}
 						
 
 			// Write license data
@@ -768,7 +780,7 @@ int Main(int argc, char* argv[])
 					{
 						if ( !global::QuietMode )
 						{
-							printf( "      Writing license data..." );
+							printf( "    Writing license data..." );
 						}
 
 						iso::WriteLicenseData( &writer, license->data );
@@ -785,7 +797,7 @@ int Main(int argc, char* argv[])
 			// Write file system
 			if ( !global::QuietMode )
 			{
-				printf( "      Writing filesystem... " );
+				printf( "    Writing directories... " );
 			}
 
 			// Sort directory entries and write it
