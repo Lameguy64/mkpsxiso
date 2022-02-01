@@ -99,7 +99,9 @@ endif()
 
 ## Installation
 
+include(GNUInstallDirs)
 install(TARGETS mkpsxiso dumpsxiso)
+install(FILES ${PROJECT_SOURCE_DIR}/README.md ${PROJECT_SOURCE_DIR}/LICENSE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/psn00bsdk/doc/mkpsxiso)
 
 ## CPack (used by GitHub Actions to package releases)
 
