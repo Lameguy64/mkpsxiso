@@ -968,7 +968,7 @@ int Main(int argc, char *argv[])
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
 			"2017 Meido-Tek Productions (Lameguy64)\n"
 			"2020 Phoenix (SadNES cITy)\n"
-			"2021 Silent, Chromaryu, and G4Vi\n\n" );
+			"2021-2022 Silent, Chromaryu, G4Vi, and spicyjpeg\n\n" );
 
 	if (argc == 1)
 	{

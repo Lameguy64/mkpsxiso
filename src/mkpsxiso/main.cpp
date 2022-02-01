@@ -95,7 +95,7 @@ int Main(int argc, char* argv[])
 	static constexpr const char* VERSION_TEXT =
 		"MKPSXISO " VERSION " - PlayStation ISO Image Maker\n"
 		"2017-2018 Meido-Tek Productions (Lameguy64)\n"
-		"2021 Silent, Chromaryu, and G4Vi\n\n";
+		"2021-2022 Silent, Chromaryu, G4Vi, and spicyjpeg\n\n";
 
 	bool OutputOverride = false;
 
