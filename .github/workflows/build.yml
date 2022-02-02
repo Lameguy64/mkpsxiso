@@ -87,6 +87,5 @@ jobs:
         fail_on_unmatched_files: true
         #generate_release_notes:  true
         files: |
-          *.zip
           mkpsxiso-windows/*
           mkpsxiso-linux/*
