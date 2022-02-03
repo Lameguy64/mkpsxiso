@@ -1,57 +1,65 @@
+
 # MKPSXISO
-MKPSXISO is basically a modern clone of BUILDCD used for building CD images of PlayStation games in the official development tools. The problem with BUILDCD however is, apart from licensing issues, its an old 16-bit DOS program which will not work natively under 64-bit versions of Windows without a DOS emulator which not only makes automated build scripts that produce ISO images messy in homebrew development but it also slows ISO creation speed considerably. BUILDCD also only produces CD images in a special image format supported by early CD burners and must be converted to an ISO format with a separate tool making the already slow ISO creation process even slower.
 
-While other ISO creation tools such as MKISOFS may work as an alternative most do not let you control the order of the files stored in the ISO image which is essential for optimizing file order to speed up access times and all do not support mixed-mode type files for CD streaming such as XA audio and MDEC video streams. MKPSXISO is made specifically to replace BUILDCD to aid in PlayStation homebrew development on modern systems as well as modification/hacking of existing PlayStation titles. MKPSXISO can also be used as a regular ISO creation tool that complies with the older ISO9660 standard with no Joliet extensions.
+`mkpsxiso` builds PlayStation CD images from an XML document.
 
-MKPSXISO more or less replicates most of the functionality of BUILDCD but better! The most notable difference is that MKPSXISO is much faster and creates ISO images in either standalone iso or cue+bin format so that generated images can immediately be run on an emulator or burned to a CD.
+`dumpsxiso` dumps PlayStation CD images to files and documents the precise structure to a `mkpsxiso` compatible XML document.
 
-Another notable difference of MKPSXISO is that it injects the Sony license data correctly into the disc image which eliminates the need of having to use a separate program for properly licensing the ISO image. However, the license data is not included so one must have a copy of the official PlayStation Programmer's Tool SDK or the PsyQ SDK (both of which can be found in www.psxdev.net) for the license files to be able to take advantage of this feature. This is to avoid possible legal problems when including Sony's license data into open source programs.
+`mkpsxiso` is meant to provide a faster, cross-platform, modern replacement of the BUILDCD from the official development tools. BUILDCD unfortunately only runs on 16 bit DOS compatible systems and it's output format is unusable by modern CD burning tools. Other ISO creation tools such as MKISOFS do not allow controlling the precise order of files (necessary for optimizing access times) and do not support mixed-mode type files for CD streaming such as XA audio and MDEC video streams used by many PlayStation games. `mkpsxiso` outputs either a standard `.bin` and `.cue` or `.iso` ready to burn to CD or use in an emulator! The hope is that `mkpsxiso` tools ease PlayStation homebrew development and ROM hacking and reverse engineer efforts. `mkpsxiso` can also be used as a regular ISO creation tool that complies with the older ISO9660 standard with no Joliet extensions.
+
+`mkpsxiso` can properly license the image with the Sony license data during ISO building eliminating the use of the extra program. However, you must supply your own copy. It can be found in the PsyQ SDK, see [Starting PSX Development](https://psx.arthus.net/starting.html). `dumpsxiso` can also dump the license data of an existing disk.
 
 ## Features
+
 * Uses XML for scripting ISO projects.
 * Outputs ISO images directly to iso or bin+cue image format.
 * Injects license data into ISO image correctly.
 * File LBA controlled by order of files allowing for file seek optimization (just like BUILDCD).
 * Supports mixed-mode CD-XA stream files such as XA audio and STR video.
-* Supports CD-DA audio tracks from uncompressed WAV files either as plain tracks or DA/WAV files.
+* Supports CDDA audio tracks from wav, flac, pcm, and mp3 files, both as DA files and just as audio tracks
 * Can output log of all files packed with details such as LBA, size and timecode offset.
+* Extract CDDA tracks from ISO as wav, flac, and pcm.
+* Many images can be rebuilt 1:1 now.
+    * XML generation: by default in strict LBA order, but can instead sort by dir for pretty output.
+    * Timestamps and XA attributes are preserved.
 
 ## Binary Download
-The latest Win32 binaries is now a release download in this repository.
 
-Older versions (probably going to be removed soon, there's no benefit to using these versions anyway):
-* [mkpsxiso-1.20.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.20.zip)
-* [mkpsxiso-1.19.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.19.zip)
-* [mkpsxiso-1.18.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.18.zip)
-* [mkpsxiso-1.15.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.15.zip)
-* [mkpsxiso-1.14.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.14.zip)
-* [mkpsxiso-1.10.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.10.zip)
-* [mkpsxiso-1.06.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.06.zip)
-* [mkpsxiso-1.04.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.04.zip)
-* [mkpsxiso-1.00.zip](http://lameguy64.github.io/mkpsxiso/mkpsxiso-1.00.zip)
+[Releases](../../releases/latest) for Win32 and `ubuntu-latest`, both are built by github CI starting at v2.0
+
+[Ancient releases](https://github.com/Lameguy64/mkpsxiso/tree/gh-pages) (NOT RECOMMENDED)
 
 ## Compiling
 
 1. Set up CMake and a compiler toolchain. Install the `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
-   * MSVC with vcpkg (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
-   * MSys64 with the following packages: `make`, `cmake`, `mingw-w64-x86_64-gcc`, `mingw-w64-x86_64-tinyxml2`
-   * Cygwin64 with the following packages: `make`, `cmake`, `gcc`, `tinyxml2`
-2. Install `tinyxml2` using vcpkg, your distro's package manager or build it manually from [its repo](https://github.com/leethomason/tinyxml2).
-3. Run the following commands from the mkpsxiso directory:
+   * MSVC (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
+   * MSys2 (use the "MinGW 64-bit" shell) with the following packages: `git`, `mingw-w64-x86_64-make`, `mingw-w64-x86_64-cmake`, `mingw-w64-x86_64-g++`
+   * Cygwin64 with the following packages: `git`, `make`, `cmake`, `gcc`
 
-```bash
-cmake -S . -B build/ -DCMAKE_BUILD_TYPE=Release
-cmake --build build/
-cmake --install build/
-```
+2. Clone/download the repo, then run the following command from the mkpsxiso directory to ensure `tinyxml2` is also downloaded and updated:
 
-**NOTE**: Add `sudo` to the install command if necessary. If you are using vcpkg, add `-DCMAKE_TOOLCHAIN_FILE` to the first command as explained [here](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
+   ```bash
+   git submodule update --init --recursive
+   ```
+
+3. Run the following commands:
+
+   ```bash
+   cmake -S . -B ./build -DCMAKE_BUILD_TYPE=Release
+   cmake --build ./build
+   cmake --install ./build
+   ```
+
+   If you wish to build dumpsxiso without libFLAC support (libFLAC is required for encoding CDDA/DA audio as FLAC), add `-DMKPSXISO_NO_LIBFLAC=1` to the end of the first command.
+
+   Add `sudo` to the install command if necessary.
 
 The default installation path is `C:\Program Files\mkpsxiso\bin` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 
 ## Issues
 
 The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
+
 ```xml
 <dir name="dira">
     <dir name="subdir1a">
@@ -84,9 +92,29 @@ On Windows, browsing the subdirectories in dirb and dirc will not list the conte
 
 This can be avoided by minimizing identically named directories but its best to test your generated disc image before considering it ready for release.
 
+## Links
+[PSXDEV discord](https://discord.com/invite/s2KJnf3c)
+
+[PSXDEV](https://www.psxdev.net/)
+
+
 ## Changelog
 
-**Version 1.27**
+**Version 2.0 (02/02/2022)**
+* Added tinyxml2 as a submodule, so manual installation is no longer needed and built binaries will always be statically linked.
+* Add `dumpsxiso` the successor to `isodump`. Use `dumpsxiso` to unpack `.bin` isos and `mkpsxiso` to repack.
+* Make xml file paths relative to the XML.
+* Unify CDDA tracks and DA files to reflect the reality DA files are just links to CDDA tracks by LBA.
+* Add `<pregap>` element to `<track>` for specifying the pregap. `dumpsxiso` attempts to be intelligent about guessing the pregap.
+* Add `<dummy>` element to specify non-file sectors in an ISO in order to preserve LBA order
+* Add packing flac, pcm, and mp3 files as CDDA tracks/DA files in addition to wav. `dumpsxiso` can extract as wav, flac, and pcm.
+* Add memory mapped ISO writing to improve packing speed
+* Fix directory records spanning more than 1 sector
+* dumpsxiso: add group by directory/pretty xml writing
+* Fix ECC and timestamp bugs
+* Massive refactor and cleanup, too many fixes and changes to list, see the commits for details
+
+**Version 1.27 (10/25/2021)**
 * Fixed stringop overflow bug when temporarily clearing sector address bytes.
 * Path is now stripped for the .bin file specification of cue sheets.
 

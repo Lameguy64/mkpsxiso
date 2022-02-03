@@ -164,30 +164,37 @@
 			
 			<!-- Sample DA audio file entry.
 			
-				Unlike data and mixed mode file types, DA files can only be put last in the ISO file system as
-				these files will not become actual files of the data track, but
-				just links to a separate audio track that mkpsxiso will automatically create, after the data track,
-				out of the content of the 'da' file (which is simply a WAV file).
-				The created audio track will also be mapped in the CUE sheet.
+				DA files SHOULD be put last in the ISO file system or your ISO image may be corrupt.
+				These files do not exists in the data track, but are just links to CDDA audio tracks.
+				A DA file must have a trackid that matches with with a <track>. The trackid is just a
+				string.
 				
 				You can still use <track> elements after this, if you want to add further audio tracks
 				that are not referenced by any DA file in the data track.
 			-->
-			<file name="audio1.da" type="da" source="myaudio1.wav"/>
+			<file name="audio1.da" trackid="02" type="da"/>
 		
 		</directory_tree>
 		
 	</track>
+	<!-- Specifies CDDA audio tracks
 
-	<!-- Specifies additional CD-DA audio tracks to the CD image.
-	
-		WAV files must be in Microsoft format, 44100KHz 16-bit stereo, uncompressed. Mkpsxiso will not perform
-		transcoding if the input file format is not correct.
-		
-		Plans for supporting FLAC as source audio were considered but dropped because Lameguy64 found it to
-		be impossible to compile libflac under Windows and that most people usually use XA audio over CDDA anyway.
+		The source file MUST be one of wav, flac, pcm, or mp3. For lossless audio [The whole point of using CDDA],
+		your audio SHOULD be in redbook format 44100KHz 16-bit stereo.
+
 	-->
+
+	<!-- CDDA audio track corresponding to the DA file-->
+	<track type="audio" trackid="02" source="myaudio.wav"/>
+
+	<!-- Specifies additional CDDA audio tracks to the CD image. -->
 	<track type="audio" source="myaudio2.wav"/>
-	<track type="audio" source="myaudio3.wav"/>
+	<track type="audio" source="myaudio3.wav">
+		<!-- This track has a non-default pregap (the default is 2 seconds).
+			The pregap is specified in MM:SS:FF (minutes, seconds, frames[0-74]).
+			The pregap is NOT included in the track source, currently it just filled as silence.
+		-->
+		<pregap duration="00:04:00"/>
+	</track>
 	
 </iso_project>
