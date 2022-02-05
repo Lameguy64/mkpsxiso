@@ -7,3 +7,6 @@
 [submodule "flac"]
 	path = flac
 	url = https://github.com/CookiePLMonster/flac
+[submodule "ghc"]
+	path = ghc
+	url = https://github.com/gulrak/filesystem

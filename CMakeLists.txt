@@ -30,6 +30,10 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/miniaudio/miniaudio.h)
 	message(FATAL_ERROR "The miniaudio directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ghc/include/ghc/filesystem.hpp)
+	message(FATAL_ERROR "The ghc directory is empty. Run 'git submodule update --init --recursive' to populate it.")
+endif()
+
 # Build tinyxml2. I didn't bother with tinyxml2's actual CMake integration
 # because it's far easier do do this. It is a single-file library after all.
 add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
@@ -56,6 +60,9 @@ if(NOT MKPSXISO_NO_LIBFLAC)
 	add_subdirectory(flac EXCLUDE_FROM_ALL)
 endif()
 
+# Add ghc to support filesystem on MacOS
+add_subdirectory(ghc EXCLUDE_FROM_ALL)
+
 ## Internal dependencies
 
 # Populate shared files
@@ -66,6 +73,7 @@ add_library(iso_shared OBJECT
 )
 target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
+target_link_libraries(iso_shared ghc_filesystem)
 
 find_package(Threads REQUIRED)
 
