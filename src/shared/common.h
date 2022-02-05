@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cd.h"
-#include <filesystem>
+#include "fs.h"
 #include <memory>
 #include <optional>
 #include <string>
@@ -71,11 +71,11 @@ struct file_deleter
 	}
 };
 using unique_file = std::unique_ptr<FILE, file_deleter>;
-unique_file OpenScopedFile(const std::filesystem::path& path, const char* mode);
+unique_file OpenScopedFile(const fs::path& path, const char* mode);
 
 bool CompareICase(std::string_view strLeft, std::string_view strRight);
 
 // Argument parsing
 bool ParseArgument(char** argv, std::string_view command, std::string_view longCommand = std::string_view{});
-std::optional<std::filesystem::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand = std::string_view{});
+std::optional<fs::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand = std::string_view{});
 std::optional<std::string> ParseStringArgument(char**& argv, std::string_view command, std::string_view longCommand = std::string_view{});

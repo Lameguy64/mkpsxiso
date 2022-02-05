@@ -25,7 +25,7 @@ cd::IsoReader::~IsoReader()
 }
 
 
-bool cd::IsoReader::Open(const std::filesystem::path& fileName)
+bool cd::IsoReader::Open(const fs::path& fileName)
 {
 	Close();
 
@@ -269,9 +269,9 @@ size_t cd::IsoPathTable::ReadPathTable(cd::IsoReader* reader, int lba)
 
 }
 
-std::filesystem::path cd::IsoPathTable::GetFullDirPath(int dirEntry) const
+fs::path cd::IsoPathTable::GetFullDirPath(int dirEntry) const
 {
-	std::filesystem::path path;
+	fs::path path;
 
 	while (true)
 	{

@@ -3,7 +3,7 @@
 // Cross-platform memory mapped file wrapper
 
 #include <cstdint>
-#include <filesystem>
+#include "fs.h"
 
 class MMappedFile
 {
@@ -25,7 +25,7 @@ public:
 	MMappedFile();
 	~MMappedFile();
 
-	bool Create(const std::filesystem::path& filePath, uint64_t size);
+	bool Create(const fs::path& filePath, uint64_t size);
 	View GetView(uint64_t offset, size_t size) const;
 
 private:

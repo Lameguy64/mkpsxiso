@@ -28,7 +28,7 @@ MMappedFile::~MMappedFile()
 #endif
 }
 
-bool MMappedFile::Create(const std::filesystem::path& filePath, uint64_t size)
+bool MMappedFile::Create(const fs::path& filePath, uint64_t size)
 {
 	bool result = false;
 

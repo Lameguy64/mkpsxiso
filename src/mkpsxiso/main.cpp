@@ -6,10 +6,10 @@
 
 #include <stdio.h>
 #include <string>
-#include <filesystem>
 #include <queue>
 
 #include "common.h"
+#include "fs.h"
 #include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 #include "xml.h"
@@ -33,21 +33,21 @@ namespace global
 	int			trackNum	= 1;
 	int			noXA		= false;
 
-	std::filesystem::path XMLscript;
-	std::filesystem::path LBAfile;
-	std::filesystem::path LBAheaderFile;
-	std::filesystem::path ImageName;
+	fs::path XMLscript;
+	fs::path LBAfile;
+	fs::path LBAheaderFile;
+	fs::path ImageName;
 
-	std::optional<std::filesystem::path> cuefile;
+	std::optional<fs::path> cuefile;
 	int			NoIsoGen = false;
-	std::filesystem::path RebuildXMLScript;
+	fs::path RebuildXMLScript;
 };
 
 
-bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const EntryAttributes& parentAttribs, bool& found_da);
-int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const fs::path& xmlPath, const EntryAttributes& parentAttribs, bool& found_da);
+int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
 
-int PackFileAsCDDA(void* buffer, size_t bufSize, const std::filesystem::path& audioFile);
+int PackFileAsCDDA(void* buffer, size_t bufSize, const fs::path& audioFile);
 
 bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const unsigned lba)
 {
@@ -166,7 +166,7 @@ int Main(int argc, char* argv[])
 		{
 			if ( global::XMLscript.empty() )
 			{
-				global::XMLscript = std::filesystem::u8path(*args);
+				global::XMLscript = fs::u8path(*args);
 			}
 		}
 
@@ -347,7 +347,7 @@ int Main(int argc, char* argv[])
 		{
 			if ( const char* image_name = projectElement->Attribute(xml::attrib::IMAGE_NAME); image_name != nullptr )
 			{
-				global::ImageName = std::filesystem::u8path(image_name);
+				global::ImageName = fs::u8path(image_name);
 			}
 			else
 			{
@@ -359,7 +359,7 @@ int Main(int argc, char* argv[])
 
 		if ( const char* cue_sheet = projectElement->Attribute(xml::attrib::CUE_SHEET); cue_sheet != nullptr )
 		{
-			global::cuefile = std::filesystem::u8path(cue_sheet);
+			global::cuefile = fs::u8path(cue_sheet);
 		}
 
 		if ( !global::QuietMode )
@@ -554,7 +554,7 @@ int Main(int argc, char* argv[])
 				}
 				else
 				{
-					std::filesystem::path trackSource = (global::XMLscript.parent_path() / trackRelativeSource);
+					fs::path trackSource = (global::XMLscript.parent_path() / trackRelativeSource);
 					fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
 
 					// pregap
@@ -746,7 +746,7 @@ int Main(int argc, char* argv[])
 						printf( "      Packing audio %s... ", track.source.c_str() );
 					}
 
-					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), track.size, std::filesystem::u8path(track.source) ) )
+					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), track.size, fs::u8path(track.source) ) )
 					{
 						if ( !global::QuietMode )
 						{
@@ -771,7 +771,7 @@ int Main(int argc, char* argv[])
 			const tinyxml2::XMLElement* licenseElement = dataTrack->FirstChildElement(xml::elem::LICENSE);
 			if ( licenseElement != nullptr )
 			{
-				FILE* fp = OpenFile( global::XMLscript.parent_path() / std::filesystem::u8path(licenseElement->Attribute(xml::attrib::LICENSE_FILE)), "rb" );
+				FILE* fp = OpenFile( global::XMLscript.parent_path() / fs::u8path(licenseElement->Attribute(xml::attrib::LICENSE_FILE)), "rb" );
 				if (fp != nullptr)
 				{
 					auto license = std::make_unique<cd::ISO_LICENSE>();
@@ -858,7 +858,7 @@ EntryAttributes ReadEntryAttributes(EntryAttributes current, const tinyxml2::XML
 	return current;
 };
 
-int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::filesystem::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen)
+int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen)
 {
 	const tinyxml2::XMLElement* identifierElement =
 		trackElement->FirstChildElement(xml::elem::IDENTIFIERS);
@@ -948,7 +948,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 	{
 		if ( const char* license_file_attrib = licenseElement->Attribute(xml::attrib::LICENSE_FILE); license_file_attrib != nullptr )
 		{
-			const std::filesystem::path license_file{xmlPath / std::filesystem::u8path(license_file_attrib)};
+			const fs::path license_file{xmlPath / fs::u8path(license_file_attrib)};
 			if ( license_file.empty() )
 			{
 				if ( !global::QuietMode )
@@ -1096,7 +1096,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 	return true;
 }
 
-static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const std::filesystem::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
+static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
 {
 	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
 	const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE);
@@ -1114,10 +1114,10 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 		return false;
 	}
 
-	std::filesystem::path srcFile;
+	fs::path srcFile;
 	if ( sourceElement != nullptr )
 	{
-		srcFile = std::filesystem::u8path(sourceElement);
+		srcFile = fs::u8path(sourceElement);
 	}
 
 	std::string name;
@@ -1232,7 +1232,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 				printf( "ERROR: <%s %s=\"audio\" %s=\"%s\"> must have source\n", xml::elem::TRACK, xml::attrib::TRACK_TYPE, xml::attrib::TRACK_ID, trackid);
 				return false;
 			}
-			srcFile = std::filesystem::u8path(sourceElement);
+			srcFile = fs::u8path(sourceElement);
 			found_da = true;
 		}
 		else
@@ -1300,7 +1300,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	return true;
 }
 
-static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const std::filesystem::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
+static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
 {
 	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
 	if ( strlen( nameElement ) > 12 )
@@ -1311,10 +1311,10 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 		return false;
 	}
 
-	std::filesystem::path srcDir;
+	fs::path srcDir;
 	if (const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE); sourceElement != nullptr)
 	{
-		srcDir = xmlPath / std::filesystem::u8path(sourceElement);
+		srcDir = xmlPath / fs::u8path(sourceElement);
 	}
 
 	bool alreadyExists = false;
@@ -1342,7 +1342,7 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 	return ParseDirectory(subdir, dirElement, xmlPath, defaultAttributes, found_da);
 }
 
-bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const std::filesystem::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
 {
 	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
@@ -1372,7 +1372,7 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 	return true;
 }
 
-int PackFileAsCDDA(void* buffer, size_t bufSize, const std::filesystem::path& audioFile)
+int PackFileAsCDDA(void* buffer, size_t bufSize, const fs::path& audioFile)
 {
 	// open the decoder
     ma_decoder decoder;

@@ -123,7 +123,7 @@ unsigned int SwapBytes32(unsigned int val)
 			((val & 0xFF000000) >> 24);
 }
 
-unique_file OpenScopedFile(const std::filesystem::path& path, const char* mode)
+unique_file OpenScopedFile(const fs::path& path, const char* mode)
 {
 	return unique_file { OpenFile(path, mode) };
 }
@@ -153,12 +153,12 @@ bool ParseArgument(char** argv, std::string_view command, std::string_view longC
 	return false;
 }
 
-std::optional<std::filesystem::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand)
+std::optional<fs::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand)
 {
 	if (ParseArgument(argv, command, longCommand) && *(argv+1) != nullptr)
 	{
 		argv++;
-		return std::filesystem::u8path(*argv);
+		return fs::u8path(*argv);
 	}
 	return std::nullopt;
 }

@@ -4,7 +4,7 @@
 #include "cd.h"
 #include "xa.h"
 #include "listview.h"
-#include <filesystem>
+#include "fs.h"
 #include <memory>
 #include <optional>
 #include <vector>
@@ -38,7 +38,7 @@ namespace cd {
         ~IsoReader();
 
         // Open ISO image
-        bool Open(const std::filesystem::path& fileName);
+        bool Open(const fs::path& fileName);
 
         // Read data sectors in bytes (supports sequential reading)
         size_t ReadBytes(void* ptr, size_t bytes, bool singleSector = false);
@@ -81,7 +81,7 @@ namespace cd {
         void FreePathTable();
         size_t ReadPathTable(cd::IsoReader* reader, int lba);
 
-        std::filesystem::path GetFullDirPath(int dirEntry) const;
+        fs::path GetFullDirPath(int dirEntry) const;
     };
 
 
@@ -93,7 +93,7 @@ namespace cd {
             ISO_DIR_ENTRY entry;
             cdxa::ISO_XA_ATTRIB extData;
             std::string identifier;
-            std::filesystem::path virtualPath;
+            fs::path virtualPath;
 
             std::unique_ptr<IsoDirEntries> subdir;
         };

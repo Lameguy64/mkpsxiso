@@ -53,7 +53,7 @@ time_t timegm(struct tm* tm)
 }
 #endif
 
-FILE* OpenFile(const std::filesystem::path& path, const char* mode)
+FILE* OpenFile(const fs::path& path, const char* mode)
 {
 #ifdef _WIN32
 	FILE* file = nullptr;
@@ -64,7 +64,7 @@ FILE* OpenFile(const std::filesystem::path& path, const char* mode)
 #endif
 }
 
-std::optional<struct stat64> Stat(const std::filesystem::path& path)
+std::optional<struct stat64> Stat(const fs::path& path)
 {
 	struct stat64 fileAttrib;
 #ifdef _WIN32
@@ -79,14 +79,14 @@ std::optional<struct stat64> Stat(const std::filesystem::path& path)
 	return fileAttrib;
 }
 
-int64_t GetSize(const std::filesystem::path& path)
+int64_t GetSize(const fs::path& path)
 {
 	auto fileAttrib = Stat(path);
 	return fileAttrib.has_value() ? fileAttrib->st_size : -1;
 }
 
 
-void UpdateTimestamps(const std::filesystem::path& path, const cd::ISO_DATESTAMP& entryDate)
+void UpdateTimestamps(const fs::path& path, const cd::ISO_DATESTAMP& entryDate)
 {
 	tm timeBuf {};
 	timeBuf.tm_year = entryDate.year;

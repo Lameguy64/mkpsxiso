@@ -68,6 +68,7 @@ add_subdirectory(ghc EXCLUDE_FROM_ALL)
 # Populate shared files
 add_library(iso_shared OBJECT
 	${shared_dir}/common.cpp
+	${shared_dir}/fs.cpp
 	${shared_dir}/mmappedfile.cpp
 	${shared_dir}/platform.cpp
 )

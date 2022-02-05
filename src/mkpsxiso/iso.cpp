@@ -63,7 +63,7 @@ static T RoundToEven(T val)
 	return (val + 1) & -2;
 }
 
-int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
+int iso::DirTreeClass::GetAudioSize(const fs::path& audioFile)
 {
 	ma_decoder decoder;
 	VirtualWavEx vw;
@@ -113,7 +113,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	return entries.back();
 }
 
-bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes, const char *trackid)
+bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::path& srcfile, const EntryAttributes& attributes, const char *trackid)
 {
     auto fileAttrib = Stat(srcfile);
     if ( !fileAttrib )
@@ -264,7 +264,7 @@ void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
 	entriesInDir.emplace_back(entries.back());
 }
 
-iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::filesystem::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists)
+iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists)
 {
 	// Duplicate directory entries are allowed, but the subsequent occurences will not add
 	// a new directory to 'entries'.
