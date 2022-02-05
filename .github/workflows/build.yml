@@ -14,11 +14,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         path: mkpsxiso
-
-    - name: Update repo submodules
-      run: |
-        cd mkpsxiso
-        git submodule update --init --recursive
+        submodules: recursive
 
     - name: Build and package mkpsxiso
       run: |
@@ -47,11 +43,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         path: mkpsxiso
-
-    - name: Update repo submodules
-      run: |
-        cd mkpsxiso
-        git submodule update --init --recursive
+        submodules: recursive
 
     - name: Build and package mkpsxiso
       run: |
