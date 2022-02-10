@@ -299,6 +299,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::
 			}
 
 			printf( "WARNING: 'source' attribute for subdirectory '%s' is invalid or empty.\n", id );
+			fflush(stdout);
 		}
 	}
 
@@ -352,6 +353,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 		printf("WARNING: Directory record ");
 		PrintRecordPath();
 		printf(" exceeds 2048 bytes.\n");
+		fflush(stdout);
 	}
 
 	bool firstDAWritten = false;
@@ -634,6 +636,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				if ( !global::QuietMode )
 				{
 					printf( "      Packing %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
+					fflush(stdout);
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -648,6 +651,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				if ( !global::QuietMode )
 				{
 					printf("Done.\n");
+					fflush(stdout);
 				}
 
 			}
@@ -660,6 +664,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			if ( !global::QuietMode )
 			{
 				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
+				fflush(stdout);
 			}
 
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -674,6 +679,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			if (!global::QuietMode)
 			{
 				printf( "Done.\n" );
+				fflush(stdout);
 			}
 
 		// Write data only STR streams as Mode 2 Form 1
@@ -685,6 +691,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				if ( !global::QuietMode )
 				{
 					printf( "      Packing XA-DO %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
+					fflush(stdout);
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -700,6 +707,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				if ( !global::QuietMode )
 				{
 					printf("Done.\n");
+					fflush(stdout);
 				}
 
 			}

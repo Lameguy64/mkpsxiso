@@ -64,6 +64,7 @@ bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const un
 		{
 			std::string_view id(entry.id);
 			printf("    DA File %s\n", std::string(id.substr(0, id.find_last_of(';'))).c_str());
+			fflush(stdout);
 		}
 		return true;
 	}
@@ -75,26 +76,25 @@ bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const un
 int Main(int argc, char* argv[])
 {
 	static constexpr const char* HELP_TEXT =
-		"mkpsxiso [-h|--help] [-y] [-q|--quiet] [-o|--output <file>] [-lba <file>] [-lbahead <file>]\n"
-		"  [-rebuildxml <file>] [-nolimit] [-noisogen] <xml>\n\n"
-		"  -y        - Always overwrite ISO image files.\n"
-		"  -q|--quiet - Quiet mode (prints nothing but warnings and errors).\n"
-		"  -o|--output - Specifies output file name (overrides XML but not cue_sheet).\n"
-		"  <xml>     - File name of an ISO image project in XML document format.\n\n"
-		"Special Options:\n\n"
-		"  -lba      - Outputs a log of all files packed with LBA information.\n"
-		"  -lbahead  - Outputs a C header of all the file's LBA addresses.\n"
-		"  -nolimit  - Remove warning when a directory record exceeds a sector.\n"
-		"  -noisogen - Do not generate ISO but calculates file LBAs only\n"
-		"              (To be used with -lba or -lbahead without generating ISO).\n"
-		"  -noxa     - Do not generate CD-XA file attributes\n"
-		"              (XA data can still be included but not recommended).\n"
-		"  -rebuildxml - Rebuild the XML using our newest schema\n"
-		"  -h|--help - Show this help text\n";
+		"mkpsxiso [-h|--help] [-y] [-q|--quiet] [-o|--output <file>] [-lba <file>]\n"
+		"  [-lbahead <file>] [-rebuildxml <file>] [-nolimit] [-noisogen] <xml>\n\n"
+		"  -y\t\tAlways overwrite ISO image files\n"
+		"  -q|--quiet\tQuiet mode (suppress all but warnings and errors)\n"
+		"  -o|--output\tSpecify output file (overrides image_name but not cue_sheet)\n"
+		"  <xml>\t\tFile name of disc image project in XML document format\n\n"
+		"  -lba\t\tGenerate a log of file LBA locations in disc image\n"
+		"  -lbahead\tGenerate a C header of file LBA locations in disc image\n"
+		"  -nolimit\tRemove warning when a directory record exceeds a sector\n"
+		"  -noisogen\tDo not generate ISO but calculates file LBA locations only\n"
+		"\t\t(use with -lba or -lbahead)\n"
+		"  -noxa\t\tDo not generate CD-XA extended file attributes\n"
+		"\t\t(XA data can still be included but not recommended)\n"
+		"  -rebuildxml\tRebuild the XML using our newest schema\n"
+		"  -h|--help\tShow this help text\n";
 
 	static constexpr const char* VERSION_TEXT =
 		"MKPSXISO " VERSION " - PlayStation ISO Image Maker\n"
-		"2017-2018 Meido-Tek Productions (Lameguy64)\n"
+		"2017-2022 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
 		"2021-2022 Silent, Chromaryu, G4Vi, and spicyjpeg\n\n";
 
 	bool OutputOverride = false;
@@ -175,6 +175,7 @@ int Main(int argc, char* argv[])
 	if ( (!global::QuietMode) || (argc == 1) )
 	{
 		printf(VERSION_TEXT);
+		fflush(stdout);
 	}
 
 	if ( argc == 1 )
@@ -301,6 +302,7 @@ int Main(int argc, char* argv[])
 		if ( !global::QuietMode )
 		{
 			printf( "      Writing new XML ... " );
+			fflush(stdout);
 		}
 		if (FILE* file = OpenFile(global::RebuildXMLScript, "w"); file != nullptr)
 	    {
@@ -309,12 +311,14 @@ int Main(int argc, char* argv[])
 	    }
 		else
 		{
-			printf( "ERROR: Cannot open %s for writing\n", global::RebuildXMLScript.generic_u8string().c_str());
+			printf( "ERROR: Cannot open %s for writing\n", 
+				global::RebuildXMLScript.generic_u8string().c_str());
 			return EXIT_FAILURE;
 		}
 		if ( !global::QuietMode )
 		{
 			printf("Ok.\n");
+			fflush(stdout);
 		}
 	    return EXIT_SUCCESS;
 	}
@@ -365,13 +369,15 @@ int Main(int argc, char* argv[])
 		if ( !global::QuietMode )
 		{
 			printf( "Building ISO Image: %" PRFILESYSTEM_PATH, global::ImageName.lexically_normal().c_str() );
-
+			
 			if ( global::cuefile )
 			{
 				printf( " + %" PRFILESYSTEM_PATH, global::cuefile->lexically_normal().c_str() );
 			}
 
 			printf( "\n" );
+			
+			fflush(stdout);
 		}
 
 		global::noXA = projectElement->IntAttribute( xml::attrib::NO_XA, 0 );
@@ -381,6 +387,7 @@ int Main(int argc, char* argv[])
 			if ( GetSize( global::ImageName ) >= 0 )
 			{
 				printf( "WARNING: ISO image already exists, overwrite? <y/n> " );
+				fflush(stdout);
 				char key;
 
 				do {
@@ -399,6 +406,7 @@ int Main(int argc, char* argv[])
 			else
 			{
 				printf( "\n" );
+				fflush(stdout);
 			}
 
 		}
@@ -461,6 +469,7 @@ int Main(int argc, char* argv[])
 		if ( !global::QuietMode )
 		{
 			printf("Scanning tracks...\n\n");
+			fflush(stdout);
 		}
 		for ( const tinyxml2::XMLElement* trackElement = projectElement->FirstChildElement(xml::elem::TRACK);
 			trackElement != nullptr; trackElement = trackElement->NextSiblingElement(xml::elem::TRACK) )
@@ -484,6 +493,7 @@ int Main(int argc, char* argv[])
 			{
 				printf( "  Track #%d %s:\n", global::trackNum,
 					track_type );
+				fflush(stdout);
 			}
 
 			// Generate ISO file system for data track
@@ -792,11 +802,19 @@ int Main(int argc, char* argv[])
 					fclose( fp );
 				}
 			}
+			else
+			{
+				// Write blank sectors if no license data is to be injected
+				auto appBlankSectors = 
+					writer.GetSectorViewM2F1(0, 16, cd::IsoWriter::EdcEccForm::Form2);
+				appBlankSectors->WriteBlankSectors(16);
+			}
 
 			// Write file system
 			if ( !global::QuietMode )
 			{
 				printf( "    Writing directories... " );
+				fflush(stdout);
 			}
 
 			// Sort directory entries and write it
@@ -809,6 +827,7 @@ int Main(int argc, char* argv[])
 			if ( !global::QuietMode )
 			{
 				printf( "Ok.\n" );
+				fflush(stdout);
 			}
 
 			// Close both ISO writer and CUE sheet
@@ -820,6 +839,7 @@ int Main(int argc, char* argv[])
 				printf( "ISO image generated successfully.\n" );
 				printf( "Total image size: %d bytes (%d sectors)\n",
 					(CD_SECTOR_SIZE*totalLenLBA), totalLenLBA );
+				fflush(stdout);
 			}
 		}
 
@@ -941,6 +961,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 					isoIdentifiers.ModificationDate );
 			}
 			printf( "\n" );
+			fflush(stdout);
 		}
 	}
 
@@ -990,6 +1011,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 				}
 				printf( "WARNING: Specified license file may not be of "
 					"correct format.\n" );
+				fflush(stdout);
             }
 
 
@@ -1045,6 +1067,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 	if ( !global::QuietMode )
 	{
 		printf( "    Parsing directory tree...\n" );
+		fflush(stdout);
 	}
 
 	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate);
@@ -1081,6 +1104,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 		printf( "      Directories: %d\n", dirTree->GetDirCountTotal() );
 		printf( "      Total file system size: %d bytes (%d sectors)\n\n",
 			CD_SECTOR_SIZE*totalLen, totalLen);
+		fflush(stdout);
 	}
 
 	if ( (global::NoLimit == false) &&
@@ -1091,6 +1115,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 			printf( "      " );
 		}
 		printf( "WARNING: Path table exceeds 2048 bytes.\n" );
+		fflush(stdout);
 	}
 
 	return true;

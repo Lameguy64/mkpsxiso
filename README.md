@@ -100,7 +100,13 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
-**Version 2.0 (02/02/2022)**
+**Version 2.01 (02/10/2022)**
+* Fixed invalid sectors generated when no license file is specified.
+* Fixed wide char string specifier for MinGW.
+* Added a bunch of fflush() calls to make sure build messages are output at all times.
+* Improved help text.
+
+**Version 2.00 (02/02/2022)**
 * Added tinyxml2 as a submodule, so manual installation is no longer needed and built binaries will always be statically linked.
 * Add `dumpsxiso` the successor to `isodump`. Use `dumpsxiso` to unpack `.bin` isos and `mkpsxiso` to repack.
 * Make xml file paths relative to the XML.
