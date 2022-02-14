@@ -270,15 +270,14 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::
 	// a new directory to 'entries'.
 	// TODO: It's not possible now, but a warning should be issued if entry attributes are specified for the subsequent occurences
 	// of the directory. This check probably needs to be moved outside of the function.
-	auto currentSubdir = std::find_if(entries.begin(), entries.end(), [id](const auto& e)
-		{
-			return e.type == EntryType::EntryDir && e.id == id;
-		});
-
-	if (currentSubdir != entries.end())
+	for(auto& e : entriesInDir)
 	{
-		alreadyExists = true;
-		return currentSubdir->subdir.get();
+		const iso::DIRENTRY& entry = e.get();
+		if((entry.type == EntryType::EntryDir) && (entry.id == id))
+		{
+			alreadyExists = true;
+		    return entry.subdir.get();
+		}
 	}
 
 	auto fileAttrib = Stat(srcDir);
