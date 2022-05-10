@@ -92,11 +92,6 @@ On Windows, browsing the subdirectories in dirb and dirc will not list the conte
 
 This can be avoided by minimizing identically named directories but its best to test your generated disc image before considering it ready for release.
 
-## Links
-[PSXDEV discord](https://discord.com/invite/s2KJnf3c)
-
-[PSXDEV](https://www.psxdev.net/)
-
 
 ## Changelog
 
