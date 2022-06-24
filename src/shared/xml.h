@@ -41,6 +41,7 @@ namespace attrib
 	constexpr const char* XA_GID = "xa_gid";
 	constexpr const char* XA_UID = "xa_uid";
 
+	constexpr const char* ID_FILE = "id_file";
 	constexpr const char* SYSTEM_ID = "system";
 	constexpr const char* VOLUME_ID = "volume";
 	constexpr const char* APPLICATION = "application";

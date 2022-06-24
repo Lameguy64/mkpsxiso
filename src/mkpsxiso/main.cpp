@@ -33,6 +33,7 @@ namespace global
 	int			trackNum	= 1;
 	int			noXA		= false;
 
+	std::optional<std::string> volid_override;
 	std::filesystem::path XMLscript;
 	std::filesystem::path LBAfile;
 	std::filesystem::path LBAheaderFile;
@@ -41,6 +42,8 @@ namespace global
 	std::optional<std::filesystem::path> cuefile;
 	int			NoIsoGen = false;
 	std::filesystem::path RebuildXMLScript;
+	
+	tinyxml2::XMLDocument xmlIdFile;
 };
 
 
@@ -80,14 +83,16 @@ int Main(int argc, char* argv[])
 		"  [-lbahead <file>] [-rebuildxml <file>] [-nolimit] [-noisogen] <xml>\n\n"
 		"  -y\t\tAlways overwrite ISO image files\n"
 		"  -q|--quiet\tQuiet mode (suppress all but warnings and errors)\n"
-		"  -o|--output\tSpecify output file (overrides image_name but not cue_sheet)\n"
+		"  -o|--output\tSpecify output file (overrides image_name attribute)\n"
+		"  -c|--cuefile\tSpecify cue sheet file (overrides cue_sheet attribute)\n"
+		"  -l|--label\tSpecify volume ID (overrides volume element)\n"
 		"  <xml>\t\tFile name of disc image project in XML document format\n\n"
 		"  -lba\t\tGenerate a log of file LBA locations in disc image\n"
 		"  -lbahead\tGenerate a C header of file LBA locations in disc image\n"
-		"  -nolimit\tRemove warning when a directory record exceeds a sector\n"
-		"  -noisogen\tDo not generate ISO but calculates file LBA locations only\n"
-		"\t\t(use with -lba or -lbahead)\n"
-		"  -noxa\t\tDo not generate CD-XA extended file attributes\n"
+		"  -nolimit\tRemove warning when a directory record surpasses a sector\n"
+		"  -noisogen\tDo not generate ISO, but calculate file LBA locations only\n"
+		"\t\t(for use with -lba or -lbahead)\n"
+		"  -noxa\t\tDo not generate CD-XA extended file attributes (plain ISO9660)\n"
 		"\t\t(XA data can still be included but not recommended)\n"
 		"  -rebuildxml\tRebuild the XML using our newest schema\n"
 		"  -h|--help\tShow this help text\n";
@@ -140,6 +145,17 @@ int Main(int argc, char* argv[])
 			{
 				global::ImageName = *output;
 				OutputOverride = true;
+				continue;
+			}
+			if (auto output = ParsePathArgument(args, "c", "cuefile"); output.has_value())
+			{
+				global::cuefile = *output;
+				OutputOverride = true;
+				continue;
+			}
+			if (auto label = ParseStringArgument(args, "l", "label"); label.has_value())
+			{
+				global::volid_override = label;
 				continue;
 			}
 			if (auto newxmlfile = ParsePathArgument(args, "rebuildxml"); newxmlfile.has_value())
@@ -233,7 +249,9 @@ int Main(int argc, char* argv[])
 	// Fix XML tree to our current spec
 	// convert DA file source syntax to DA file trackid syntax
 	unsigned trackindex = 2;
-	for(tinyxml2::XMLElement *modifyProject = xmlFile.FirstChildElement(xml::elem::ISO_PROJECT); modifyProject != nullptr; modifyProject = modifyProject->NextSiblingElement(xml::elem::ISO_PROJECT))
+	for(tinyxml2::XMLElement *modifyProject = xmlFile.FirstChildElement(xml::elem::ISO_PROJECT);
+		modifyProject != nullptr;
+		modifyProject = modifyProject->NextSiblingElement(xml::elem::ISO_PROJECT))
 	{
 		tinyxml2::XMLElement *modifyTrack = modifyProject->FirstChildElement(xml::elem::TRACK);
 		if((modifyTrack == nullptr) || (!modifyTrack->Attribute(xml::attrib::TRACK_TYPE, "data")))
@@ -341,7 +359,7 @@ int Main(int argc, char* argv[])
 		imagesCount++;
 		if ( imagesCount > 1 && OutputOverride )
 		{
-			printf( "ERROR: -o switch cannot be used in multi-disc ISO "
+			printf( "ERROR: -o or -c switch cannot be used in multi-disc ISO "
 				"project.\n" );
 			return EXIT_FAILURE;
 		}
@@ -355,15 +373,18 @@ int Main(int argc, char* argv[])
 			}
 			else
 			{
-				printf( "ERROR: %s attribute not specfied in "
-					"<iso_project> element.\n", xml::attrib::IMAGE_NAME );
-				return EXIT_FAILURE;
+				// Use file name of XML project as the image file name
+				global::ImageName = global::XMLscript.stem();
+				global::ImageName += ".iso";
 			}
 		}
 
-		if ( const char* cue_sheet = projectElement->Attribute(xml::attrib::CUE_SHEET); cue_sheet != nullptr )
+		if ( !global::cuefile )
 		{
-			global::cuefile = std::filesystem::u8path(cue_sheet);
+			if ( const char* cue_sheet = projectElement->Attribute(xml::attrib::CUE_SHEET); cue_sheet != nullptr )
+			{
+				global::cuefile = std::filesystem::u8path(cue_sheet);
+			}
 		}
 
 		if ( !global::QuietMode )
@@ -410,7 +431,6 @@ int Main(int argc, char* argv[])
 			}
 
 		}
-
 
 		// Check if there is a track element specified
 		if ( projectElement->FirstChildElement(xml::elem::TRACK) == nullptr )
@@ -543,7 +563,7 @@ int Main(int argc, char* argv[])
 						printf( "    " );
 					}
 
-					printf( "ERROR: %s attribute must be specified "
+					printf( "ERROR: %s attribute or -c parameter must be specified "
 						"when using audio tracks.\n", xml::attrib::CUE_SHEET );
 
 					return EXIT_FAILURE;
@@ -754,6 +774,7 @@ int Main(int argc, char* argv[])
 					if ( !global::QuietMode )
 					{
 						printf( "      Packing audio %s... ", track.source.c_str() );
+						fflush(stdout);
 					}
 
 					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), track.size, std::filesystem::u8path(track.source) ) )
@@ -790,6 +811,7 @@ int Main(int argc, char* argv[])
 						if ( !global::QuietMode )
 						{
 							printf( "    Writing license data..." );
+							fflush(stdout);
 						}
 
 						iso::WriteLicenseData( &writer, license->data );
@@ -845,7 +867,7 @@ int Main(int argc, char* argv[])
 
 		// Check for next <iso_project> element
 		projectElement = projectElement->NextSiblingElement(xml::elem::ISO_PROJECT);
-
+		
 	}
 
     return 0;
@@ -889,15 +911,83 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 
 	if ( identifierElement != nullptr )
 	{
-		isoIdentifiers.SystemID		= identifierElement->Attribute(xml::attrib::SYSTEM_ID);
-		isoIdentifiers.VolumeID		= identifierElement->Attribute(xml::attrib::VOLUME_ID);
-		isoIdentifiers.VolumeSet	= identifierElement->Attribute(xml::attrib::VOLUME_SET);
-		isoIdentifiers.Publisher	= identifierElement->Attribute(xml::attrib::PUBLISHER);
-		isoIdentifiers.Application	= identifierElement->Attribute(xml::attrib::APPLICATION);
-		isoIdentifiers.DataPreparer	= identifierElement->Attribute(xml::attrib::DATA_PREPARER);
-		isoIdentifiers.Copyright	= identifierElement->Attribute(xml::attrib::COPYRIGHT);
-		isoIdentifiers.CreationDate = identifierElement->Attribute(xml::attrib::CREATION_DATE);
+		const char* identifierFile;
+		
+		// Otherwise use individual elements defined by each attribute
+		isoIdentifiers.SystemID			= identifierElement->Attribute(xml::attrib::SYSTEM_ID);
+		isoIdentifiers.VolumeID			= identifierElement->Attribute(xml::attrib::VOLUME_ID);
+		isoIdentifiers.VolumeSet		= identifierElement->Attribute(xml::attrib::VOLUME_SET);
+		isoIdentifiers.Publisher		= identifierElement->Attribute(xml::attrib::PUBLISHER);
+		isoIdentifiers.Application		= identifierElement->Attribute(xml::attrib::APPLICATION);
+		isoIdentifiers.DataPreparer		= identifierElement->Attribute(xml::attrib::DATA_PREPARER);
+		isoIdentifiers.Copyright		= identifierElement->Attribute(xml::attrib::COPYRIGHT);
+		isoIdentifiers.CreationDate		= identifierElement->Attribute(xml::attrib::CREATION_DATE);
 		isoIdentifiers.ModificationDate = identifierElement->Attribute(xml::attrib::MODIFICATION_DATE);
+
+		// Is an ID file specified?
+		if( identifierFile = identifierElement->Attribute(xml::attrib::ID_FILE) )
+		{
+			// Load the file as an XML document
+			{
+				tinyxml2::XMLError error;
+				if (FILE* file = OpenFile(identifierFile, "rb"); file != nullptr)
+				{
+					error = global::xmlIdFile.LoadFile(file);
+					fclose(file);
+				}
+				else
+				{
+					error = tinyxml2::XML_ERROR_FILE_NOT_FOUND;
+				}
+
+				if ( error != tinyxml2::XML_SUCCESS )
+				{
+					printf("ERROR: ");
+					if ( error == tinyxml2::XML_ERROR_FILE_NOT_FOUND )
+					{
+						printf("File not found.\n");
+					}
+					else if ( error == tinyxml2::XML_ERROR_FILE_COULD_NOT_BE_OPENED )
+					{
+						printf("File cannot be opened.\n");
+					}
+					else if ( error == tinyxml2::XML_ERROR_FILE_READ_ERROR )
+					{
+						printf("Error reading file.\n");
+					}
+					else
+					{
+						printf("%s on line %d\n", global::xmlIdFile.ErrorName(), global::xmlIdFile.ErrorLineNum());
+					}
+					return false;
+				}
+			}
+			
+			// Get the identifier element, if there is one
+			if( identifierElement = global::xmlIdFile.FirstChildElement(xml::elem::IDENTIFIERS) )
+			{
+				const char *str;
+				// Use strings defined in file, otherwise leave ones already defined alone
+				if( str = identifierElement->Attribute(xml::attrib::SYSTEM_ID) )
+					isoIdentifiers.SystemID			= str;
+				if( str = identifierElement->Attribute(xml::attrib::VOLUME_ID) )
+					isoIdentifiers.VolumeID			= str;
+				if( str = identifierElement->Attribute(xml::attrib::VOLUME_SET) )
+					isoIdentifiers.VolumeSet		= str;
+				if( str = identifierElement->Attribute(xml::attrib::PUBLISHER) )
+					isoIdentifiers.Publisher		= str;
+				if( str = identifierElement->Attribute(xml::attrib::APPLICATION) )
+					isoIdentifiers.Application		= str;
+				if( str = identifierElement->Attribute(xml::attrib::DATA_PREPARER) )
+					isoIdentifiers.DataPreparer		= str;
+				if( str = identifierElement->Attribute(xml::attrib::COPYRIGHT) )
+					isoIdentifiers.Copyright		= str;
+				if( str = identifierElement->Attribute(xml::attrib::CREATION_DATE) )
+					isoIdentifiers.CreationDate		= str;
+				if( str = identifierElement->Attribute(xml::attrib::MODIFICATION_DATE) )
+					isoIdentifiers.ModificationDate = str;
+			}
+		}
 
 		bool hasSystemID = true;
 		if ( isoIdentifiers.SystemID == nullptr )
@@ -911,6 +1001,11 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 		{
 			hasApplication = false;
 			isoIdentifiers.Application = "PLAYSTATION";
+		}
+		
+		if( global::volid_override )
+		{
+			isoIdentifiers.VolumeID = global::volid_override->c_str();
 		}
 
 		// Print out identifiers if present
@@ -977,7 +1072,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const std::file
 					printf( "    " );
 				}
 
-				printf("ERROR: file attribute of <license> element is missing "
+				printf("ERROR: File attribute of <license> element is missing "
 					"or blank on line %d\n.", licenseElement->GetLineNum() );
 
 				return false;

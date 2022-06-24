@@ -2,7 +2,9 @@
 #include "cd.h"
 
 #ifdef _WIN32
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
 #include <io.h>
 #endif
