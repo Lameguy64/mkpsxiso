@@ -16,6 +16,10 @@
 #define PRFILESYSTEM_PATH "s"
 #endif
 
+#ifdef __APPLE__
+#define stat64 stat
+#endif
+
 namespace cd
 {
 	struct ISO_DATESTAMP;
