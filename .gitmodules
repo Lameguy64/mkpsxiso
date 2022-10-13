@@ -7,3 +7,6 @@
 [submodule "flac"]
 	path = flac
 	url = https://github.com/CookiePLMonster/flac
+[submodule "ThreadPool"]
+	path = ThreadPool
+	url = https://github.com/progschj/ThreadPool.git
