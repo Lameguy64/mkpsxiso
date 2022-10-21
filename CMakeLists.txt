@@ -34,6 +34,10 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ghc/include/ghc/filesystem.hpp)
 	message(FATAL_ERROR "The ghc directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ThreadPool/ThreadPool.h)
+	message(FATAL_ERROR "The ThreadPool directory is empty. Run 'git submodule update --init --recursive' to populate it.")
+endif()
+
 # Build tinyxml2. I didn't bother with tinyxml2's actual CMake integration
 # because it's far easier do do this. It is a single-file library after all.
 add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
@@ -86,7 +90,7 @@ add_executable(mkpsxiso
 	${mkpsxiso_dir}/iso.cpp
 	${mkpsxiso_dir}/main.cpp
 )
-target_include_directories(mkpsxiso PUBLIC "miniaudio")
+target_include_directories(mkpsxiso PUBLIC "miniaudio" "ThreadPool")
 target_link_libraries(mkpsxiso tinyxml2 iso_shared Threads::Threads)
 if(MINGW)
 	target_link_libraries(mkpsxiso "-municode")

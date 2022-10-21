@@ -22,6 +22,8 @@ bool IsoWriter::Create(const fs::path& fileName, unsigned int sizeLBA)
 {
 	const uint64_t sizeBytes = static_cast<uint64_t>(sizeLBA) * CD_SECTOR_SIZE;
 
+	m_threadPool = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
+	
 	m_mmap = std::make_unique<MMappedFile>();
 	return m_mmap->Create(fileName, sizeBytes);
 }
@@ -33,8 +35,9 @@ void IsoWriter::Close()
 
 // ======================================================
 
-IsoWriter::SectorView::SectorView(MMappedFile* mappedFile, unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm)
-	: m_view(mappedFile->GetView(static_cast<uint64_t>(offsetLBA) * CD_SECTOR_SIZE, static_cast<size_t>(sizeLBA) * CD_SECTOR_SIZE))
+IsoWriter::SectorView::SectorView(ThreadPool* threadPool, MMappedFile* mappedFile, unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm)
+	: m_threadPool(threadPool) 
+	, m_view(mappedFile->GetView(static_cast<uint64_t>(offsetLBA) * CD_SECTOR_SIZE, static_cast<size_t>(sizeLBA) * CD_SECTOR_SIZE))
 	, m_currentLBA(offsetLBA)
 	, m_endLBA(offsetLBA + sizeLBA)
 	, m_edcEccForm(edcEccForm)
@@ -85,7 +88,7 @@ void IsoWriter::SectorView::CalculateForm1()
 {
 	SECTOR_M2F1* sector = static_cast<SECTOR_M2F1*>(m_currentSector);
 
-	m_checksumJobs.emplace_front(std::async(std::launch::async, [](SECTOR_M2F1* sector)
+	m_checksumJobs.emplace_front(m_threadPool->enqueue([](SECTOR_M2F1* sector)
 		{
 			// Encode EDC data
 			EDC_ECC_GEN.ComputeEdcBlock(sector->subHead, sizeof(sector->subHead) + sizeof(sector->data), sector->edc);
@@ -101,7 +104,7 @@ void IsoWriter::SectorView::CalculateForm1()
 void IsoWriter::SectorView::CalculateForm2()
 {
 	SECTOR_M2F2* sector = static_cast<SECTOR_M2F2*>(m_currentSector);
-	m_checksumJobs.emplace_front(std::async(std::launch::async, &EDCECC::ComputeEdcBlock, &EDC_ECC_GEN,
+	m_checksumJobs.emplace_front(m_threadPool->enqueue(&EDCECC::ComputeEdcBlock, &EDC_ECC_GEN,
 		sector->data, sizeof(sector->data) - 4, sector->data + sizeof(sector->data) - 4));
 }
 
@@ -258,7 +261,7 @@ private:
 
 auto IsoWriter::GetSectorViewM2F1(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const -> std::unique_ptr<SectorView>
 {
-	return std::make_unique<SectorViewM2F1>(m_mmap.get(), offsetLBA, sizeLBA, edcEccForm);
+	return std::make_unique<SectorViewM2F1>(m_threadPool.get(), m_mmap.get(), offsetLBA, sizeLBA, edcEccForm);
 }
 
 class SectorViewM2F2 final : public IsoWriter::SectorView
@@ -423,7 +426,7 @@ public:
 
 auto IsoWriter::GetSectorViewM2F2(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const -> std::unique_ptr<SectorView>
 {
-	return std::make_unique<SectorViewM2F2>(m_mmap.get(), offsetLBA, sizeLBA, edcEccForm);
+	return std::make_unique<SectorViewM2F2>(m_threadPool.get(), m_mmap.get(), offsetLBA, sizeLBA, edcEccForm);
 }
 
 // ======================================================

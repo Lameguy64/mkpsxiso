@@ -10,3 +10,6 @@
 [submodule "ghc"]
 	path = ghc
 	url = https://github.com/gulrak/filesystem
+[submodule "ThreadPool"]
+	path = ThreadPool
+	url = https://github.com/progschj/ThreadPool
