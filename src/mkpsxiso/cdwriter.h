@@ -3,9 +3,10 @@
 
 #include "cd.h"
 #include "mmappedfile.h"
+
+#include <ThreadPool.h>
 #include <filesystem>
 #include <forward_list>
-#include <future>
 #include <memory>
 
 namespace cd {
@@ -31,7 +32,7 @@ public:
 	class SectorView
 	{
 	public:
-		SectorView(MMappedFile* mappedFile, unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm);
+		SectorView(ThreadPool* threadPool, MMappedFile* mappedFile, unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm);
 		virtual ~SectorView();
 
 		virtual void WriteFile(FILE* file) = 0;
@@ -59,6 +60,7 @@ public:
 
 	private:
 		std::forward_list<std::future<void>> m_checksumJobs;
+		ThreadPool* m_threadPool;
 		MMappedFile::View m_view;
 	};
 
@@ -86,6 +88,7 @@ public:
 
 private:
 	std::unique_ptr<MMappedFile> m_mmap;
+	std::unique_ptr<ThreadPool> m_threadPool;
 };
 
 ISO_USHORT_PAIR SetPair16(unsigned short val);
