@@ -340,19 +340,6 @@ void iso::DirTreeClass::PrintRecordPath()
 
 int iso::DirTreeClass::CalculateTreeLBA(int lba)
 {
-	bool passedSector = false;
-	lba += GetSizeInSectors(CalculateDirEntryLen(&passedSector));
-
-	if ( ( global::NoLimit == false) && passedSector )
-	{
-		if (!global::QuietMode)
-			printf("      ");
-
-		printf("WARNING: Directory record ");
-		PrintRecordPath();
-		printf(" exceeds 2048 bytes.\n");
-	}
-
 	bool firstDAWritten = false;
 	for ( DIRENTRY& entry : entries )
 	{

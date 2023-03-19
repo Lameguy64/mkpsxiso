@@ -1072,7 +1072,8 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	// Calculate directory tree LBAs and retrieve size of image
 	int pathTableLen = dirTree->CalculatePathTableLen(root);
 
-	const int rootLBA = 17+(GetSizeInSectors(pathTableLen)*4);
+	// 16 license sectors + 2 header sectors
+	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
