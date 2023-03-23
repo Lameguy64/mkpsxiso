@@ -29,7 +29,6 @@ namespace global
 	int			QuietMode	= false;
 	int			Overwrite	= false;
 
-	int			NoLimit		= false;
 	int			trackNum	= 1;
 	int			noXA		= false;
 
@@ -76,7 +75,7 @@ int Main(int argc, char* argv[])
 {
 	static constexpr const char* HELP_TEXT =
 		"mkpsxiso [-h|--help] [-y] [-q|--quiet] [-o|--output <file>] [-lba <file>] [-lbahead <file>]\n"
-		"  [-rebuildxml <file>] [-nolimit] [-noisogen] <xml>\n\n"
+		"  [-rebuildxml <file>] [-noisogen] <xml>\n\n"
 		"  -y        - Always overwrite ISO image files.\n"
 		"  -q|--quiet - Quiet mode (prints nothing but warnings and errors).\n"
 		"  -o|--output - Specifies output file name (overrides XML but not cue_sheet).\n"
@@ -84,7 +83,6 @@ int Main(int argc, char* argv[])
 		"Special Options:\n\n"
 		"  -lba      - Outputs a log of all files packed with LBA information.\n"
 		"  -lbahead  - Outputs a C header of all the file's LBA addresses.\n"
-		"  -nolimit  - Remove warning when a directory record exceeds a sector.\n"
 		"  -noisogen - Do not generate ISO but calculates file LBAs only\n"
 		"              (To be used with -lba or -lbahead without generating ISO).\n"
 		"  -noxa     - Do not generate CD-XA file attributes\n"
@@ -114,11 +112,6 @@ int Main(int argc, char* argv[])
 			if (auto lbaHead = ParsePathArgument(args, "lbahead"); lbaHead.has_value())
 			{
 				global::LBAheaderFile = *lbaHead;
-				continue;
-			}
-			if (ParseArgument(args, "nolimit"))
-			{
-				global::NoLimit = true;
 				continue;
 			}
 			if (ParseArgument(args, "noisogen"))
@@ -1082,16 +1075,6 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		printf( "      Directories: %d\n", dirTree->GetDirCountTotal() );
 		printf( "      Total file system size: %d bytes (%d sectors)\n\n",
 			CD_SECTOR_SIZE*totalLen, totalLen);
-	}
-
-	if ( (global::NoLimit == false) &&
-		(pathTableLen > 2048) )
-	{
-		if ( !global::QuietMode )
-		{
-			printf( "      " );
-		}
-		printf( "WARNING: Path table exceeds 2048 bytes.\n" );
 	}
 
 	return true;

@@ -99,10 +99,8 @@ namespace iso
 		/** Calculates the length of the directory record to be produced by this class in bytes.
 		 *
 		 *  Returns: Length of directory record in bytes.
-		 * 
-		 * * *passedSector - Flag to indicate if the directory record has exceeded a sector
 		 */
-		int	CalculateDirEntryLen(bool* passedSector = nullptr) const;
+		int	CalculateDirEntryLen() const;
 
 		/** Calculates the LBA of all file and directory entries in the directory record and returns the next LBA
 		 *	address.

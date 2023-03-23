@@ -378,7 +378,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 	return lba;
 }
 
-int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
+int iso::DirTreeClass::CalculateDirEntryLen() const
 {
 	int dirEntryLen = 68;
 
@@ -412,11 +412,6 @@ int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
 		}
 
 		dirEntryLen += dataLen;
-	}
-
-	if (dirEntryLen > 2048 && passedSector != nullptr)
-	{
-		*passedSector = true;
 	}
 
 	return 2048 * GetSizeInSectors(dirEntryLen);
