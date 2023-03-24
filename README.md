@@ -95,7 +95,15 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
-**Version 2.02**
+**Version 2.03 (xx/xx/2023)**
+* On platforms where `std::filesystem` is unavailable, `ghc::filesystem` is now used instead.
+* Switched back to main `libflac`.
+* mkpsxiso: Resolved a possible crash when building images with big files.
+* mkpsxiso: Fixed an ISO generation bug when building images with directories with many files.
+* mkpsxiso: Removed a legacy `-nolimit` command line option.
+* dumpsxiso: Output a Copyright field to the XML.
+
+**Version 2.02 (06/24/2022)**
 * Fixed NOMINMAX redefinition warnings.
 * Added -c|--cuefile argument to specify the cue sheet file name. Overrides the name defined in the XML file.
 * Output file is derived from the XML project file name if no output file was specified by arguments or the image_name attribute.
