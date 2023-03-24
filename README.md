@@ -88,19 +88,28 @@ The only known major issue that hasn't (or cannot) be resolved is that if you cr
 </dir>
 ```
 
-On Windows, browsing the subdirectories in dirb and dirc will not list the contents for some reason and trying to access it in a command prompt leads to a permission denied or similar error message. Disc image tools such as CDmage will display the contents of the aforementioned subdirectories without issue and the issue persists on disc images created with BuildCD suggesting it is likely an operating system related issue and not an ISO generator issue.
+On Windows browsing the subdirectories in 'dirb' and 'dirc' will not list the contents for some reason and trying to access it in a command prompt leads to a permission denied or similar error message. Disc image tools such as CDmage will display the contents of the aforementioned subdirectories without issue and the issue persists with disc images created with BuildCD, suggesting it is likely a bug with the operating system and not mkpsxiso.
 
 This can be avoided by minimizing identically named directories but its best to test your generated disc image before considering it ready for release.
-
-## Links
-[PSXDEV discord](https://discord.com/invite/s2KJnf3c)
-
-[PSXDEV](https://www.psxdev.net/)
 
 
 ## Changelog
 
-**Version 2.0 (02/02/2022)**
+**Version 2.02**
+* Fixed NOMINMAX redefinition warnings.
+* Added -c|--cuefile argument to specify the cue sheet file name. Overrides the name defined in the XML file.
+* Output file is derived from the XML project file name if no output file was specified by arguments or the image_name attribute.
+* Added -l|--label argument to specify the volume ID string. Overrides the volume ID defined in the XML file.
+* Added id_file attribute for the <identifier> element. Reads identifiers from a separate XML file containing a single <identifier> element.
+* Added ISO descriptor check in dumpsxiso.
+
+**Version 2.01 (02/10/2022)**
+* Fixed invalid sectors generated when no license file is specified.
+* Fixed wide char string specifier for MinGW.
+* Added a bunch of fflush() calls to make sure build messages are output at all times.
+* Improved help text.
+
+**Version 2.00 (02/02/2022)**
 * Added tinyxml2 as a submodule, so manual installation is no longer needed and built binaries will always be statically linked.
 * Add `dumpsxiso` the successor to `isodump`. Use `dumpsxiso` to unpack `.bin` isos and `mkpsxiso` to repack.
 * Make xml file paths relative to the XML.

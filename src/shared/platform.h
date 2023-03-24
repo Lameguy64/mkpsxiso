@@ -12,7 +12,7 @@
 // Printf format for fs::path::c_str()
 #ifdef _WIN32
 #define stat64 _stat64
-#define PRFILESYSTEM_PATH "ws"
+#define PRFILESYSTEM_PATH "ls"
 #else
 #define PRFILESYSTEM_PATH "s"
 #endif

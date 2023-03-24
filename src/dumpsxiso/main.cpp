@@ -967,7 +967,7 @@ int Main(int argc, char *argv[])
 		"  -h|--help  - Show this help text\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
-			"2017 Meido-Tek Productions (Lameguy64)\n"
+			"2017 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
 			"2020 Phoenix (SadNES cITy)\n"
 			"2021-2022 Silent, Chromaryu, G4Vi, and spicyjpeg\n\n" );
 
@@ -1057,6 +1057,19 @@ int Main(int argc, char *argv[])
 		printf("ERROR: Cannot open file %" PRFILESYSTEM_PATH "...\n", param::isoFile.lexically_normal().c_str());
 		return EXIT_FAILURE;
 
+	}
+	
+	// Check if file has a valid ISO9660 header
+	{
+		char sectbuff[2048];
+		//char descid[] = { 0x01, 0x43, 0x44, 0x30, 0x30, 0x31, 0x01 };
+		reader.SeekToSector(16);
+		reader.ReadBytes(&sectbuff, 2048);
+		if( memcmp(sectbuff, "\1CD001\1", 7) )
+		{
+			printf("ERROR: File does not contain a valid ISO9660 file system.\n");
+			return EXIT_FAILURE;
+		}
 	}
 
 	if (!param::outPath.empty())

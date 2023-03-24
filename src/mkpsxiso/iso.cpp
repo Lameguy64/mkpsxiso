@@ -276,7 +276,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 		if((entry.type == EntryType::EntryDir) && (entry.id == id))
 		{
 			alreadyExists = true;
-		    return entry.subdir.get();
+			return entry.subdir.get();
 		}
 	}
 
