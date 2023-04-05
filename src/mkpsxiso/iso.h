@@ -9,7 +9,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <filesystem>
+#include "fs.h"
 #include "cdwriter.h"
 #include "common.h"
 
@@ -34,7 +34,7 @@ namespace iso
 		int64_t length;		/// Length of file in bytes
 		int		lba;		/// File LBA (in sectors)
 
-		std::filesystem::path srcfile;	/// Filename with path to source file (empty if directory or dummy)
+		fs::path srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		EntryType	  type;		/// File type (0 - file, 1 - directory)
 		unsigned char attribs;	/// XA attributes, 0xFF is not set
 		unsigned short perms;	/// XA permissions
@@ -83,7 +83,7 @@ namespace iso
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
 
 	public:
-        static int GetAudioSize(const std::filesystem::path& audioFile);
+        static int GetAudioSize(const fs::path& audioFile);
 		EntryList& entries; // List of all entries on the disc
 		std::vector<std::reference_wrapper<iso::DIRENTRY>> entriesInDir; // References to entries in this directory
 
@@ -99,10 +99,8 @@ namespace iso
 		/** Calculates the length of the directory record to be produced by this class in bytes.
 		 *
 		 *  Returns: Length of directory record in bytes.
-		 * 
-		 * * *passedSector - Flag to indicate if the directory record has exceeded a sector
 		 */
-		int	CalculateDirEntryLen(bool* passedSector = nullptr) const;
+		int	CalculateDirEntryLen() const;
 
 		/** Calculates the LBA of all file and directory entries in the directory record and returns the next LBA
 		 *	address.
@@ -120,7 +118,7 @@ namespace iso
 		 *	*srcfile	- Path and filename to the source file.
 		 *  attributes  - GMT offset/XA permissions for the file, if applicable.
 		 */
-		bool AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes, const char *trackid = nullptr);
+		bool AddFileEntry(const char* id, EntryType type, const fs::path& srcfile, const EntryAttributes& attributes, const char *trackid = nullptr);
 
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.
@@ -148,7 +146,7 @@ namespace iso
 		 *
 		 *	Returns: Pointer to another DirTreeClass for accessing the directory record of the subdirectory.
 		 */
-		DirTreeClass* AddSubDirEntry(const char* id, const std::filesystem::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists);
+		DirTreeClass* AddSubDirEntry(const char* id, const fs::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists);
 
 		/**	Writes the source files assigned to the directory entries to a CD image. Its recommended to execute
 		 *	this first before writing the actual file system.

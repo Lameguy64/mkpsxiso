@@ -19,7 +19,7 @@ class VirtualWavEx : public VirtualWav {
     unique_file pcmFp;
 };
 
-MA_API ma_result ma_decoder_init_path_pcm(const std::filesystem::path& pFilePath, ma_decoder_config* pConfig, ma_decoder* pDecoder, VirtualWavEx *pUserData);
+MA_API ma_result ma_decoder_init_path_pcm(const fs::path& pFilePath, ma_decoder_config* pConfig, ma_decoder* pDecoder, VirtualWavEx *pUserData);
 #endif
 
 #if defined(MINIAUDIO_IMPLEMENTATION) || defined(MA_IMPLEMENTATION)
@@ -206,7 +206,7 @@ MA_API ma_result ma_decoder_init_FILE_pcm(FILE *file, ma_decoder_config* pConfig
 }
 #ifdef __cplusplus
 // feed to pcm file to miniaudio as a wav file
-MA_API ma_result ma_decoder_init_path_pcm(const std::filesystem::path& pFilePath, ma_decoder_config* pConfig, ma_decoder* pDecoder, VirtualWavEx *pUserData)
+MA_API ma_result ma_decoder_init_path_pcm(const fs::path& pFilePath, ma_decoder_config* pConfig, ma_decoder* pDecoder, VirtualWavEx *pUserData)
 {
     unique_file file(OpenFile(pFilePath, "rb"));
     if(!file)

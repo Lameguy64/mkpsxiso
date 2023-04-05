@@ -3,9 +3,8 @@
 
 #include "cd.h"
 #include "mmappedfile.h"
-
+#include "fs.h"
 #include <ThreadPool.h>
-#include <filesystem>
 #include <forward_list>
 #include <memory>
 
@@ -79,7 +78,7 @@ public:
 
 	IsoWriter() = default;
 
-	bool Create(const std::filesystem::path& fileName, unsigned int sizeLBA);
+	bool Create(const fs::path& fileName, unsigned int sizeLBA);
 	void Close();
 
 	std::unique_ptr<SectorView> GetSectorViewM2F1(unsigned int offsetLBA, unsigned int sizeLBA, EdcEccForm edcEccForm) const;

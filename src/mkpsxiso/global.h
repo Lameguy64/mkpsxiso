@@ -8,7 +8,6 @@ namespace global {
 	extern time_t	BuildTime;
 	extern int		QuietMode;
 	extern int		noXA;
-	extern int		NoLimit;
 	extern int		trackNum;
 };
 

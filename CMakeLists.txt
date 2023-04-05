@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.20)
 project(
 	mkpsxiso
 	LANGUAGES    C CXX
-	VERSION      2.02
+	VERSION      2.03
 	DESCRIPTION  "PlayStation ISO image maker & dumping tool"
 	HOMEPAGE_URL "https://github.com/Lameguy64/mkpsxiso"
 )
@@ -28,6 +28,10 @@ endif()
 
 if(NOT EXISTS ${PROJECT_SOURCE_DIR}/miniaudio/miniaudio.h)
 	message(FATAL_ERROR "The miniaudio directory is empty. Run 'git submodule update --init --recursive' to populate it.")
+endif()
+
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ghc/include/ghc/filesystem.hpp)
+	message(FATAL_ERROR "The ghc directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
 if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ThreadPool/ThreadPool.h)
@@ -60,16 +64,21 @@ if(NOT MKPSXISO_NO_LIBFLAC)
 	add_subdirectory(flac EXCLUDE_FROM_ALL)
 endif()
 
+# Add ghc to support filesystem on MacOS
+add_subdirectory(ghc EXCLUDE_FROM_ALL)
+
 ## Internal dependencies
 
 # Populate shared files
 add_library(iso_shared OBJECT
 	${shared_dir}/common.cpp
+	${shared_dir}/fs.cpp
 	${shared_dir}/mmappedfile.cpp
 	${shared_dir}/platform.cpp
 )
 target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
+target_link_libraries(iso_shared ghc_filesystem)
 
 find_package(Threads REQUIRED)
 
@@ -82,7 +91,6 @@ add_executable(mkpsxiso
 	${mkpsxiso_dir}/main.cpp
 )
 target_include_directories(mkpsxiso PUBLIC "miniaudio" "ThreadPool")
-
 target_link_libraries(mkpsxiso tinyxml2 iso_shared Threads::Threads)
 if(MINGW)
 	target_link_libraries(mkpsxiso "-municode")

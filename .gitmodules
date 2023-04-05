@@ -6,7 +6,10 @@
 	url = https://github.com/mackron/miniaudio
 [submodule "flac"]
 	path = flac
-	url = https://github.com/CookiePLMonster/flac
+	url = https://github.com/xiph/flac
+[submodule "ghc"]
+	path = ghc
+	url = https://github.com/gulrak/filesystem
 [submodule "ThreadPool"]
 	path = ThreadPool
-	url = https://github.com/progschj/ThreadPool.git
+	url = https://github.com/progschj/ThreadPool

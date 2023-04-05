@@ -4,14 +4,14 @@
 #include "miniaudio.h"
 #include "miniaudio_pcm.h"
 
-ma_result ma_decoder_init_path(const std::filesystem::path& pFilePath, const ma_decoder_config* pConfig, ma_decoder* pDecoder);
+ma_result ma_decoder_init_path(const fs::path& pFilePath, const ma_decoder_config* pConfig, ma_decoder* pDecoder);
 
-ma_result ma_redbook_decoder_init_path_by_ext(const std::filesystem::path& filePath, ma_decoder* pDecoder, VirtualWavEx *vw, bool& isLossy);
+ma_result ma_redbook_decoder_init_path_by_ext(const fs::path& filePath, ma_decoder* pDecoder, VirtualWavEx *vw, bool& isLossy);
 
 #if defined(MINIAUDIO_IMPLEMENTATION) || defined(MA_IMPLEMENTATION)
 
 // Helper wrapper to simplify dealing with paths on Windows
-ma_result ma_decoder_init_path(const std::filesystem::path& pFilePath, const ma_decoder_config* pConfig, ma_decoder* pDecoder)
+ma_result ma_decoder_init_path(const fs::path& pFilePath, const ma_decoder_config* pConfig, ma_decoder* pDecoder)
 {
 #ifdef _WIN32
 	return ma_decoder_init_file_w(pFilePath.c_str(), pConfig, pDecoder);
@@ -28,7 +28,7 @@ typedef enum {
 } DecoderAudioFormats;
 
 // Helper wrapper to open as redbook (44100kHz stereo s16le) audio and use the file extension to determine the order to try decoders
-ma_result ma_redbook_decoder_init_path_by_ext(const std::filesystem::path& filePath, ma_decoder* pDecoder, VirtualWavEx *vw, bool& isLossy)
+ma_result ma_redbook_decoder_init_path_by_ext(const fs::path& filePath, ma_decoder* pDecoder, VirtualWavEx *vw, bool& isLossy)
 {
 	ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_s16, 2, 44100);	
 	isLossy = false;

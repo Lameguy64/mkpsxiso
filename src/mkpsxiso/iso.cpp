@@ -63,7 +63,7 @@ static T RoundToEven(T val)
 	return (val + 1) & -2;
 }
 
-int iso::DirTreeClass::GetAudioSize(const std::filesystem::path& audioFile)
+int iso::DirTreeClass::GetAudioSize(const fs::path& audioFile)
 {
 	ma_decoder decoder;
 	VirtualWavEx vw;
@@ -113,7 +113,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	return entries.back();
 }
 
-bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const std::filesystem::path& srcfile, const EntryAttributes& attributes, const char *trackid)
+bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::path& srcfile, const EntryAttributes& attributes, const char *trackid)
 {
     auto fileAttrib = Stat(srcfile);
     if ( !fileAttrib )
@@ -264,21 +264,20 @@ void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
 	entriesInDir.emplace_back(entries.back());
 }
 
-iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::filesystem::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists)
+iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::path& srcDir, const EntryAttributes& attributes, bool& alreadyExists)
 {
 	// Duplicate directory entries are allowed, but the subsequent occurences will not add
 	// a new directory to 'entries'.
 	// TODO: It's not possible now, but a warning should be issued if entry attributes are specified for the subsequent occurences
 	// of the directory. This check probably needs to be moved outside of the function.
-	auto currentSubdir = std::find_if(entries.begin(), entries.end(), [id](const auto& e)
-		{
-			return e.type == EntryType::EntryDir && e.id == id;
-		});
-
-	if (currentSubdir != entries.end())
+	for(auto& e : entriesInDir)
 	{
-		alreadyExists = true;
-		return currentSubdir->subdir.get();
+		const iso::DIRENTRY& entry = e.get();
+		if((entry.type == EntryType::EntryDir) && (entry.id == id))
+		{
+			alreadyExists = true;
+			return entry.subdir.get();
+		}
 	}
 
 	auto fileAttrib = Stat(srcDir);
@@ -299,7 +298,6 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const std::
 			}
 
 			printf( "WARNING: 'source' attribute for subdirectory '%s' is invalid or empty.\n", id );
-			fflush(stdout);
 		}
 	}
 
@@ -342,20 +340,6 @@ void iso::DirTreeClass::PrintRecordPath()
 
 int iso::DirTreeClass::CalculateTreeLBA(int lba)
 {
-	bool passedSector = false;
-	lba += GetSizeInSectors(CalculateDirEntryLen(&passedSector));
-
-	if ( ( global::NoLimit == false) && passedSector )
-	{
-		if (!global::QuietMode)
-			printf("      ");
-
-		printf("WARNING: Directory record ");
-		PrintRecordPath();
-		printf(" exceeds 2048 bytes.\n");
-		fflush(stdout);
-	}
-
 	bool firstDAWritten = false;
 	for ( DIRENTRY& entry : entries )
 	{
@@ -394,7 +378,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 	return lba;
 }
 
-int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
+int iso::DirTreeClass::CalculateDirEntryLen() const
 {
 	int dirEntryLen = 68;
 
@@ -428,11 +412,6 @@ int iso::DirTreeClass::CalculateDirEntryLen(bool* passedSector) const
 		}
 
 		dirEntryLen += dataLen;
-	}
-
-	if (dirEntryLen > 2048 && passedSector != nullptr)
-	{
-		*passedSector = true;
 	}
 
 	return 2048 * GetSizeInSectors(dirEntryLen);
@@ -636,7 +615,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				if ( !global::QuietMode )
 				{
 					printf( "      Packing %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
-					fflush(stdout);
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -651,7 +629,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				if ( !global::QuietMode )
 				{
 					printf("Done.\n");
-					fflush(stdout);
 				}
 
 			}
@@ -664,7 +641,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			if ( !global::QuietMode )
 			{
 				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
-				fflush(stdout);
 			}
 
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -679,7 +655,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			if (!global::QuietMode)
 			{
 				printf( "Done.\n" );
-				fflush(stdout);
 			}
 
 		// Write data only STR streams as Mode 2 Form 1
@@ -691,7 +666,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				if ( !global::QuietMode )
 				{
 					printf( "      Packing XA-DO %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
-					fflush(stdout);
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -707,7 +681,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				if ( !global::QuietMode )
 				{
 					printf("Done.\n");
-					fflush(stdout);
 				}
 
 			}

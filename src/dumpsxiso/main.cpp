@@ -10,12 +10,12 @@
 
 
 #include <string>
-#include <filesystem>
 #include <map>
 #include <memory>
 
 #include "platform.h"
 #include "common.h"
+#include "fs.h"
 #include "cd.h"
 #include "xa.h"
 #include "cdreader.h"
@@ -59,16 +59,16 @@ const unsigned SUPPORTED_CODECS  = (BUILTIN_CODECS | LIBFLAC_SUPPORTED);
 
 namespace param {
 
-    std::filesystem::path isoFile;
-    std::filesystem::path outPath;
-    std::filesystem::path xmlFile;
+    fs::path isoFile;
+    fs::path outPath;
+    fs::path xmlFile;
     bool outputSortedByDir = false;
 	EncoderAudioFormats encodingFormat = EAF_WAV;
 }
 
-std::filesystem::path GetRealDAFilePath(const std::filesystem::path& inputPath)
+fs::path GetRealDAFilePath(const fs::path& inputPath)
 {
-	std::filesystem::path outputPath(inputPath); 
+	fs::path outputPath(inputPath); 
 	if(param::encodingFormat == EAF_WAV)
 	{
 		outputPath.replace_extension(".WAV");
@@ -160,7 +160,7 @@ std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
 }
 
 void SaveLicense(const cd::ISO_LICENSE& license) {
-    const std::filesystem::path outputPath = param::outPath / "license_data.dat";
+    const fs::path outputPath = param::outPath / "license_data.dat";
 
 	FILE* outFile = OpenFile(outputPath, "wb");
 
@@ -405,7 +405,7 @@ static EntryType GetXAEntryType(unsigned short xa_attr)
 }
 
 std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, int offs, int sectors,
-	const std::filesystem::path& path)
+	const fs::path& path)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
     dirEntries->ReadDirEntries(&reader, offs, sectors);
@@ -437,11 +437,11 @@ std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd:
 	return dirEntries;
 }
 
-void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entry>& files, const std::filesystem::path& rootPath)
+void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entry>& files, const fs::path& rootPath)
 {
     for (const auto& entry : files)
 	{
-		const std::filesystem::path outputPath = rootPath / entry.virtualPath / CleanIdentifier(entry.identifier);
+		const fs::path outputPath = rootPath / entry.virtualPath / CleanIdentifier(entry.identifier);
         if (entry.subdir == nullptr) // Do not extract directories, they're already prepared
 		{
 			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", entry.identifier.c_str(), outputPath.lexically_normal().c_str());
@@ -580,7 +580,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 	// else directories will have their timestamps discarded when files are being unpacked into them!
 	for (const auto& entry : files)
 	{
-		std::filesystem::path toChange(rootPath / entry.virtualPath / CleanIdentifier(entry.identifier));
+		fs::path toChange(rootPath / entry.virtualPath / CleanIdentifier(entry.identifier));
 		const EntryType type = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
 		if(type == EntryType::EntryDA)
 		{
@@ -590,12 +590,12 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 	}
 }
 
-tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement* dirElement, std::filesystem::path* currentVirtualPath,
-	const std::filesystem::path& sourcePath, const std::string& trackid, EntryAttributeCounters& attributeCounters)
+tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement* dirElement, fs::path* currentVirtualPath,
+	const fs::path& sourcePath, const std::string& trackid, EntryAttributeCounters& attributeCounters)
 {
 	tinyxml2::XMLElement* newelement;
 
-	const std::filesystem::path outputPath = sourcePath / entry.virtualPath / CleanIdentifier(entry.identifier);
+	const fs::path outputPath = sourcePath / entry.virtualPath / CleanIdentifier(entry.identifier);
 	const EntryType entryType = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
 	if (entryType == EntryType::EntryDir)
 	{
@@ -654,10 +654,10 @@ void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement)
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 }
 
-void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, unsigned int& expectedLBA,
+void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
 	EntryAttributeCounters& attributeCounters)
 {
-	std::filesystem::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
+	fs::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
 	unsigned tracknum = 2;
 	for (const auto& entry : files)
 	{
@@ -684,8 +684,8 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 		}
 
 		// Work out the relative position between the current directory and the element to create
-		const std::filesystem::path relative = entry.virtualPath.lexically_relative(currentVirtualPath);
-		for (const std::filesystem::path& part : relative)
+		const fs::path relative = entry.virtualPath.lexically_relative(currentVirtualPath);
+		for (const fs::path& part : relative)
 		{
 			if (part == "..")
 			{
@@ -711,7 +711,7 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 	}
 }
 
-void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElement* dirElement, const std::filesystem::path& sourcePath, unsigned int& expectedLBA,
+void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
 	EntryAttributeCounters& attributeCounters)
 {
 	unsigned tracknum = 2;
@@ -786,10 +786,10 @@ void ParseISO(cd::IsoReader& reader) {
 	// Prepare output directories
 	for(size_t i=0; i<numEntries; i++)
 	{
-		const std::filesystem::path dirPath = param::outPath / pathTable.GetFullDirPath(i);
+		const fs::path dirPath = param::outPath / pathTable.GetFullDirPath(i);
 
 		std::error_code ec;
-		std::filesystem::create_directories(dirPath, ec);
+		fs::create_directories(dirPath, ec);
 	}
 
     printf("ISO contents:\n\n");
@@ -838,6 +838,7 @@ void ParseISO(cd::IsoReader& reader) {
 				setAttributeIfNotEmpty(xml::attrib::VOLUME_SET, CleanDescElement(descriptor.volumeSetIdentifier));
 				setAttributeIfNotEmpty(xml::attrib::PUBLISHER, CleanDescElement(descriptor.publisherIdentifier));
 				setAttributeIfNotEmpty(xml::attrib::DATA_PREPARER, CleanDescElement(descriptor.dataPreparerIdentifier));
+				setAttributeIfNotEmpty(xml::attrib::COPYRIGHT, CleanDescElement(descriptor.copyrightFileIdentifier));
 				newElement->SetAttribute(xml::attrib::CREATION_DATE, LongDateToString(descriptor.volumeCreateDate).c_str());
 				if (auto ZERO_DATE = GetUnspecifiedLongDate(); memcmp(&descriptor.volumeModifyDate, &ZERO_DATE, sizeof(descriptor.volumeModifyDate)) != 0)
 				{
@@ -846,7 +847,7 @@ void ParseISO(cd::IsoReader& reader) {
 				}
 			}
 
-			const std::filesystem::path xmlPath = param::xmlFile.parent_path().lexically_normal();
+			const fs::path xmlPath = param::xmlFile.parent_path().lexically_normal();
 
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
@@ -857,7 +858,7 @@ void ParseISO(cd::IsoReader& reader) {
 			// Create <default_attributes> now so it lands before the directory tree
 			tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
 
-			const std::filesystem::path sourcePath = param::outPath.lexically_proximate(xmlPath);
+			const fs::path sourcePath = param::outPath.lexically_proximate(xmlPath);
 
 			// process DA "files" to tracks and add to the dirs so the XML looks nicer
 			std::vector<std::list<cd::IsoDirEntries::Entry>::const_iterator> dafiles;
@@ -883,7 +884,7 @@ void ParseISO(cd::IsoReader& reader) {
 				// add back in to the rest of the files
 				for(auto it = entries.begin(); it != entries.end(); ++it)
 				{
-				    std::filesystem::path vpath = (*it).virtualPath / CleanIdentifier((*it).identifier);
+				    fs::path vpath = (*it).virtualPath / CleanIdentifier((*it).identifier);
 					if(dafile->virtualPath == vpath)
 					{
 						do {
@@ -1033,7 +1034,7 @@ int Main(int argc, char *argv[])
 
 		if (param::isoFile.empty())
 		{
-			param::isoFile = std::filesystem::u8path(*args);
+			param::isoFile = fs::u8path(*args);
 		}
 		else
 		{

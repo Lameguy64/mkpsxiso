@@ -18,7 +18,7 @@ ISO_UINT_PAIR cd::SetPair32(unsigned int val) {
 	return { val, SwapBytes32(val) };
 }
 
-bool IsoWriter::Create(const std::filesystem::path& fileName, unsigned int sizeLBA)
+bool IsoWriter::Create(const fs::path& fileName, unsigned int sizeLBA)
 {
 	const uint64_t sizeBytes = static_cast<uint64_t>(sizeLBA) * CD_SECTOR_SIZE;
 
