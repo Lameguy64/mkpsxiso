@@ -842,7 +842,7 @@ void ParseISO(cd::IsoReader& reader) {
 
 
 	std::list<cd::IsoDirEntries::Entry> entries;
-	std::unique_ptr<cd::IsoDirEntries> rootDir = (param::aggressive
+	std::unique_ptr<cd::IsoDirEntries> rootDir = (param::pathTable
 		?	ParseRootPathTable(reader, ListView(entries), pathTable.pathTableList)
 		: ParseRoot(reader,
 					ListView(entries),
@@ -1012,8 +1012,8 @@ int Main(int argc, char *argv[])
 		"  -s <path>  - Outputs an MKPSXISO compatible XML script for later rebuilding.\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
 		"  -e|--encode <codec> - Codec to encode CDDA/DA audio. wave is default. Supported codecs: " SUPPORTED_CODEC_TEXT "\n"
-		"  -h|--help  - Show this help text\n" +
-    "  -pt|--pathTable - instead of going throught the file system, go to every know directory in order; helps with deobfuscating";
+		"  -h|--help  - Show this help text\n"
+    "  -pt|--pathTable - instead of going throught the file system, go to every know directory in order; helps with deobfuscating\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
 			"2017 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
