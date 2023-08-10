@@ -321,6 +321,42 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 		});
 }
 
+void cd::IsoDirEntries::ReadDirEntriesSkip(cd::IsoReader* reader, int lba, int sectors)
+{
+	size_t numEntries = 0; // Used to skip the first two entries, . and ..
+    for (int sec = 0; sec < sectors; sec++)
+    {
+        reader->SeekToSector(lba + sec);
+		while (true)
+		{
+			auto entry = ReadEntry(reader);
+			if (!entry)
+			{
+				// Either end of the table, or end of sector
+				break;
+			}
+
+			// skip folders, we make them manually
+			if (numEntries++ >= 2 && !(entry->entry.flags & 0x2))
+			{
+				dirEntryList.emplace(std::move(entry.value()));
+			}
+		}
+    }
+
+	// Sort the directory by LBA for pretty printing
+	dirEntryList.SortView([](const auto& left, const auto& right)
+		{
+			return left.get().entry.entryOffs.lsb < right.get().entry.entryOffs.lsb;
+		});
+}
+
+std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadSingleEntry(cd::IsoReader* reader, int lba, int sectors)
+{
+    reader->SeekToSector(lba + sectors);
+		return ReadEntry(reader);
+}
+
 std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoReader* reader) const
 {
 	Entry entry;

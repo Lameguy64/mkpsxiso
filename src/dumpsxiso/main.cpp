@@ -10,6 +10,7 @@
 
 
 #include <string>
+#include <vector>
 #include <map>
 #include <memory>
 
@@ -63,6 +64,7 @@ namespace param {
     fs::path outPath;
     fs::path xmlFile;
     bool outputSortedByDir = false;
+		bool pathTable = false;
 	EncoderAudioFormats encodingFormat = EAF_WAV;
 }
 
@@ -425,6 +427,37 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 	return dirEntries;
 }
 
+std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList, int index,
+   const fs::path& path) {
+    auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
+
+    dirEntries->ReadDirEntriesSkip(&reader, pathTableList[index].entry.dirOffs, 1);
+  
+    for (auto& e : dirEntries->dirEntryList.GetView()) {
+    		auto& entry = e.get();
+        printf("id: %s, path: %s, index: %d\n", entry.identifier.c_str(), path.c_str(), index);
+    
+
+    		entry.virtualPath = path;
+    }
+  
+    for (int i = 1; i < pathTableList.size(); i++) {
+        auto& e = pathTableList[i];
+        if (e.entry.parentDirIndex - 1 == index) {
+            auto rawEntry = dirEntries->ReadSingleEntry(&reader, e.entry.dirOffs, e.entry.extLength);
+
+            if (!rawEntry) { continue; }
+
+            auto& entry = dirEntries->dirEntryList.emplace(std::move(rawEntry.value()));
+
+        		entry.virtualPath = path;
+            entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, i, path / e.name);
+        }
+    } 
+
+    return dirEntries;  
+}
+
 std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, int offs)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
@@ -435,6 +468,19 @@ std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd:
 		CleanIdentifier(entry.identifier));
 
 	return dirEntries;
+}
+
+std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList)
+{ 
+    auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
+    dirEntries->ReadRootDir(&reader, pathTableList[0].entry.dirOffs);
+
+  	auto& entry = dirEntries->dirEntryList.GetView().front().get();
+
+    entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, 0,
+    CleanIdentifier(entry.identifier));
+    
+  	return dirEntries;
 }
 
 void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entry>& files, const fs::path& rootPath)
@@ -796,9 +842,11 @@ void ParseISO(cd::IsoReader& reader) {
 
 
 	std::list<cd::IsoDirEntries::Entry> entries;
-	std::unique_ptr<cd::IsoDirEntries> rootDir = ParseRoot(reader,
+	std::unique_ptr<cd::IsoDirEntries> rootDir = (param::aggressive
+		?	ParseRootPathTable(reader, ListView(entries), pathTable.pathTableList)
+		: ParseRoot(reader,
 					ListView(entries),
-					descriptor.rootDirRecord.entryOffs.lsb);
+					descriptor.rootDirRecord.entryOffs.lsb));
 
 	// Sort files by LBA for "strict" output
 	entries.sort([](const auto& left, const auto& right)
@@ -964,7 +1012,8 @@ int Main(int argc, char *argv[])
 		"  -s <path>  - Outputs an MKPSXISO compatible XML script for later rebuilding.\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
 		"  -e|--encode <codec> - Codec to encode CDDA/DA audio. wave is default. Supported codecs: " SUPPORTED_CODEC_TEXT "\n"
-		"  -h|--help  - Show this help text\n";
+		"  -h|--help  - Show this help text\n" +
+    "  -pt|--pathTable - instead of going throught the file system, go to every know directory in order; helps with deobfuscating";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
 			"2017 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
@@ -982,6 +1031,11 @@ int Main(int argc, char *argv[])
 		// Is it a switch?
 		if ((*args)[0] == '-')
 		{
+			if (ParseArgument(args, "pt", "pathTable"))
+			{
+        param::pathTable = true;
+        continue;
+			}
 			if (ParseArgument(args, "h", "help"))
 			{
 				printf(HELP_TEXT);
