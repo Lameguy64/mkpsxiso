@@ -337,7 +337,7 @@ void cd::IsoDirEntries::ReadDirEntriesSkip(cd::IsoReader* reader, int lba, int s
 			}
 
 			// skip folders, we make them manually
-			if (numEntries++ >= 2 && !(entry->entry.flags & 0x2))
+			if (numEntries++ >= 2 && !(entry.value().entry.flags & 0x2))
 			{
 				dirEntryList.emplace(std::move(entry.value()));
 			}
@@ -349,12 +349,6 @@ void cd::IsoDirEntries::ReadDirEntriesSkip(cd::IsoReader* reader, int lba, int s
 		{
 			return left.get().entry.entryOffs.lsb < right.get().entry.entryOffs.lsb;
 		});
-}
-
-std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadSingleEntry(cd::IsoReader* reader, int lba, int sectors)
-{
-    reader->SeekToSector(lba + sectors);
-		return ReadEntry(reader);
 }
 
 std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoReader* reader) const

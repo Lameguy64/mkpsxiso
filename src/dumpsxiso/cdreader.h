@@ -103,7 +103,6 @@ namespace cd {
         void ReadDirEntries(cd::IsoReader* reader, int lba, int sectors);
         void ReadRootDir(cd::IsoReader* reader, int lba);
         void ReadDirEntriesSkip(cd::IsoReader* reader, int lba, int sectors);
-        std::optional<cd::IsoDirEntries::Entry> ReadSingleEntry(cd::IsoReader* reader, int lba, int sectors);
 
 
     private:

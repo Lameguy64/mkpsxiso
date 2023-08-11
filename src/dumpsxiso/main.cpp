@@ -431,28 +431,41 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
    const fs::path& path) {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
 
-    dirEntries->ReadDirEntriesSkip(&reader, pathTableList[index].entry.dirOffs, 1);
-  
-    for (auto& e : dirEntries->dirEntryList.GetView()) {
-    		auto& entry = e.get();
-
-    		entry.virtualPath = path;
-    }
+		int sec = pathTableList[index].entry.extLength 
+				? pathTableList[index].entry.extLength 
+				: 1;
+	  dirEntries->ReadDirEntriesSkip(&reader, pathTableList[index].entry.dirOffs, sec);
   
     for (int i = 1; i < pathTableList.size(); i++) {
         auto& e = pathTableList[i];
         if (e.entry.parentDirIndex - 1 == index) {
-            auto rawEntry = dirEntries->ReadSingleEntry(&reader, e.entry.dirOffs, e.entry.extLength);
-
-            if (!rawEntry) { continue; }
-
-            auto& entry = dirEntries->dirEntryList.emplace(std::move(rawEntry.value()));
-
-        		entry.virtualPath = path;
-            entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, i, path / e.name);
+            dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
         }
     } 
 
+    for (auto& e : dirEntries->dirEntryList.GetView()) {
+    		auto& entry = e.get();
+										
+    		entry.virtualPath = path;
+
+        if (entry.entry.flags & 0x2) {
+						int index = -1;
+						std::string s = "";
+						for (int i = 1; i < pathTableList.size(); i++) {
+								auto& ee = pathTableList[i];
+								if (ee.entry.dirOffs == entry.entry.entryOffs.lsb) {
+										index = i;
+										s = ee.name;
+										break;
+								}
+						}
+
+						if (index < 0) continue;
+				
+						entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, index, path / s);				
+				}
+    }
+  
     return dirEntries;  
 }
 
