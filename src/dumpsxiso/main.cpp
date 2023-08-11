@@ -435,8 +435,6 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
   
     for (auto& e : dirEntries->dirEntryList.GetView()) {
     		auto& entry = e.get();
-        printf("id: %s, path: %s, index: %d\n", entry.identifier.c_str(), path.c_str(), index);
-    
 
     		entry.virtualPath = path;
     }
