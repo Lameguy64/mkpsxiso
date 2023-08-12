@@ -461,6 +461,7 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 						}
 
 						if (index < 0) continue;
+						entry.identifier = s;
 				
 						entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, index, path / s);				
 				}
