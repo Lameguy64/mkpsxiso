@@ -107,6 +107,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
+	entry.flba = attributes.FLBA;
 
 	entries.emplace_back( std::move(entry) );
 
@@ -221,6 +222,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
+	entry.flba		= attributes.FLBA;
 
 	if ( !srcfile.empty() )
 	{
@@ -344,7 +346,9 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 	for ( DIRENTRY& entry : entries )
 	{
 		// Set current LBA to directory record entry
-		entry.lba = lba;
+		entry.lba = (entry.flba)
+			? entry.flba
+			: lba;
 
 		// If it is a subdir
 		if (entry.subdir != nullptr)
@@ -354,18 +358,22 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 				entry.subdir->name = entry.id;
 			}
 
-			lba += GetSizeInSectors(entry.subdir->CalculateDirEntryLen());
+			lba += GetSizeInSectors(entry.subdir->CalculateDirEntryLen());		
 		}
 		else
 		{
 			// Increment LBA by the size of file
 			if ( entry.type == EntryType::EntryFile || entry.type == EntryType::EntryXA_DO || entry.type == EntryType::EntryDummy )
-			{
-				lba += GetSizeInSectors(entry.length, 2048);
+			{	
+				lba += (entry.flba)
+					? entry.flba - lba + GetSizeInSectors(entry.length, 2048)
+					: GetSizeInSectors(entry.length, 2048);					
 			}
 			else if ( entry.type == EntryType::EntryXA )
 			{
-				lba += GetSizeInSectors(entry.length, 2336);
+				lba += (entry.flba)
+					? entry.flba - lba + GetSizeInSectors(entry.length, 2336)
+					: GetSizeInSectors(entry.length, 2336);					
 			}
 			else if ( entry.type == EntryType::EntryDA )
 			{
@@ -614,6 +622,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			{
 				if ( !global::QuietMode )
 				{
+					printf(" offset %d", entry.lba);
 					printf( "      Packing %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 				}
 

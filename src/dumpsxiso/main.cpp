@@ -653,6 +653,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 {
 	tinyxml2::XMLElement* newelement;
 
+			
 	const fs::path outputPath = sourcePath / entry.virtualPath / CleanIdentifier(entry.identifier);
 	const EntryType entryType = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
 	if (entryType == EntryType::EntryDir)
@@ -690,6 +691,10 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 
 		if (entryType == EntryType::EntryXA)
 		{
+			if (param::pathTable) {
+				 newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
+			}
+
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "mixed");
 		}
 		else if (entryType == EntryType::EntryDA)
@@ -698,6 +703,10 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 		}
 		else if (entryType == EntryType::EntryFile)
 		{
+			if (param::pathTable) {
+				 newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
+			}
+
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
 		}
 	}
