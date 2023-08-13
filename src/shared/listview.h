@@ -41,6 +41,12 @@ public:
 		std::sort(m_view.begin(), m_view.end(), std::forward<Compare>(comp));
 	}
 
+	void ClearView() {
+		size_t length = m_view.size();
+		m_view.clear();
+		m_list.resize(m_list.size() - length);
+	}
+
 	// Access to the view.
 	std::vector<std::reference_wrapper<type>>& GetView() { return m_view; }
 	const std::vector<std::reference_wrapper<type>>& GetView() const { return m_view; }
