@@ -445,7 +445,6 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 	
 		do {
 			  dirEntries->ReadDirEntriesSkip(&reader, pathTableList[index].entry.dirOffs, sec);
-				printf("index: %d, secs: %d, len: %d\n", index, sec, dirEntries->dirEntryList.GetView().size());
 				if (dirEntries->dirEntryList.GetView().size() == 0) {
 					break;
 				}

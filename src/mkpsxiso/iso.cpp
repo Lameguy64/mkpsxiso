@@ -622,7 +622,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			{
 				if ( !global::QuietMode )
 				{
-					printf(" offset %d", entry.lba);
 					printf( "      Packing %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
 				}
 
