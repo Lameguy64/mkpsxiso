@@ -480,7 +480,7 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 
         if (entry.entry.flags & 0x2) {
 						int index = -1;
-						std::string s = "";
+						std::string s;
 						for (int i = 1; i < pathTableList.size(); i++) {
 								auto& ee = pathTableList[i];
 								if (ee.entry.dirOffs == entry.entry.entryOffs.lsb) {
