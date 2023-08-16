@@ -100,9 +100,8 @@ namespace cd {
         ListView<Entry> dirEntryList;
 
         IsoDirEntries(ListView<Entry> view);
-        void ReadDirEntries(cd::IsoReader* reader, int lba, int sectors);
+        void ReadDirEntries(cd::IsoReader* reader, int lba, int sectors, bool skipFolders);
         void ReadRootDir(cd::IsoReader* reader, int lba);
-        void ReadDirEntriesSkip(cd::IsoReader* reader, int lba, int sectors);
 
 
     private:

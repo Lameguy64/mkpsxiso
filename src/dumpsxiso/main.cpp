@@ -410,7 +410,7 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 	const fs::path& path)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
-    dirEntries->ReadDirEntries(&reader, offs, sectors);
+    dirEntries->ReadDirEntries(&reader, offs, sectors, false);
 
     for (auto& e : dirEntries->dirEntryList.GetView())
 	{
@@ -444,7 +444,7 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 		}
 	
 		do {
-			  dirEntries->ReadDirEntriesSkip(&reader, pathTableList[index].entry.dirOffs, sec);
+			  dirEntries->ReadDirEntries(&reader, pathTableList[index].entry.dirOffs, sec, true);
 				if (dirEntries->dirEntryList.GetView().size() == 0) {
 					break;
 				}

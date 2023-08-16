@@ -292,7 +292,7 @@ cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
 {
 }
 
-void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors)
+void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors, bool skipFolders)
 {
 	size_t numEntries = 0; // Used to skip the first two entries, . and ..
     for (int sec = 0; sec < sectors; sec++)
@@ -307,37 +307,7 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 				break;
 			}
 
-			if (numEntries++ >= 2)
-			{
-				dirEntryList.emplace(std::move(entry.value()));
-			}
-		}
-    }
-
-	// Sort the directory by LBA for pretty printing
-	dirEntryList.SortView([](const auto& left, const auto& right)
-		{
-			return left.get().entry.entryOffs.lsb < right.get().entry.entryOffs.lsb;
-		});
-}
-
-void cd::IsoDirEntries::ReadDirEntriesSkip(cd::IsoReader* reader, int lba, int sectors)
-{
-	size_t numEntries = 0; // Used to skip the first two entries, . and ..
-    for (int sec = 0; sec < sectors; sec++)
-    {
-        reader->SeekToSector(lba + sec);
-		while (true)
-		{
-			auto entry = ReadEntry(reader);
-			if (!entry)
-			{
-				// Either end of the table, or end of sector
-				break;
-			}
-
-			// skip folders, we make them manually
-			if (numEntries++ >= 2 && !(entry.value().entry.flags & 0x2))
+			if (numEntries++ >= 2 && !(skipFolders && entry.value().entry.flags & 0x2))
 			{
 				dirEntryList.emplace(std::move(entry.value()));
 			}
