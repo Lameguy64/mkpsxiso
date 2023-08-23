@@ -681,7 +681,6 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 {
 	tinyxml2::XMLElement* newelement;
 
-			
 	const fs::path outputPath = sourcePath / entry.virtualPath / CleanIdentifier(entry.identifier);
 	const EntryType entryType = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
 	if (entryType == EntryType::EntryDir)
