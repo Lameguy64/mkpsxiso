@@ -342,6 +342,9 @@ void iso::DirTreeClass::PrintRecordPath()
 
 int iso::DirTreeClass::CalculateTreeLBA(int lba)
 {
+	int maxFlba = 0;
+	int sizeMax = 0;
+
 	bool firstDAWritten = false;
 	for ( DIRENTRY& entry : entries )
 	{
@@ -365,15 +368,21 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			// Increment LBA by the size of file
 			if ( entry.type == EntryType::EntryFile || entry.type == EntryType::EntryXA_DO || entry.type == EntryType::EntryDummy )
 			{	
-				lba += (entry.flba)
-					? entry.flba - lba + GetSizeInSectors(entry.length, 2048)
-					: GetSizeInSectors(entry.length, 2048);					
+				if (entry.flba > maxFlba) {
+					maxFlba = entry.flba;
+					sizeMax = GetSizeInSectors(entry.length, 2048);
+				}
+
+				lba += GetSizeInSectors(entry.length, 2048);
 			}
 			else if ( entry.type == EntryType::EntryXA )
 			{
-				lba += (entry.flba)
-					? entry.flba - lba + GetSizeInSectors(entry.length, 2336)
-					: GetSizeInSectors(entry.length, 2336);					
+				if (entry.flba > maxFlba) {
+					maxFlba = entry.flba;
+					sizeMax = GetSizeInSectors(entry.length, 2336);
+				}
+
+				lba += GetSizeInSectors(entry.length, 2336);
 			}
 			else if ( entry.type == EntryType::EntryDA )
 			{
@@ -382,6 +391,8 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			}
 		}
 	}
+	if (maxFlba)
+		return maxFlba + sizeMax;
 
 	return lba;
 }
