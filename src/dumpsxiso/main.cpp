@@ -876,7 +876,7 @@ void ParseISO(cd::IsoReader& reader) {
     size_t numEntries = pathTable.ReadPathTable(&reader, descriptor.pathTable1Offs);
 
 		std::vector<cd::IsoPathTable::Entry> sorted(pathTable.pathTableList);
-		std::sort(sorted.begin(), sorted.end(), [](auto& a, auto& b) {
+		std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
 				return a.entry.dirOffs < b.entry.dirOffs;	
 		});
 
