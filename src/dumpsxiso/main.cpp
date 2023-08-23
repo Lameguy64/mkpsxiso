@@ -1069,7 +1069,7 @@ int Main(int argc, char *argv[])
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
 		"  -e|--encode <codec> - Codec to encode CDDA/DA audio. wave is default. Supported codecs: " SUPPORTED_CODEC_TEXT "\n"
 		"  -h|--help  - Show this help text\n"
-		"  -pt|--pathTable - instead of going throught the file system, go to every known directory in order; helps with deobfuscating\n";
+		"  -pt|--path-table - instead of going through the file system, go to every known directory in order; helps with deobfuscating\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
 			"2017 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
@@ -1087,7 +1087,7 @@ int Main(int argc, char *argv[])
 		// Is it a switch?
 		if ((*args)[0] == '-')
 		{
-			if (ParseArgument(args, "pt", "pathTable"))
+			if (ParseArgument(args, "pt", "path-table"))
 			{
         param::pathTable = true;
         continue;
