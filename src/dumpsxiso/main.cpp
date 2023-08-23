@@ -431,9 +431,7 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
    const fs::path& path) {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
 
-		int sec = pathTableList[index].entry.extLength 
-				? pathTableList[index].entry.extLength 
-				: 1;		
+		int sec = std::max(1, (int)pathTableList[index].entry.extLength);
 
 		int sindex = -1;
 		for (int i = 1; i < pathTableList.size(); i++) {
