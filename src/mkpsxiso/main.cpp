@@ -873,6 +873,7 @@ EntryAttributes ReadEntryAttributes(EntryAttributes current, const tinyxml2::XML
 		getAttributeIfExists(current.XAPerm, xml::attrib::XA_PERMISSIONS);
 		getAttributeIfExists(current.GID, xml::attrib::XA_GID);
 		getAttributeIfExists(current.UID, xml::attrib::XA_UID);
+		getAttributeIfExists(current.FLBA, xml::attrib::OFFSET);
 	}
 
 	return current;
@@ -1430,6 +1431,7 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 {
 	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
+		
         if ( CompareICase( "file", dirElement->Name() ))
 		{
 			if (!ParseFileEntry(dirTree, dirElement, xmlPath, defaultAttributes, found_da))

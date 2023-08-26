@@ -107,6 +107,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
+	entry.flba = attributes.FLBA;
 
 	entries.emplace_back( std::move(entry) );
 
@@ -221,6 +222,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
+	entry.flba		= attributes.FLBA;
 
 	if ( !srcfile.empty() )
 	{
@@ -340,11 +342,16 @@ void iso::DirTreeClass::PrintRecordPath()
 
 int iso::DirTreeClass::CalculateTreeLBA(int lba)
 {
+	int maxFlba = 0;
+	int sizeMax = 0;
+
 	bool firstDAWritten = false;
 	for ( DIRENTRY& entry : entries )
 	{
 		// Set current LBA to directory record entry
-		entry.lba = lba;
+		entry.lba = (entry.flba)
+			? entry.flba
+			: lba;
 
 		// If it is a subdir
 		if (entry.subdir != nullptr)
@@ -354,17 +361,27 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 				entry.subdir->name = entry.id;
 			}
 
-			lba += GetSizeInSectors(entry.subdir->CalculateDirEntryLen());
+			lba += GetSizeInSectors(entry.subdir->CalculateDirEntryLen());		
 		}
 		else
 		{
 			// Increment LBA by the size of file
 			if ( entry.type == EntryType::EntryFile || entry.type == EntryType::EntryXA_DO || entry.type == EntryType::EntryDummy )
-			{
+			{	
+				if (entry.flba > maxFlba) {
+					maxFlba = entry.flba;
+					sizeMax = GetSizeInSectors(entry.length, 2048);
+				}
+
 				lba += GetSizeInSectors(entry.length, 2048);
 			}
 			else if ( entry.type == EntryType::EntryXA )
 			{
+				if (entry.flba > maxFlba) {
+					maxFlba = entry.flba;
+					sizeMax = GetSizeInSectors(entry.length, 2336);
+				}
+
 				lba += GetSizeInSectors(entry.length, 2336);
 			}
 			else if ( entry.type == EntryType::EntryDA )
@@ -374,6 +391,8 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			}
 		}
 	}
+	if (maxFlba)
+		return maxFlba + sizeMax;
 
 	return lba;
 }

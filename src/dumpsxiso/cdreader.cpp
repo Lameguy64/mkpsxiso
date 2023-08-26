@@ -292,7 +292,7 @@ cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
 {
 }
 
-void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors)
+void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors, bool skipFolders)
 {
 	size_t numEntries = 0; // Used to skip the first two entries, . and ..
     for (int sec = 0; sec < sectors; sec++)
@@ -307,7 +307,7 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 				break;
 			}
 
-			if (numEntries++ >= 2)
+			if (numEntries++ >= 2 && !(skipFolders && entry.value().entry.flags & 0x2))
 			{
 				dirEntryList.emplace(std::move(entry.value()));
 			}

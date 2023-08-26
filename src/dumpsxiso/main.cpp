@@ -10,6 +10,7 @@
 
 
 #include <string>
+#include <vector>
 #include <map>
 #include <memory>
 
@@ -63,6 +64,7 @@ namespace param {
     fs::path outPath;
     fs::path xmlFile;
     bool outputSortedByDir = false;
+		bool pathTable = false;
 	EncoderAudioFormats encodingFormat = EAF_WAV;
 }
 
@@ -408,7 +410,7 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 	const fs::path& path)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
-    dirEntries->ReadDirEntries(&reader, offs, sectors);
+    dirEntries->ReadDirEntries(&reader, offs, sectors, false);
 
     for (auto& e : dirEntries->dirEntryList.GetView())
 	{
@@ -425,6 +427,77 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 	return dirEntries;
 }
 
+std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList, std::vector<cd::IsoPathTable::Entry>& sorted, int index,
+   const fs::path& path) {
+    auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
+
+		int sec = std::max(1, (int)pathTableList[index].entry.extLength);
+
+		int sindex = -1;
+		for (int i = 1; i < pathTableList.size(); i++) {
+				if (sorted[i].name == pathTableList[index].name && sorted[i].entry.parentDirIndex == pathTableList[index].entry.parentDirIndex) {
+						sindex = i;
+						break;
+				}
+		}
+	
+		do {
+			  dirEntries->ReadDirEntries(&reader, pathTableList[index].entry.dirOffs, sec, true);
+				if (dirEntries->dirEntryList.GetView().size() == 0) {
+					break;
+				}
+		
+				auto& entry = dirEntries->dirEntryList.GetView().back().get();							
+
+				const bool isDA = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA;
+
+				if(!isDA && sindex >= 0 && sindex + 1 < pathTableList.size() && pathTableList[index].entry.extLength == 0)
+				{
+					if (sorted[sindex + 1].entry.dirOffs > entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb))
+					{
+							sec++;
+							dirEntries->dirEntryList.ClearView();
+							continue;
+					}
+				}
+
+				break;
+		} while (true);
+  
+    for (int i = 1; i < pathTableList.size(); i++) {
+        auto& e = pathTableList[i];
+        if (e.entry.parentDirIndex - 1 == index) {
+            dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
+        }
+    } 
+
+    for (auto& e : dirEntries->dirEntryList.GetView()) {
+    		auto& entry = e.get();
+										
+    		entry.virtualPath = path;
+
+        if (entry.entry.flags & 0x2) {
+						int index = -1;
+						std::string s;
+						for (int i = 1; i < pathTableList.size(); i++) {
+								auto& ee = pathTableList[i];
+								if (ee.entry.dirOffs == entry.entry.entryOffs.lsb) {
+										index = i;
+										s = ee.name;
+										break;
+								}
+						}
+
+						if (index < 0) continue;
+						entry.identifier = s;
+				
+						entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, sorted, index, path / s);				
+				}
+    }
+  
+    return dirEntries;  
+}
+
 std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, int offs)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
@@ -435,6 +508,19 @@ std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd:
 		CleanIdentifier(entry.identifier));
 
 	return dirEntries;
+}
+
+std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList, std::vector<cd::IsoPathTable::Entry>& sorted)
+{ 
+    auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
+    dirEntries->ReadRootDir(&reader, pathTableList[0].entry.dirOffs);
+
+  	auto& entry = dirEntries->dirEntryList.GetView().front().get();
+
+    entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, sorted, 0,
+    CleanIdentifier(entry.identifier));
+    
+  	return dirEntries;
 }
 
 void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entry>& files, const fs::path& rootPath)
@@ -632,6 +718,10 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 
 		if (entryType == EntryType::EntryXA)
 		{
+			if (param::pathTable) {
+				 newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
+			}
+
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "mixed");
 		}
 		else if (entryType == EntryType::EntryDA)
@@ -640,6 +730,10 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 		}
 		else if (entryType == EntryType::EntryFile)
 		{
+			if (param::pathTable) {
+				 newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
+			}
+
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
 		}
 	}
@@ -778,6 +872,11 @@ void ParseISO(cd::IsoReader& reader) {
 
     size_t numEntries = pathTable.ReadPathTable(&reader, descriptor.pathTable1Offs);
 
+		std::vector<cd::IsoPathTable::Entry> sorted(pathTable.pathTableList);
+		std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+				return a.entry.dirOffs < b.entry.dirOffs;	
+		});
+
     if (numEntries == 0) {
         printf("   No files to find.\n");
         return;
@@ -796,9 +895,11 @@ void ParseISO(cd::IsoReader& reader) {
 
 
 	std::list<cd::IsoDirEntries::Entry> entries;
-	std::unique_ptr<cd::IsoDirEntries> rootDir = ParseRoot(reader,
+	std::unique_ptr<cd::IsoDirEntries> rootDir = (param::pathTable
+		?	ParseRootPathTable(reader, ListView(entries), pathTable.pathTableList, sorted)
+		: ParseRoot(reader,
 					ListView(entries),
-					descriptor.rootDirRecord.entryOffs.lsb);
+					descriptor.rootDirRecord.entryOffs.lsb));
 
 	// Sort files by LBA for "strict" output
 	entries.sort([](const auto& left, const auto& right)
@@ -964,7 +1065,8 @@ int Main(int argc, char *argv[])
 		"  -s <path>  - Outputs an MKPSXISO compatible XML script for later rebuilding.\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
 		"  -e|--encode <codec> - Codec to encode CDDA/DA audio. wave is default. Supported codecs: " SUPPORTED_CODEC_TEXT "\n"
-		"  -h|--help  - Show this help text\n";
+		"  -h|--help  - Show this help text\n"
+		"  -pt|--path-table - instead of going through the file system, go to every known directory in order; helps with deobfuscating\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
 			"2017 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
@@ -982,6 +1084,11 @@ int Main(int argc, char *argv[])
 		// Is it a switch?
 		if ((*args)[0] == '-')
 		{
+			if (ParseArgument(args, "pt", "path-table"))
+			{
+        param::pathTable = true;
+        continue;
+			}
 			if (ParseArgument(args, "h", "help"))
 			{
 				printf(HELP_TEXT);

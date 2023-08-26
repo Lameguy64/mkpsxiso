@@ -33,6 +33,7 @@ namespace iso
 		std::string	id;		/// Entry identifier (empty if invisible dummy)
 		int64_t length;		/// Length of file in bytes
 		int		lba;		/// File LBA (in sectors)
+		int flba; /// Force LBA
 
 		fs::path srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		EntryType	  type;		/// File type (0 - file, 1 - directory)
