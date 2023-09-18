@@ -95,7 +95,10 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
-**Version 2.03 (xx/xx/2023)**
+**Version 2.04 (09/18/2023)**
+* Added a `dumpsxiso` option to extract every known directory in the path table by specifying `-pt`/`--path-table`, to help with obsfuscated file systems.
+
+**Version 2.03 (04/05/2023)**
 * On platforms where `std::filesystem` is unavailable, `ghc::filesystem` is now used instead.
 * Switched back to main `libflac`.
 * mkpsxiso: Resolved a possible crash when building images with big files.
