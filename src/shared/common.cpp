@@ -105,7 +105,7 @@ uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize)
 std::string SectorsToTimecode(const unsigned sectors)
 {
 	char timecode[16];
-	snprintf( timecode, sizeof(timecode), "%02u:%02u:%02u", (sectors/75)/60, (sectors/75)%60, sectors%75);
+	snprintf( timecode, sizeof(timecode), "%02u:%02u:%02u", ((sectors+150)/75)/60, ((sectors+150)/75)%60, sectors%75);
 	return std::string(timecode);
 }	                
 
