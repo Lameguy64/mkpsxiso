@@ -1,6 +1,7 @@
 #include "cdwriter.h"
 #include "common.h"
 #include "edcecc.h"
+#include "global.h"
 #include "platform.h"
 
 #include <algorithm>
@@ -104,8 +105,14 @@ void IsoWriter::SectorView::CalculateForm1()
 void IsoWriter::SectorView::CalculateForm2()
 {
 	SECTOR_M2F2* sector = static_cast<SECTOR_M2F2*>(m_currentSector);
-	m_checksumJobs.emplace_front(m_threadPool->enqueue(&EDCECC::ComputeEdcBlock, &EDC_ECC_GEN,
-		sector->data, sizeof(sector->data) - 4, sector->data + sizeof(sector->data) - 4));
+	m_checksumJobs.emplace_front(m_threadPool->enqueue([](SECTOR_M2F2* sector) {
+		if (CompareICase(global::xa_edc, "no")) {
+			std::memset(&sector->data[2332], 0, 4);
+		}
+		else {
+			EDC_ECC_GEN.ComputeEdcBlock(sector->data, sizeof(sector->data) - 4, &sector->data[2332]);
+		}
+	}, sector));
 }
 
 void IsoWriter::SectorView::WaitForChecksumJobs()
@@ -192,7 +199,7 @@ public:
 		}
 	}
 
-	void WriteBlankSectors(unsigned int count) override
+	void WriteBlankSectors(unsigned int count, const uint8_t subhead) override
 	{
 		SectorType* sector = static_cast<SectorType*>(m_currentSector);
 		const bool isForm2 = m_edcEccForm == IsoWriter::EdcEccForm::Form2;
@@ -200,7 +207,7 @@ public:
 		while (m_currentLBA < m_endLBA && count > 0)
 		{
 			PrepareSectorHeader();
-			SetSubHeader(sector->subHead, isForm2 ? 0x00200000 : 0);
+			SetSubHeader(sector->subHead, subhead << 16);
 
 			std::fill(std::begin(sector->data), std::end(sector->data), 0);
 			if (m_edcEccForm == IsoWriter::EdcEccForm::Form1)
@@ -351,7 +358,7 @@ public:
 		}
 	}
 
-	void WriteBlankSectors(unsigned int count) override
+	void WriteBlankSectors(unsigned int count, const uint8_t subhead) override
 	{
 		SectorType* sector = static_cast<SectorType*>(m_currentSector);
 		const bool isForm2 = m_edcEccForm == IsoWriter::EdcEccForm::Form2;

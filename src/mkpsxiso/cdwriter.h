@@ -36,7 +36,7 @@ public:
 
 		virtual void WriteFile(FILE* file) = 0;
 		virtual void WriteMemory(const void* memory, size_t size) = 0;
-		virtual void WriteBlankSectors(unsigned int count) = 0;
+		virtual void WriteBlankSectors(unsigned int count, const uint8_t subhead = 32) = 0;
 		virtual size_t GetSpaceInCurrentSector() const = 0;
 		virtual void NextSector() = 0;
 		virtual void SetSubheader(unsigned int subHead) = 0;

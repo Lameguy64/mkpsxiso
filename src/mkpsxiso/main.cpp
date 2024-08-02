@@ -26,6 +26,7 @@
 namespace global
 {
 	time_t		BuildTime;
+	const char* xa_edc;
 	int			QuietMode	= false;
 	int			Overwrite	= false;
 
@@ -503,6 +504,12 @@ int Main(int argc, char* argv[])
 			if ( CompareICase( "data", track_type ) )
 			{
 				dataTrack = trackElement;
+				global::xa_edc = trackElement->Attribute(xml::attrib::XA_EDC);
+				
+				if ( global::xa_edc == nullptr ) {
+				global::xa_edc = "yes";
+				}
+
 				if ( global::trackNum != 1 )
 				{
 					if ( !global::QuietMode )
@@ -735,8 +742,6 @@ int Main(int argc, char* argv[])
 			}
 
 			// Copy the files into the disc image
-			iso::DIRENTRY& root = entries.front();
-			iso::DirTreeClass* dirTree = root.subdir.get();
 			dirTree->WriteFiles( &writer );
 
 			if ( !global::QuietMode )
@@ -819,8 +824,7 @@ int Main(int argc, char* argv[])
 				printf( "    Writing directories... " );
 			}
 
-			// Sort directory entries and write it
-			dirTree->SortDirectoryEntries();
+			// Write directory entries
 			dirTree->WriteDirectoryRecords( &writer, root, root );
 
 			// Write file system descriptors to finish the image
@@ -1163,11 +1167,13 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		return false;
 	}
 
-	// Calculate directory tree LBAs and retrieve size of image
 	int pathTableLen = dirTree->CalculatePathTableLen(root);
 
 	// 16 license sectors + 2 header sectors
 	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
+
+	// Sort directory entries, calculate tree LBAs and retrieve size of image
+	dirTree->SortDirectoryEntries();
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
@@ -1369,17 +1375,11 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 //
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
-	int dummyType = 0; // Data
-	const char* type = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
-	if ( type != nullptr )
-	{
-		// TODO: Make reasonable
-		if ( CompareICase(type, "2336") )
-		{
-			dummyType = 1; // XA
-		}
-	}
+	uint8_t dummyType = 0;
 
+	if (dirElement->Attribute(xml::attrib::XA_PERMISSIONS) != nullptr) {
+		dummyType = atoi(dirElement->Attribute(xml::attrib::XA_PERMISSIONS));
+	}
 
 	dirTree->AddDummyEntry( atoi( dirElement->Attribute(xml::attrib::NUM_DUMMY_SECTORS) ), dummyType );
 	return true;

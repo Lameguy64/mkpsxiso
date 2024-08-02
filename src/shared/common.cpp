@@ -18,7 +18,9 @@ static void snprintfZeroPad(char* s, size_t n, const char* format, ...)
 
 	const int bytesWritten = vsnprintf(buf.get(), n + 1, format, args);
 	memcpy(s, buf.get(), bytesWritten);
-	std::fill(s + bytesWritten, s + n, '\0');
+	if (bytesWritten < n) {
+		std::fill(s + bytesWritten, s + n, '\0');
+	}
 
 	va_end(args);
 }

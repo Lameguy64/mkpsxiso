@@ -25,6 +25,7 @@ namespace attrib
 	constexpr const char* NO_XA = "no_xa";
 
 	constexpr const char* TRACK_TYPE = "type";
+	constexpr const char* XA_EDC = "xa_edc";
 	constexpr const char* TRACK_SOURCE = "source";
 	constexpr const char* TRACK_ID = "trackid";
 	constexpr const char* PREGAP_DURATION = "duration";

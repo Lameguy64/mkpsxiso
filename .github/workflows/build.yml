@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Fetch repo contents
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: mkpsxiso
         submodules: recursive
@@ -22,7 +22,7 @@ jobs:
         cmake --build build --config Release -t package
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: mkpsxiso-windows
         path: |
@@ -40,7 +40,7 @@ jobs:
         sudo apt-get install -y --no-install-recommends build-essential ninja-build
 
     - name: Fetch repo contents
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: mkpsxiso
         submodules: recursive
@@ -48,10 +48,10 @@ jobs:
     - name: Build and package mkpsxiso
       run: |
         cmake --preset ci -S mkpsxiso
-        cmake --build build -t package
+        cmake --build build --config Release -t package
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: mkpsxiso-linux
         path: |
@@ -68,7 +68,7 @@ jobs:
     steps:
     - name: Fetch build artifacts
       if:   ${{ github.ref_type == 'tag' }}
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: .
 

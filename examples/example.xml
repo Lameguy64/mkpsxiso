@@ -26,11 +26,13 @@
 		
 		Attributes:
 			type		- Track type (either data or audio).
+			xa_edc		- For data track only, specifies if the image has (yes) or no (no) EDC in Form 2 sectors.
+						  If xa_edc is not specified, defaults to 'yes'.
 			source		- For audio tracks only, specifies the file name of a wav audio
 						  file as source data for the audio track.
 			
 	-->
-	<track type="data">
+	<track type="data" xa_edc="yes">
 	
 		<!-- <identifiers>
 			Optional, Specifies the identifier strings for the data track.
@@ -159,8 +161,12 @@
 				
 				Attributes:
 					sectors	- Size of dummy file in sector units (1024 = 2MB).
+					xa_perm	- The dummy's subhead value. Values between 0-255 only
+								 '0': for a Form 1 dummy (0x00).
+								'32': for a Form 2 dummy (0x20).
+							If xa_perm is not specified, defaults to '0'.
 			-->
-			<dummy sectors="1024"/>
+			<dummy sectors="1024" xa_perm="0"/>
 			
 			<!-- Sample DA audio file entry.
 			

@@ -37,13 +37,9 @@ static size_t GetIDLength(std::string_view id)
 	return length;
 }
 
-static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
+static cd::ISO_DATESTAMP GetISODateStamp(const time_t time, signed char GMToffs)
 {
-	// GMToffs is specified in 15 minute units
-	const time_t GMToffsSeconds = static_cast<time_t>(15) * 60 * GMToffs;
-
-	time += GMToffsSeconds;
-	const tm timestamp = *gmtime( &time );
+	const tm timestamp = CustomLocalTime(time);
 
 	cd::ISO_DATESTAMP result;
 	result.hour		= timestamp.tm_hour;
@@ -127,6 +123,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 		printf("ERROR: File not found: %" PRFILESYSTEM_PATH "\n", srcfile.lexically_normal().c_str());
 		return false;
     }
+	GetSrcTime(srcfile, fileAttrib->st_ctime);
 
 	// Check if XA data is valid
 	if ( type == EntryType::EntryXA )
@@ -244,7 +241,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 		entry.length = fileAttrib->st_size;
 	}
 
-    entry.date = GetISODateStamp( fileAttrib->st_mtime, attributes.GMTOffs );
+    entry.date = GetISODateStamp( fileAttrib->st_ctime, attributes.GMTOffs );
 
 	entries.emplace_back(std::move(entry));
 	entriesInDir.emplace_back(entries.back());
@@ -253,12 +250,12 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 
 }
 
-void iso::DirTreeClass::AddDummyEntry(int sectors, int type)
+void iso::DirTreeClass::AddDummyEntry(const int sectors, const uint8_t subhead)
 {
 	DIRENTRY entry {};
 
 	// TODO: HUGE HACK, will be removed once EntryDummy is unified with EntryFile again
-	entry.perms	=	type;
+	entry.perms		= subhead;
 	entry.type		= EntryType::EntryDummy;
 	entry.length	= 2048*sectors;
 
@@ -282,16 +279,10 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 		}
 	}
 
-	auto fileAttrib = Stat(srcDir);
 	time_t dirTime;
-	if ( fileAttrib )
-	{
-		dirTime = fileAttrib->st_mtime;
-	}
-	else
-	{
+	if (!GetSrcTime(srcDir, dirTime)) {
 		dirTime = global::BuildTime;
-
+	
 		if ( id != nullptr )
 		{
 			if ( !global::QuietMode )
@@ -416,7 +407,7 @@ int iso::DirTreeClass::CalculateDirEntryLen() const
 
 		int dataLen = sizeof(cd::ISO_DIR_ENTRY);
 
-		dataLen += GetIDLength(entry.id);
+		dataLen += entry.id.size();
 
 		if ( !global::noXA )
 		{
@@ -713,12 +704,12 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		else if ( entry.type == EntryType::EntryDummy )
 		{
 			// TODO: HUGE HACK, will be removed once EntryDummy is unified with EntryFile again
-			const bool isForm2 = entry.perms != 0;
+			const bool isForm2 = entry.perms & 0x20;
 
 			const uint32_t sizeInSectors = GetSizeInSectors(entry.length);
 			auto sectorView = writer->GetSectorViewM2F1(entry.lba, sizeInSectors, isForm2 ? cd::IsoWriter::EdcEccForm::Form2 : cd::IsoWriter::EdcEccForm::Form1);
 
-			sectorView->WriteBlankSectors(sizeInSectors);
+			sectorView->WriteBlankSectors(sizeInSectors, entry.perms);
 		}
 	}
 
