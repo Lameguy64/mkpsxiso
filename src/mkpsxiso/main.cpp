@@ -26,7 +26,7 @@
 namespace global
 {
 	time_t		BuildTime;
-	const char* xa_edc;
+	bool		xa_edc;
 	int			QuietMode	= false;
 	int			Overwrite	= false;
 
@@ -504,12 +504,8 @@ int Main(int argc, char* argv[])
 			if ( CompareICase( "data", track_type ) )
 			{
 				dataTrack = trackElement;
-				global::xa_edc = trackElement->Attribute(xml::attrib::XA_EDC);
+				global::xa_edc = trackElement->BoolAttribute(xml::attrib::XA_EDC, true);
 				
-				if ( global::xa_edc == nullptr ) {
-				global::xa_edc = "yes";
-				}
-
 				if ( global::trackNum != 1 )
 				{
 					if ( !global::QuietMode )

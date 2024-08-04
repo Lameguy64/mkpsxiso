@@ -6,7 +6,7 @@
 namespace global {
 
 	extern time_t		BuildTime;
-	extern const char*	xa_edc;
+	extern bool			xa_edc;
 	extern int			QuietMode;
 	extern int			trackNum;
 	extern int			noXA;

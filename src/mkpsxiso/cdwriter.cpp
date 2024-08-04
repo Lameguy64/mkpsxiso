@@ -106,11 +106,11 @@ void IsoWriter::SectorView::CalculateForm2()
 {
 	SECTOR_M2F2* sector = static_cast<SECTOR_M2F2*>(m_currentSector);
 	m_checksumJobs.emplace_front(m_threadPool->enqueue([](SECTOR_M2F2* sector) {
-		if (CompareICase(global::xa_edc, "no")) {
-			std::memset(&sector->data[2332], 0, 4);
+		if (global::xa_edc) {
+			EDC_ECC_GEN.ComputeEdcBlock(sector->data, sizeof(sector->data) - 4, &sector->data[2332]);
 		}
 		else {
-			EDC_ECC_GEN.ComputeEdcBlock(sector->data, sizeof(sector->data) - 4, &sector->data[2332]);
+			std::memset(&sector->data[2332], 0, 4);
 		}
 	}, sector));
 }

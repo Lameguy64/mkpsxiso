@@ -160,12 +160,12 @@ const char* CheckEDCXA(cd::IsoReader &reader) {
 	while (reader.ReadBytesXA(sector.data, 2336)) {
  		if (sector.data[2] & 0x20) {
 			if (sector.data[2332] == 0 && sector.data[2333] == 0 && sector.data[2334] == 0 && sector.data[2335] == 0) {
-				return "no";
+				return "false";
 			}
-			return "yes";
+			return "true";
 		}
 	}
-	return "yes";
+	return "true";
 }
 
 std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
