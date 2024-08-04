@@ -26,7 +26,7 @@
 		
 		Attributes:
 			type		- Track type (either data or audio).
-			xa_edc		- For data track only, specifies if the image has (yes) or no (no) EDC in Form 2 sectors.
+			xa_edc		- For data track only, specifies if the image has (true) or no (false) EDC in Form 2 sectors.
 						  If xa_edc is not specified, defaults to 'true'.
 			source		- For audio tracks only, specifies the file name of a wav audio
 						  file as source data for the audio track.

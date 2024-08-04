@@ -869,6 +869,7 @@ EntryAttributes ReadEntryAttributes(EntryAttributes current, const tinyxml2::XML
 		};
 
 		getAttributeIfExists(current.GMTOffs, xml::attrib::GMT_OFFSET);
+		getAttributeIfExists(current.FFLAGS, xml::attrib::FILE_FLAGS);
 		getAttributeIfExists(current.XAAttrib, xml::attrib::XA_ATTRIBUTES);
 		getAttributeIfExists(current.XAPerm, xml::attrib::XA_PERMISSIONS);
 		getAttributeIfExists(current.GID, xml::attrib::XA_GID);

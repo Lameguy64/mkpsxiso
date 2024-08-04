@@ -99,11 +99,12 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.length	= 0; // Length is meaningless for directories
 
 	const EntryAttributes attributes; // Leave defaults
+	entry.FF		= attributes.FFLAGS;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
-	entry.flba = attributes.FLBA;
+	entry.flba		= attributes.FLBA;
 
 	entries.emplace_back( std::move(entry) );
 
@@ -215,6 +216,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 	entry.id = std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
+	entry.FF		= attributes.FFLAGS;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -307,6 +309,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries, this);
+	entry.FF		= attributes.FFLAGS;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -469,11 +472,11 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 
 		if ( entry.type == EntryType::EntryDir )
 		{
-			dirEntry->flags = 0x02;
+			dirEntry->flags = 0x02 + entry.FF;
 		}
 		else
 		{
-			dirEntry->flags = 0x00;
+			dirEntry->flags = 0x00 + entry.FF;
 		}
 
 		// File length correction for certain file types

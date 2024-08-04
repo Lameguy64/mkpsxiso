@@ -297,6 +297,7 @@ writeFLACFile_cleanup:
 struct EntryAttributeCounters
 {
 	std::map<int, unsigned int> GMTOffs;
+	std::map<int, unsigned int> FFLAGS;
 	std::map<int, unsigned int> XAAttrib;
 	std::map<int, unsigned int> XAPerm;
 	std::map<int, unsigned int> GID;
@@ -307,6 +308,8 @@ static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::Iso
 {
 	element->SetAttribute(xml::attrib::GMT_OFFSET, entry.entry.entryDate.GMToffs);
 	++attributeCounters.GMTOffs[entry.entry.entryDate.GMToffs];
+
+	++attributeCounters.FFLAGS[entry.entry.flags];
 
 	// xa_attrib only makes sense on XA files
 	if (type == EntryType::EntryXA)
@@ -338,6 +341,7 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 
 	EntryAttributes defaultAttributes;
 	defaultAttributes.GMTOffs = static_cast<signed char>(findMaxElement(attributeCounters.GMTOffs));
+	defaultAttributes.FFLAGS = static_cast<unsigned char>(findMaxElement(attributeCounters.FFLAGS));
 	defaultAttributes.XAAttrib = static_cast<unsigned char>(findMaxElement(attributeCounters.XAAttrib));
 	defaultAttributes.XAPerm = static_cast<unsigned short>(findMaxElement(attributeCounters.XAPerm));
 	defaultAttributes.GID = static_cast<unsigned short>(findMaxElement(attributeCounters.GID));
@@ -345,6 +349,7 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 
 	// Write them out to the XML
 	defaultAttributesElement->SetAttribute(xml::attrib::GMT_OFFSET, defaultAttributes.GMTOffs);
+	defaultAttributesElement->SetAttribute(xml::attrib::FILE_FLAGS, (defaultAttributes.FFLAGS < 2) ? defaultAttributes.FFLAGS : defaultAttributes.FFLAGS - 2);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_ATTRIBUTES, defaultAttributes.XAAttrib);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_PERMISSIONS, defaultAttributes.XAPerm);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_GID, defaultAttributes.GID);
@@ -375,6 +380,7 @@ static void SimplifyDefaultXMLAttributes(tinyxml2::XMLElement* element, const En
 	};
 
 	deleteAttribute(xml::attrib::GMT_OFFSET, defaults.GMTOffs);
+	deleteAttribute(xml::attrib::FILE_FLAGS, defaults.FFLAGS);
 	deleteAttribute(xml::attrib::XA_ATTRIBUTES, defaults.XAAttrib);
 	deleteAttribute(xml::attrib::XA_PERMISSIONS, defaults.XAPerm);
 	deleteAttribute(xml::attrib::XA_GID, defaults.GID);

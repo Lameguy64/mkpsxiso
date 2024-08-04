@@ -30,21 +30,22 @@ namespace iso
 
 	struct DIRENTRY
 	{
-		std::string	id;		/// Entry identifier (empty if invisible dummy)
-		int64_t length;		/// Length of file in bytes
-		int		lba;		/// File LBA (in sectors)
-		int flba; /// Force LBA
+		std::string		id;			/// Entry identifier (empty if invisible dummy)
+		int64_t			length;		/// Length of file in bytes
+		int				lba;		/// File LBA (in sectors)
+		int 			flba;		/// Force LBA
 
-		fs::path srcfile;	/// Filename with path to source file (empty if directory or dummy)
-		EntryType	  type;		/// File type (0 - file, 1 - directory)
-		unsigned char attribs;	/// XA attributes, 0xFF is not set
-		unsigned short perms;	/// XA permissions
-		unsigned short GID;		/// Owner group ID
-		unsigned short UID;		/// Owner user ID
+		fs::path 		srcfile;	/// Filename with path to source file (empty if directory or dummy)
+		EntryType		type;		/// File type (0 - file, 1 - directory)
+		unsigned short 	FF;			/// File Flags
+		unsigned char 	attribs;	/// XA attributes, 0xFF is not set
+		unsigned short 	perms;		/// XA permissions
+		unsigned short 	GID;		/// Owner group ID
+		unsigned short 	UID;		/// Owner user ID
 		std::unique_ptr<class DirTreeClass> subdir;
 
 		cd::ISO_DATESTAMP date;
-		std::string trackid; /// only used for DA files
+		std::string 	trackid;	/// only used for DA files
 
 	};
 
