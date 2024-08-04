@@ -1371,13 +1371,8 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 //
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
-	uint8_t dummyType = 0;
 
-	if (dirElement->Attribute(xml::attrib::XA_PERMISSIONS) != nullptr) {
-		dummyType = atoi(dirElement->Attribute(xml::attrib::XA_PERMISSIONS));
-	}
-
-	dirTree->AddDummyEntry( atoi( dirElement->Attribute(xml::attrib::NUM_DUMMY_SECTORS) ), dummyType );
+	dirTree->AddDummyEntry(dirElement->UnsignedAttribute(xml::attrib::NUM_DUMMY_SECTORS), dirElement->UnsignedAttribute(xml::attrib::XA_PERMISSIONS));
 	return true;
 }
 
