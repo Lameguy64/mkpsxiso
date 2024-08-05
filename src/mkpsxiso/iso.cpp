@@ -994,27 +994,6 @@ static void CopyStringPadWithSpaces(char (&dest)[N], const char* src)
 	std::fill( begin, end, ' ' );
 }
 
-static cd::ISO_LONG_DATESTAMP GetLongDateFromString(const char* str)
-{
-	cd::ISO_LONG_DATESTAMP date;
-
-	bool gotDate = false;
-	if (str)
-	{
-		cd::ISO_DATESTAMP shortDate = GetDateFromString(str, &gotDate);
-		if (gotDate)
-		{
-			date = GetLongDateFromDate(shortDate);
-		}
-	}
-	
-	if (!gotDate)
-	{
-		date = GetUnspecifiedLongDate();
-	}
-	return date;
-}
-
 void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, const DIRENTRY& root, int imageLen)
 {
 	cd::ISO_DESCRIPTOR isoDescriptor {};
@@ -1048,7 +1027,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, nullptr );
 	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, nullptr );
 
-	isoDescriptor.volumeCreateDate = GetLongDateFromDate( root.date );
+	isoDescriptor.volumeCreateDate = GetLongDateFromString(id.CreationDate);
 	isoDescriptor.volumeModifyDate = GetLongDateFromString(id.ModificationDate);
 	isoDescriptor.volumeEffectiveDate = isoDescriptor.volumeExpiryDate = GetUnspecifiedLongDate();
 	isoDescriptor.fileStructVersion = 1;

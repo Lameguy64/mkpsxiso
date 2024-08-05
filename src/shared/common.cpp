@@ -6,7 +6,7 @@
 #include <cstdarg>
 
 using namespace cd;
-
+/*
 static void snprintfZeroPad(char* s, size_t n, const char* format, ...)
 {
 	// We need a temporary buffer that is 1 byte bigger than the specified one,
@@ -40,7 +40,7 @@ ISO_LONG_DATESTAMP GetLongDateFromDate(const ISO_DATESTAMP& src)
 
 	return result;
 }
-
+*/
 ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 {
 	bool succeeded = false;
@@ -57,7 +57,7 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 		if (argsRead < 7)
 		{
 			// Consider GMToffs optional
-			result.GMToffs = 0;
+			result.GMToffs = 36;
 		}
 		succeeded = true;
 	}
@@ -67,6 +67,41 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 		*success = succeeded;
 	}
 	return result;
+}
+
+ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success)
+{
+	ISO_LONG_DATESTAMP result {};
+
+	if (str) {
+		signed short year;
+		unsigned char month, day, hour, minute, second, hsecond;
+		signed char GMToffs;
+
+		const unsigned char argsRead = sscanf( str, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%02hhu%hhd",
+			&year, &month, &day, &hour, &minute, &second, &hsecond, &GMToffs );
+
+		if (argsRead >= 6) {
+			if (argsRead < 8) {
+				// Consider GMToffs optional
+				GMToffs = 36;
+			}
+
+			snprintf(result.year, 5, "%04d", year); // Ensure null-termination
+			snprintf(result.month, 3, "%02d", month);
+			snprintf(result.day, 3, "%02d", day);
+			snprintf(result.hour, 3, "%02d", hour);
+			snprintf(result.minute, 3, "%02d", minute);
+			snprintf(result.second, 3, "%02d", second);
+			snprintf(result.hsecond, 3, "%02d", hsecond);
+			result.GMToffs = GMToffs;
+
+			success = true;
+			return result;
+		}
+	}
+
+	return GetUnspecifiedLongDate();
 }
 
 ISO_LONG_DATESTAMP GetUnspecifiedLongDate()

@@ -1228,7 +1228,7 @@ int Main(int argc, char *argv[])
 
 	if (param::xmlFile.empty())
 	{
-		param::xmlFile = param::isoFile.stem();
+		param::xmlFile = param::isoFile.filename();
 		param::xmlFile.replace_extension(".xml");
 	}
 
