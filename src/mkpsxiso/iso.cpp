@@ -96,6 +96,9 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries);
 	entry.date		= volumeDate;
+	if (volumeDate.year < 0x67) { // some games I tested from 2003 has correct date, maybe sony fixed his tool? Needs more evidence
+		entry.date.year = volumeDate.year % 0x64; // Root overflows dates past 1999 (99/0x63)
+	}
 	entry.length	= 0; // Length is meaningless for directories
 
 	const EntryAttributes attributes; // Leave defaults
