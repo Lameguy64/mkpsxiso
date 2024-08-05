@@ -74,27 +74,32 @@ ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success)
 	ISO_LONG_DATESTAMP result {};
 
 	if (str) {
-		signed short year;
+		unsigned short year;
 		unsigned char month, day, hour, minute, second, hsecond;
-		signed char GMToffs;
 
-		const unsigned char argsRead = sscanf( str, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%02hhu%hhd",
-			&year, &month, &day, &hour, &minute, &second, &hsecond, &GMToffs );
+		const unsigned char argsRead = sscanf( str, "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu%02hhu%hhd",
+			&year, &month, &day, &hour, &minute, &second, &hsecond, &result.GMToffs );
 
 		if (argsRead >= 6) {
 			if (argsRead < 8) {
 				// Consider GMToffs optional
-				GMToffs = 36;
+				result.GMToffs = 36;
 			}
 
-			snprintf(result.year, 5, "%04d", year); // Ensure null-termination
-			snprintf(result.month, 3, "%02d", month);
-			snprintf(result.day, 3, "%02d", day);
-			snprintf(result.hour, 3, "%02d", hour);
-			snprintf(result.minute, 3, "%02d", minute);
-			snprintf(result.second, 3, "%02d", second);
-			snprintf(result.hsecond, 3, "%02d", hsecond);
-			result.GMToffs = GMToffs;
+			auto intToChars = [](unsigned short value, char* buf, unsigned char size) {
+				for (signed char i = size - 1; i >= 0; --i) {
+					buf[i] = '0' + (value % 10);
+					value /= 10;
+				}
+			};
+
+			intToChars(year, result.year, 4);
+			intToChars(month, result.month, 2);
+			intToChars(day, result.day, 2);
+			intToChars(hour, result.hour, 2);
+			intToChars(minute, result.minute, 2);
+			intToChars(second, result.second, 2);
+			intToChars(hsecond, result.hsecond, 2);
 
 			success = true;
 			return result;
