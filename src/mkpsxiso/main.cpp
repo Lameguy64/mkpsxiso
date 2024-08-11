@@ -27,6 +27,7 @@ namespace global
 {
 	time_t		BuildTime;
 	bool		xa_edc;
+	bool		old_type;
 	int			QuietMode	= false;
 	int			Overwrite	= false;
 
@@ -505,6 +506,7 @@ int Main(int argc, char* argv[])
 			{
 				dataTrack = trackElement;
 				global::xa_edc = trackElement->BoolAttribute(xml::attrib::XA_EDC, true);
+				global::old_type = trackElement->BoolAttribute(xml::attrib::OLD_TYPE, true);
 				
 				if ( global::trackNum != 1 )
 				{
@@ -821,7 +823,7 @@ int Main(int argc, char* argv[])
 			}
 
 			// Write directory entries
-			dirTree->WriteDirectoryRecords( &writer, root, root );
+			dirTree->WriteDirectoryRecords( &writer, root, root, global::old_type ? 0 : dirTree->GetDirCountTotal() );
 
 			// Write file system descriptors to finish the image
 	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLenLBA );
@@ -869,7 +871,7 @@ EntryAttributes ReadEntryAttributes(EntryAttributes current, const tinyxml2::XML
 		};
 
 		getAttributeIfExists(current.GMTOffs, xml::attrib::GMT_OFFSET);
-		getAttributeIfExists(current.FFLAGS, xml::attrib::FILE_FLAGS);
+		getAttributeIfExists(current.HFLAG, xml::attrib::HIDDEN_FLAG);
 		getAttributeIfExists(current.XAAttrib, xml::attrib::XA_ATTRIBUTES);
 		getAttributeIfExists(current.XAPerm, xml::attrib::XA_PERMISSIONS);
 		getAttributeIfExists(current.GID, xml::attrib::XA_GID);
@@ -1170,7 +1172,9 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
 
 	// Sort directory entries, calculate tree LBAs and retrieve size of image
-	dirTree->SortDirectoryEntries();
+	if (global::old_type) {
+		dirTree->SortDirectoryEntries();
+	}
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
@@ -1355,7 +1359,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, ReadEntryAttributes(defaultAttributes, dirElement), trackid);
 }
 
-static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
+static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const EntryAttributes& defaultAttributes, const bool found_da)
 {
 	//if ( found_da )
 	//{
@@ -1373,7 +1377,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
 
-	dirTree->AddDummyEntry(dirElement->UnsignedAttribute(xml::attrib::NUM_DUMMY_SECTORS), dirElement->UnsignedAttribute(xml::attrib::XA_PERMISSIONS));
+	dirTree->AddDummyEntry(dirElement->UnsignedAttribute(xml::attrib::NUM_DUMMY_SECTORS), ReadEntryAttributes(defaultAttributes, dirElement));
 	return true;
 }
 
@@ -1433,7 +1437,7 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 		}
 		else if ( CompareICase( "dummy", dirElement->Name() ))
 		{
-			if (!ParseDummyEntry(dirTree, dirElement, found_da))
+			if (!ParseDummyEntry(dirTree, dirElement, defaultAttributes, found_da))
 			{
 				return false;
 			}
