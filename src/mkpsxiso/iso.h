@@ -37,7 +37,7 @@ namespace iso
 
 		fs::path 		srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		EntryType		type;		/// File type (0 - file, 1 - directory)
-		unsigned short 	FF;			/// File Flags
+		unsigned char 	HF;			/// Hidden Flag
 		unsigned char 	attribs;	/// XA attributes, 0xFF is not set
 		unsigned short 	perms;		/// XA permissions
 		unsigned short 	GID;		/// Owner group ID
@@ -76,10 +76,12 @@ namespace iso
 		// Same for all 'dir' arguments to methods of this class
 		std::string name;
 
+		DIRENTRY* entry = nullptr;
+
 		DirTreeClass* parent = nullptr; // Non-owning
 		
 		/// Internal function for generating and writing directory records
-		bool WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir) const;
+		bool WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, const unsigned short totalDirs) const;
 
 		/// Internal function for recursive path table generation
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
@@ -125,10 +127,10 @@ namespace iso
 		/** Adds an invisible dummy file entry to the directory record. Its invisible because its file entry
 		 *	is not actually added to the directory record.
 		 *
-		 *	sectors	- The size of the dummy file in sector units (1 = 2048 bytes, 1024 = 2MB).
-		 *  subhead	- 0x00 (0) for form1 (data) dummy, 0x20 (32) for form2 (XA) dummy
+		 *	sectors		- The size of the dummy file in sector units (1 = 2048 bytes, 1024 = 2MB).
+		 *  attributes	- LBA offset/XA permissions 0x00(0) for form1 (data) dummy, 0x20(32) for form2 (XA) dummy.
 		 */
-		void AddDummyEntry(const int sectors, const uint8_t subhead);
+		void AddDummyEntry(const int sectors, const EntryAttributes& attributes);
 
 		/** Generates a path table of all directories and subdirectories within this class' directory record.
 		 *
@@ -164,8 +166,9 @@ namespace iso
 		 *	LBA			   - Current directory LBA
 		 *  parentLBA	   - Parent directory LBA
 		 *  currentDirDate - Timestamp to use for . and .. directories.
+		 *  totalDirs	   - Total number of directories. Only usefull for games built with the latest sony mastering tool
 		 */
-		bool WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir);
+		bool WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, unsigned short totalDirs);
 
 		void SortDirectoryEntries();
 

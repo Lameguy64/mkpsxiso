@@ -155,17 +155,29 @@ void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
 
 // This will ensure that the EDC remains the same as in the original file. Games built with an old, buggy Sony's mastering tool version
 // don't have EDC Form2 data (this can be checked at redump.org) and some games rely on this to do anti-piracy checks like DDR.
-const char* CheckEDCXA(cd::IsoReader &reader) {
+const bool CheckEDCXA(cd::IsoReader &reader) {
 	cd::SECTOR_M2F2 sector;
 	while (reader.ReadBytesXA(sector.data, 2336)) {
  		if (sector.data[2] & 0x20) {
 			if (sector.data[2332] == 0 && sector.data[2333] == 0 && sector.data[2334] == 0 && sector.data[2335] == 0) {
-				return "false";
+				return false;
 			}
-			return "true";
+			return true;
 		}
 	}
-	return "true";
+	return true;
+}
+
+// Games from 2003 and onwards apparenly has built with a newer Sony's mastering tool.
+// This has different subheader in the descriptor sectors, correct root year and files are sorted by LBA and not by name.
+const bool CheckISOver(cd::IsoReader &reader) {
+	cd::SECTOR_M2F2 sector;
+	reader.SeekToSector(16);
+	reader.ReadBytesXA(sector.data, 2336);
+ 	if (sector.data[2] & 0x01) {
+		return true;
+	}
+	return false;
 }
 
 std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
@@ -297,7 +309,7 @@ writeFLACFile_cleanup:
 struct EntryAttributeCounters
 {
 	std::map<int, unsigned int> GMTOffs;
-	std::map<int, unsigned int> FFLAGS;
+	std::map<int, unsigned int> HFLAG;
 	std::map<int, unsigned int> XAAttrib;
 	std::map<int, unsigned int> XAPerm;
 	std::map<int, unsigned int> GID;
@@ -309,7 +321,7 @@ static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::Iso
 	element->SetAttribute(xml::attrib::GMT_OFFSET, entry.entry.entryDate.GMToffs);
 	++attributeCounters.GMTOffs[entry.entry.entryDate.GMToffs];
 
-	++attributeCounters.FFLAGS[entry.entry.flags];
+	++attributeCounters.HFLAG[entry.entry.flags];
 
 	// xa_attrib only makes sense on XA files
 	if (type == EntryType::EntryXA)
@@ -333,7 +345,7 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 	// First establish "defaults" - that is, the most commonly occurring attributes
 	auto findMaxElement = [](const auto& map)
 	{
-		if (map.size() > 0) {
+		if (!map.empty()) {
 			return std::max_element(map.begin(), map.end(), [](const auto& left, const auto& right) { return left.second < right.second; })->first;
 		}
 		return 0;
@@ -341,7 +353,7 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 
 	EntryAttributes defaultAttributes;
 	defaultAttributes.GMTOffs = static_cast<signed char>(findMaxElement(attributeCounters.GMTOffs));
-	defaultAttributes.FFLAGS = static_cast<unsigned char>(findMaxElement(attributeCounters.FFLAGS));
+	defaultAttributes.HFLAG = static_cast<unsigned char>(findMaxElement(attributeCounters.HFLAG));
 	defaultAttributes.XAAttrib = static_cast<unsigned char>(findMaxElement(attributeCounters.XAAttrib));
 	defaultAttributes.XAPerm = static_cast<unsigned short>(findMaxElement(attributeCounters.XAPerm));
 	defaultAttributes.GID = static_cast<unsigned short>(findMaxElement(attributeCounters.GID));
@@ -349,11 +361,13 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 
 	// Write them out to the XML
 	defaultAttributesElement->SetAttribute(xml::attrib::GMT_OFFSET, defaultAttributes.GMTOffs);
-	defaultAttributesElement->SetAttribute(xml::attrib::FILE_FLAGS, (defaultAttributes.FFLAGS < 2) ? defaultAttributes.FFLAGS : defaultAttributes.FFLAGS - 2);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_ATTRIBUTES, defaultAttributes.XAAttrib);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_PERMISSIONS, defaultAttributes.XAPerm);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_GID, defaultAttributes.GID);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_UID, defaultAttributes.UID);
+	if (defaultAttributes.HFLAG & 0x01) {
+		defaultAttributesElement->SetAttribute(xml::attrib::HIDDEN_FLAG, 1);
+	}
 
 	return defaultAttributes;
 }
@@ -380,7 +394,7 @@ static void SimplifyDefaultXMLAttributes(tinyxml2::XMLElement* element, const En
 	};
 
 	deleteAttribute(xml::attrib::GMT_OFFSET, defaults.GMTOffs);
-	deleteAttribute(xml::attrib::FILE_FLAGS, defaults.FFLAGS);
+	deleteAttribute(xml::attrib::HIDDEN_FLAG, defaults.HFLAG);
 	deleteAttribute(xml::attrib::XA_ATTRIBUTES, defaults.XAAttrib);
 	deleteAttribute(xml::attrib::XA_PERMISSIONS, defaults.XAPerm);
 	deleteAttribute(xml::attrib::XA_GID, defaults.GID);
@@ -766,7 +780,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 	return dirElement;
 }
 
-void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement,unsigned int startSector, cd::IsoReader &reader)
+void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement, const unsigned int startSector, cd::IsoReader &reader)
 {
 	if (numSectors < 1) {
 		return;
@@ -776,7 +790,10 @@ void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement,unsig
 	reader.ReadBytesXA(sector.subHead, 2336);
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
-	newelement->SetAttribute(xml::attrib::XA_PERMISSIONS, sector.subHead[2]);
+	newelement->SetAttribute(xml::attrib::XA_UID, sector.subHead[2]);
+	if (param::pathTable) {
+		newelement->SetAttribute(xml::attrib::OFFSET, startSector);
+	}
 }
 
 void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
@@ -870,7 +887,8 @@ void ParseISO(cd::IsoReader& reader) {
 
     cd::ISO_DESCRIPTOR descriptor;
 	auto license = ReadLicense(reader);
-	const char* xa_edc = CheckEDCXA(reader);
+	const bool xa_edc = CheckEDCXA(reader);
+	const bool old_type = CheckISOver(reader);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -955,6 +973,7 @@ void ParseISO(cd::IsoReader& reader) {
 			tinyxml2::XMLElement *trackElement = baseElement->InsertNewChildElement(xml::elem::TRACK);
 			trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 			trackElement->SetAttribute(xml::attrib::XA_EDC, xa_edc);
+			trackElement->SetAttribute(xml::attrib::OLD_TYPE, old_type);
 
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::IDENTIFIERS);
