@@ -1245,6 +1245,11 @@ int Main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	if (param::outPath.empty())
+	{
+		param::outPath = param::isoFile.stem();
+	}
+
 	if (param::xmlFile.empty())
 	{
 		param::xmlFile = param::isoFile.filename();
@@ -1273,10 +1278,7 @@ int Main(int argc, char *argv[])
 		}
 	}
 
-	if (!param::outPath.empty())
-	{
-		printf("Output directory : %" PRFILESYSTEM_PATH "\n", param::outPath.lexically_normal().c_str());
-	}
+	printf("Output directory : %" PRFILESYSTEM_PATH "\n", param::outPath.lexically_normal().c_str());
 
     ParseISO(reader);
 	return EXIT_SUCCESS;
