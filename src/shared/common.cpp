@@ -197,9 +197,16 @@ bool ParseArgument(char** argv, std::string_view command, std::string_view longC
 
 std::optional<fs::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand)
 {
-	if (ParseArgument(argv, command, longCommand) && *(argv+1) != nullptr)
+	if (*(argv+1) != nullptr && *(argv+1)[0] != '-')
 	{
-		argv++;
+		if (ParseArgument(argv, command, longCommand))
+		{
+			argv++;
+			return fs::u8path(*argv);
+		}
+	}
+	else if (ParseArgument(argv, command, longCommand))
+	{
 		return fs::u8path(*argv);
 	}
 	return std::nullopt;

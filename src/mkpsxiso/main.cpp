@@ -117,6 +117,12 @@ int Main(int argc, char* argv[])
 			}
 			if (auto lbaHead = ParsePathArgument(args, "lbahead"); lbaHead.has_value())
 			{
+				if (CompareICase(lbaHead->extension().string(), ".xml"))
+				{
+					args--;
+					global::LBAheaderFile = lbaHead->stem() += "_LBA.c";
+					continue;
+				}
 				global::LBAheaderFile = *lbaHead;
 				continue;
 			}
@@ -132,6 +138,12 @@ int Main(int argc, char* argv[])
 			}
 			if (auto lbaFile = ParsePathArgument(args, "lba"); lbaFile.has_value())
 			{
+				if (CompareICase(lbaFile->extension().string(), ".xml"))
+				{
+					args--;
+					global::LBAfile = lbaFile->stem() += "_LBA.txt";
+					continue;
+				}
 				global::LBAfile	= *lbaFile;
 				continue;
 			}
@@ -197,6 +209,16 @@ int Main(int argc, char* argv[])
 	{
 		printf( "No XML script specified.\n" );
 		return EXIT_FAILURE;
+	}
+
+	if ( global::LBAfile == "-lba" )
+	{
+		global::LBAfile = global::XMLscript.stem() += "_LBA.txt";
+	}
+
+	if ( global::LBAheaderFile == "-lbahead" )
+	{
+		global::LBAheaderFile = global::XMLscript.stem() += "_LBA.c";
 	}
 
 	// Get current time to be used as date stamps for all directories
@@ -532,19 +554,13 @@ int Main(int argc, char* argv[])
 					fprintf( cuefp.get(), "    INDEX 01 00:00:00\n" );
 				}
 
-				if ( global::NoIsoGen )
-				{
-					printf( "Skipped generating ISO image.\n" );
-					break;
-				}
-
 			// Add audio track
 			}
 			else if ( CompareICase( "audio", track_type ) )
 			{
 
 				// Only allow audio tracks if the cue_sheet attribute is specified
-				if ( cuefp == nullptr )
+				if ( cuefp == nullptr && !global::NoIsoGen )
 				{
 					if ( !global::QuietMode )
 					{
@@ -573,7 +589,10 @@ int Main(int argc, char* argv[])
 				else
 				{
 					fs::path trackSource = (global::XMLscript.parent_path() / trackRelativeSource);
-					fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
+					if ( cuefp )
+					{
+						fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
+					}
 
 					// pregap
 					int pregapSectors = 150; // by default 2 seconds
@@ -603,13 +622,19 @@ int Main(int argc, char* argv[])
 					}
 					if(pregapSectors > 0)
 					{
-						fprintf( cuefp.get(), "    INDEX 00 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+						if ( cuefp )
+						{
+							fprintf( cuefp.get(), "    INDEX 00 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+						}
 
 						audioTracks.emplace_back(totalLenLBA, pregapSectors * CD_SECTOR_SIZE);
 						totalLenLBA += pregapSectors;
 					}
 
-					fprintf( cuefp.get(), "    INDEX 01 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+					if ( cuefp )
+					{
+						fprintf( cuefp.get(), "    INDEX 01 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+					}
 
 					const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
 					if(trackid != nullptr)
@@ -843,6 +868,10 @@ int Main(int argc, char* argv[])
 				printf( "Total image size: %d bytes (%d sectors)\n",
 					(CD_SECTOR_SIZE*totalLenLBA), totalLenLBA );
 			}
+		}
+		else
+		{
+			printf( "Skipped generating ISO image.\n" );
 		}
 
 		// Check for next <iso_project> element

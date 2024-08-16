@@ -410,10 +410,10 @@ int iso::DirTreeClass::CalculateDirEntryLen() const
 		int dataLen = sizeof(cd::ISO_DIR_ENTRY);
 
 		dataLen += entry.id.length();
+		dataLen = RoundToEven(dataLen);
 
 		if ( !global::noXA )
 		{
-			dataLen = RoundToEven(dataLen);
 			dataLen += sizeof( cdxa::ISO_XA_ATTRIB );
 		}
 
@@ -825,7 +825,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		fprintf( fp, "%-10d", entry.lba );
 
 		// Write Timecode
-		fprintf( fp, "%-12s", SectorsToTimecode(entry.lba).c_str());
+		fprintf( fp, "%-12s", SectorsToTimecode(150 + entry.lba).c_str());
 
 		// Write size in byte units
 		if (entry.type != EntryType::EntryDir)

@@ -358,11 +358,6 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	entry.identifier.resize(entry.entry.identifierLen);
 	reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen, true);
 
-	if (entry.identifier == "ST0D_00D.BIN;1")
-	{
-		int i = 0;
-	}
-
 	// Strip trailing zeroes, if any
 	entry.identifier.resize(strlen(entry.identifier.c_str()));
 

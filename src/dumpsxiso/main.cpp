@@ -1252,8 +1252,7 @@ int Main(int argc, char *argv[])
 
 	if (param::xmlFile.empty())
 	{
-		param::xmlFile = param::isoFile.filename();
-		param::xmlFile.replace_extension(".xml");
+		param::xmlFile = param::isoFile.stem() += ".xml";
 	}
 
 	cd::IsoReader reader;
