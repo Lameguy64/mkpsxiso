@@ -128,9 +128,10 @@ namespace iso
 		 *	is not actually added to the directory record.
 		 *
 		 *	sectors		- The size of the dummy file in sector units (1 = 2048 bytes, 1024 = 2MB).
-		 *  attributes	- LBA offset/XA permissions 0x00(0) for form1 (data) dummy, 0x20(32) for form2 (XA) dummy.
+		 *	submode		- Submode value 0x00(0) for form1 (data) dummy, 0x20(32) for form2 (XA) dummy.
+		 *	flba		- Forced LBA offset.
 		 */
-		void AddDummyEntry(const int sectors, const EntryAttributes& attributes);
+		void AddDummyEntry(const unsigned int sectors, const unsigned char submode, const unsigned int flba);
 
 		/** Generates a path table of all directories and subdirectories within this class' directory record.
 		 *

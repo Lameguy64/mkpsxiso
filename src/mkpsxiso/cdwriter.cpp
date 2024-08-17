@@ -199,7 +199,7 @@ public:
 		}
 	}
 
-	void WriteBlankSectors(unsigned int count, const uint8_t subhead) override
+	void WriteBlankSectors(unsigned int count, const unsigned char submode) override
 	{
 		SectorType* sector = static_cast<SectorType*>(m_currentSector);
 		const bool isForm2 = m_edcEccForm == IsoWriter::EdcEccForm::Form2;
@@ -207,7 +207,7 @@ public:
 		while (m_currentLBA < m_endLBA && count > 0)
 		{
 			PrepareSectorHeader();
-			SetSubHeader(sector->subHead, subhead << 16);
+			SetSubHeader(sector->subHead, submode << 16);
 
 			std::fill(std::begin(sector->data), std::end(sector->data), 0);
 			if (m_edcEccForm == IsoWriter::EdcEccForm::Form1)
@@ -358,7 +358,7 @@ public:
 		}
 	}
 
-	void WriteBlankSectors(unsigned int count, const uint8_t subhead) override
+	void WriteBlankSectors(unsigned int count, const unsigned char submode) override
 	{
 		SectorType* sector = static_cast<SectorType*>(m_currentSector);
 		const bool isForm2 = m_edcEccForm == IsoWriter::EdcEccForm::Form2;

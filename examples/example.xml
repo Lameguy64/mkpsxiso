@@ -163,11 +163,11 @@
 				
 				Attributes:
 					sectors	- Size of dummy file in sector units (1024 = 2MB).
-					xa_uid	- The dummy's subhead value. Values between 0-255 only
+					type	- The dummy's submode value. Values between 0-255 only
 								 '0': for a Form 1 dummy (0x00).
 								'32': for a Form 2 dummy (0x20).
 			-->
-			<dummy sectors="1024" xa_uid="0"/>
+			<dummy sectors="1024" type="0"/>
 			
 			<!-- Sample DA audio file entry.
 			

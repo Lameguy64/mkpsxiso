@@ -790,7 +790,7 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	reader.ReadBytesXA(sector.subHead, 2336);
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
-	newelement->SetAttribute(xml::attrib::XA_UID, sector.subHead[2]);
+	newelement->SetAttribute(xml::attrib::ENTRY_TYPE, sector.subHead[2]);
 	if (param::pathTable) {
 		newelement->SetAttribute(xml::attrib::OFFSET, startSector);
 	}

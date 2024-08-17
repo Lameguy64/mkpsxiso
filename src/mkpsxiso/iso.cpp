@@ -249,15 +249,15 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 
 }
 
-void iso::DirTreeClass::AddDummyEntry(const int sectors, const EntryAttributes& attributes)
+void iso::DirTreeClass::AddDummyEntry(const unsigned int sectors, const unsigned char submode, const unsigned int flba)
 {
 	DIRENTRY entry {};
 
 	// TODO: HUGE HACK, will be removed once EntryDummy is unified with EntryFile again
-	entry.UID		= (attributes.UID < 256) ? attributes.UID : 0;
+	entry.attribs	= submode;
 	entry.type		= EntryType::EntryDummy;
 	entry.length	= 2048*sectors;
-	entry.flba		= attributes.FLBA;
+	entry.flba		= flba;
 
 	entries.emplace_back(std::move(entry));
 	entriesInDir.emplace_back(entries.back());
@@ -712,12 +712,12 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		else if ( entry.type == EntryType::EntryDummy )
 		{
 			// TODO: HUGE HACK, will be removed once EntryDummy is unified with EntryFile again
-			const bool isForm2 = entry.UID & 0x20;
+			const bool isForm2 = entry.attribs & 0x20;
 
 			const uint32_t sizeInSectors = GetSizeInSectors(entry.length);
 			auto sectorView = writer->GetSectorViewM2F1(entry.lba, sizeInSectors, isForm2 ? cd::IsoWriter::EdcEccForm::Form2 : cd::IsoWriter::EdcEccForm::Form1);
 
-			sectorView->WriteBlankSectors(sizeInSectors, entry.UID);
+			sectorView->WriteBlankSectors(sizeInSectors, entry.attribs);
 		}
 	}
 

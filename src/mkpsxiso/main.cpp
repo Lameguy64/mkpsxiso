@@ -1388,7 +1388,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, ReadEntryAttributes(defaultAttributes, dirElement), trackid);
 }
 
-static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const EntryAttributes& defaultAttributes, const bool found_da)
+static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
 {
 	//if ( found_da )
 	//{
@@ -1406,7 +1406,9 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
 
-	dirTree->AddDummyEntry(dirElement->UnsignedAttribute(xml::attrib::NUM_DUMMY_SECTORS), ReadEntryAttributes(defaultAttributes, dirElement));
+	dirTree->AddDummyEntry( dirElement->UnsignedAttribute(xml::attrib::NUM_DUMMY_SECTORS),
+							dirElement->UnsignedAttribute(xml::attrib::ENTRY_TYPE),
+							dirElement->UnsignedAttribute(xml::attrib::OFFSET) );
 	return true;
 }
 
@@ -1466,7 +1468,7 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 		}
 		else if ( CompareICase( "dummy", dirElement->Name() ))
 		{
-			if (!ParseDummyEntry(dirTree, dirElement, defaultAttributes, found_da))
+			if (!ParseDummyEntry(dirTree, dirElement, found_da))
 			{
 				return false;
 			}
