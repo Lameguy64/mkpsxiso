@@ -375,6 +375,10 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
 	entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
 
+	// Add the EntryType here so as not to keep calculating it everytime later
+	// Check for file number first to determine if it's a STR/XA file, because some games (Mega Man X3) have flagged them as DATA but currently they are not
+	entry.type = entry.extData.filenum ? EntryType::EntryXA : GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
+
 	return entry;
 }
 

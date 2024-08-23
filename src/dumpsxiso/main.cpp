@@ -21,6 +21,7 @@
 #include "xa.h"
 #include "cdreader.h"
 #include "xml.h"
+#include "cue.h"
 
 #ifndef MKPSXISO_NO_LIBFLAC
 #include "FLAC/stream_encoder.h"
@@ -63,9 +64,13 @@ namespace param {
     fs::path isoFile;
     fs::path outPath;
     fs::path xmlFile;
+	bool pathTable = false;
     bool outputSortedByDir = false;
-		bool pathTable = false;
 	EncoderAudioFormats encodingFormat = EAF_WAV;
+}
+
+namespace global {
+	CueFile cueFile;
 }
 
 fs::path GetRealDAFilePath(const fs::path& inputPath)
@@ -129,12 +134,6 @@ static std::string_view CleanDescElement(char (&id)[N])
     return result;
 }
 
-std::string_view CleanIdentifier(std::string_view id)
-{
-	std::string_view result(id.substr(0, id.find_last_of(';')));
-	return result;
-}
-
 void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
 	memcpy(header->chunkID,"RIFF",4);
 	header->chunkSize = 36 + dataSize;
@@ -195,7 +194,7 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
 	FILE* outFile = OpenFile(outputPath, "wb");
 
     if (outFile == NULL) {
-		printf("ERROR: Cannot create license file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
+		printf("ERROR: Cannot create license file \"%" PRFILESYSTEM_PATH "\"...", outputPath.lexically_normal().c_str());
         return;
     }
 
@@ -321,8 +320,6 @@ static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::Iso
 	element->SetAttribute(xml::attrib::GMT_OFFSET, entry.entry.entryDate.GMToffs);
 	++attributeCounters.GMTOffs[entry.entry.entryDate.GMToffs];
 
-	++attributeCounters.HFLAG[entry.entry.flags];
-
 	// xa_attrib only makes sense on XA files
 	if (type == EntryType::EntryXA)
 	{
@@ -338,6 +335,9 @@ static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::Iso
 	element->SetAttribute(xml::attrib::XA_UID, entry.extData.owneruserid);
 	++attributeCounters.GID[entry.extData.ownergroupid];
 	++attributeCounters.UID[entry.extData.owneruserid];
+
+	element->SetAttribute(xml::attrib::HIDDEN_FLAG, entry.entry.flags & 0x01);
+	++attributeCounters.HFLAG[entry.entry.flags & 0x01];
 }
 
 static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defaultAttributesElement, const EntryAttributeCounters& attributeCounters)
@@ -365,8 +365,8 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_PERMISSIONS, defaultAttributes.XAPerm);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_GID, defaultAttributes.GID);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_UID, defaultAttributes.UID);
-	if (defaultAttributes.HFLAG & 0x01) {
-		defaultAttributesElement->SetAttribute(xml::attrib::HIDDEN_FLAG, 1);
+	if (defaultAttributes.HFLAG) {
+		defaultAttributesElement->SetAttribute(xml::attrib::HIDDEN_FLAG, 0x01);
 	}
 
 	return defaultAttributes;
@@ -406,7 +406,7 @@ static void SimplifyDefaultXMLAttributes(tinyxml2::XMLElement* element, const En
 	}
 }
 
-static EntryType GetXAEntryType(unsigned short xa_attr)
+EntryType GetXAEntryType(unsigned short xa_attr)
 {
 	// we try to guess the file type. Usually, the xa_attr should tell this, but there are many games
 	// that do not follow the standard, and sometime leave some or all the attributes unset.
@@ -488,7 +488,7 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 		
 				auto& entry = dirEntries->dirEntryList.GetView().back().get();							
 
-				const bool isDA = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA;
+				const bool isDA = entry.type == EntryType::EntryDA;
 
 				if(!isDA && sindex >= 0 && sindex + 1 < pathTableList.size() && pathTableList[index].entry.extLength == 0)
 				{
@@ -562,6 +562,90 @@ std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, Lis
   	return dirEntries;
 }
 
+std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::IsoReader &reader, std::list<cd::IsoDirEntries::Entry>& entries)
+{
+	std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> DAfiles;
+	unsigned tracknum = 2;
+
+	// Get referenced DA files and assign them an ID number
+	for(auto it = entries.begin(); it != entries.end(); ++it) {
+		if(it->type == EntryType::EntryDA) {
+			it->trackid = (tracknum < 10 ? "0" : "") + std::to_string(tracknum);
+			tracknum++;
+			DAfiles.emplace_back(it);
+		}
+	}
+
+	if (tracknum <= global::cueFile.tracks.size()) {
+		std::vector<cd::IsoDirEntries::Entry> unrefDAbuff;
+		// Create a buffer of unreferenced DA tracks
+		for(const auto& track : global::cueFile.tracks) {
+			// Skip non audio tracks
+			if (track.type != "AUDIO") {
+				continue;
+			}
+			auto& entry = unrefDAbuff.emplace_back();
+			entry.entry.entryOffs.lsb = track.startSector;
+			entry.entry.entrySize.lsb = track.sizeInSectors * 2048; // We are using this size instead of 2352 because of how the code was written
+			entry.identifier = GetRealDAFilePath("TRACK - " + track.number).generic_u8string() + ";1";
+			entry.type = EntryType::EntryDA;
+
+			// Additional safety check in case the .cue file had a wrong pause size
+			// For ex, Mega Man X3 track 30 had a 149 sectors pause, but at redump.org says it was a standard 150 one
+			unsigned char sectorBuff[CD_SECTOR_SIZE];
+			unsigned char emptyBuff[CD_SECTOR_SIZE] = {0};
+			while (true) {
+				if (reader.SeekToSector(entry.entry.entryOffs.lsb - 1) < 0) {
+					break;
+				}
+				reader.ReadBytesDA(sectorBuff, CD_SECTOR_SIZE);
+				if (std::memcmp(sectorBuff, emptyBuff, CD_SECTOR_SIZE)) {
+					entry.entry.entryOffs.lsb--;
+					entry.entry.entrySize.lsb += 2048;
+				}
+				else {
+					break;
+				}
+			}
+		}
+
+		// Checks for already referenced DA files and deletes them from the buffer
+		if (tracknum > 2) {
+			unrefDAbuff.erase(std::remove_if(unrefDAbuff.begin(), unrefDAbuff.end(), [&DAfiles](const cd::IsoDirEntries::Entry& entry) {
+								return std::any_of(DAfiles.begin(), DAfiles.end(), [&entry](const auto& daEntry) {
+											return daEntry->entry.entryOffs.lsb == entry.entry.entryOffs.lsb;
+										});
+							  }), unrefDAbuff.end());
+		}
+
+		// Add unreferenced DA files in entries for further extraction
+		for (auto& entry : unrefDAbuff) {
+			entries.emplace_back(std::move(entry));
+			DAfiles.emplace_back(std::prev(entries.end()));
+		}
+
+		// Sort DA files by LBA
+		std::sort(DAfiles.begin(), DAfiles.end(),[](const auto& left, const auto& right)
+			{
+				return left->entry.entryOffs.lsb < right->entry.entryOffs.lsb;
+			});
+
+		// Only recalculate the trackid's if there were unreferenced tracks among the referenced ones
+		// This is just for a prettier XML view because unsorted trackid's have no impact at build time
+		if (tracknum > 2 && tracknum <= global::cueFile.tracks.size()) {
+			tracknum = 2;
+			for(const auto& entry : DAfiles) {
+				if(!entry->trackid.empty()) {
+					entry->trackid = (tracknum < 10 ? "0" : "") + std::to_string(tracknum);
+				}
+				tracknum++;
+			}
+		}
+	}
+
+	return DAfiles;
+}
+
 void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entry>& files, const fs::path& rootPath)
 {
     for (const auto& entry : files)
@@ -571,8 +655,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 		{
 			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", entry.identifier.c_str(), outputPath.lexically_normal().c_str());
 
-			const EntryType type = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
-			if (type == EntryType::EntryXA)
+			if (entry.type == EntryType::EntryXA)
 			{
 				// Extract XA or STR file.
 				// For both XA and STR files, we need to extract the data 2336 bytes per sector.
@@ -590,7 +673,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
+					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...", outputPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -615,25 +698,30 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				fclose(outFile);
 
 			}
-			else if (type == EntryType::EntryDA)
+			else if (entry.type == EntryType::EntryDA)
 			{
 				// Extract CDDA file
 				int result = reader.SeekToSector(entry.entry.entryOffs.lsb);
 
 				if (result) {
-					printf("WARNING: The CDDA file %" PRFILESYSTEM_PATH " is out of the iso file bounds.\n", outputPath.lexically_normal().c_str());
+					printf("WARNING: The CDDA file \"%" PRFILESYSTEM_PATH "\" is out of the iso file bounds.\n", outputPath.lexically_normal().c_str());
 					printf("This usually means that the game has audio tracks, and they are on separate files.\n");
-					printf("As DUMPSXISO does not support dumping from a cue file, you should use an iso file containing all tracks.\n\n");
+					if (global::cueFile.multiBIN) {
+						printf("Multi .bin cue file currently is not supported, you need to use a cue in single binary format.\n\n");
+					}
+					else {
+						printf("You should use a single bin/cue file containing all tracks.\n\n");
+					}
 					printf("DUMPSXISO will write the file as a dummy (silent) cdda file.\n");
 					printf("This is generally fine, when the real CDDA file is also a dummy file.\n");
-					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n");
+					printf("If it is not dummy, you WILL lose this audio data in the rebuilt iso.\n\n");
 				}
 
                 auto daOutPath = GetRealDAFilePath(outputPath);
 				auto outFile = OpenScopedFile(daOutPath, "wb");
 
 				if (!outFile) {
-					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", daOutPath.lexically_normal().c_str());
+					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...", daOutPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -661,7 +749,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					return;
 				}
 			}
-			else if (type == EntryType::EntryFile)
+			else if (entry.type == EntryType::EntryFile)
 			{
 				// Extract regular file
 
@@ -670,7 +758,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file %" PRFILESYSTEM_PATH "...", outputPath.lexically_normal().c_str());
+					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...", outputPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -706,9 +794,11 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 	for (const auto& entry : files)
 	{
 		fs::path toChange(rootPath / entry.virtualPath / CleanIdentifier(entry.identifier));
-		const EntryType type = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
-		if(type == EntryType::EntryDA)
+		if(entry.type == EntryType::EntryDA)
 		{
+			if (entry.trackid.empty()) {
+				continue; // Skip if it's an unreferenced DA file
+			}
 			toChange = GetRealDAFilePath(toChange);
 		}
 		UpdateTimestamps(toChange, entry.entry.entryDate);
@@ -716,13 +806,12 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 }
 
 tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyxml2::XMLElement* dirElement, fs::path* currentVirtualPath,
-	const fs::path& sourcePath, const std::string& trackid, EntryAttributeCounters& attributeCounters)
+	const fs::path& sourcePath, EntryAttributeCounters& attributeCounters)
 {
 	tinyxml2::XMLElement* newelement;
 
 	const fs::path outputPath = sourcePath / entry.virtualPath / CleanIdentifier(entry.identifier);
-	const EntryType entryType = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
-	if (entryType == EntryType::EntryDir)
+	if (entry.type == EntryType::EntryDir)
 	{
 		if (!entry.identifier.empty())
 		{
@@ -746,37 +835,22 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 	{
         newelement = dirElement->InsertNewChildElement("file");
         newelement->SetAttribute(xml::attrib::ENTRY_NAME, std::string(CleanIdentifier(entry.identifier)).c_str());
-		if(entryType != EntryType::EntryDA)
+		if(entry.type != EntryType::EntryDA)
 		{
 			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_u8string().c_str());
+			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, entry.type == EntryType::EntryFile ? "data" : "mixed");	
 		}
 		else
 		{
-			newelement->SetAttribute(xml::attrib::TRACK_ID, trackid.c_str());
-		}
-
-		if (entryType == EntryType::EntryXA)
-		{
-			if (param::pathTable) {
-				 newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
-			}
-
-			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "mixed");
-		}
-		else if (entryType == EntryType::EntryDA)
-		{
+			newelement->SetAttribute(xml::attrib::TRACK_ID, entry.trackid.c_str());
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "da");
 		}
-		else if (entryType == EntryType::EntryFile)
+		if (param::pathTable)
 		{
-			if (param::pathTable) {
-				 newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
-			}
-
-			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "data");
+			newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
 		}
 	}
-	WriteOptionalXMLAttribs(newelement, entry, entryType, attributeCounters);
+	WriteOptionalXMLAttribs(newelement, entry, entry.type, attributeCounters);
 	return dirElement;
 }
 
@@ -796,17 +870,15 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	}
 }
 
-void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
+void WriteXMLByLBA(std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
 	EntryAttributeCounters& attributeCounters, cd::IsoReader &reader)
 {
 	fs::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
-	unsigned tracknum = 2;
-	for (const auto& entry : files)
-	{
-		const bool isDA = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA;
 
+	for (auto& entry : files)
+	{
 		// if this is a DA file we are at the end of filesystem
-		if(!isDA)
+		if (entry.type != EntryType::EntryDA)
 		{
 			// only check for gaps, update LBA if it's inside the iso filesystem
 			if (entry.entry.entryOffs.lsb > expectedLBA)
@@ -815,14 +887,9 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 			}
 			expectedLBA = entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb);
 		}
-
-		// add a trackid to DA tracks
-		std::string trackid;
-		if (isDA)
+		else if (entry.trackid.empty())
 		{
-			char tidbuf[3];
-			snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum++);
-			trackid = tidbuf;
+			continue; // Skip if it's an unreferenced DA file
 		}
 
 		// Work out the relative position between the current directory and the element to create
@@ -849,32 +916,24 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 			currentVirtualPath /= part;
 		}
 
-		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath, trackid, attributeCounters);
+		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath, attributeCounters);
 	}
 }
 
 void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
 	EntryAttributeCounters& attributeCounters)
 {
-	unsigned tracknum = 2;
 	for (const auto& e : directory->dirEntryList.GetView())
 	{
-		const auto& entry = e.get();
+		auto& entry = e.get();
 
-		std::string trackid;
-		if (GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA)
-		{
-			char tidbuf[3];
-			snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum++);
-			trackid = tidbuf;
-		}
-		else
+		if (entry.type != EntryType::EntryDA)
 		{
 			// Update the LBA to the max encountered value
 			expectedLBA = std::max(expectedLBA, entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb));
 		}
 
-		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath, trackid, attributeCounters);
+		tinyxml2::XMLElement* child = WriteXMLEntry(entry, dirElement, nullptr, sourcePath, attributeCounters);
 		// Recursively write children if there are any
 		if (const cd::IsoDirEntries* subdir = entry.subdir.get(); subdir != nullptr)
 		{
@@ -946,10 +1005,8 @@ void ParseISO(cd::IsoReader& reader) {
 
 	std::list<cd::IsoDirEntries::Entry> entries;
 	std::unique_ptr<cd::IsoDirEntries> rootDir = (param::pathTable
-		?	ParseRootPathTable(reader, ListView(entries), pathTable.pathTableList, sorted)
-		: ParseRoot(reader,
-					ListView(entries),
-					descriptor.rootDirRecord.entryOffs.lsb));
+		? ParseRootPathTable(reader, ListView(entries), pathTable.pathTableList, sorted)
+		: ParseRoot(reader,	ListView(entries), descriptor.rootDirRecord.entryOffs.lsb));
 
 	// Sort files by LBA for "strict" output
 	entries.sort([](const auto& left, const auto& right)
@@ -957,6 +1014,9 @@ void ParseISO(cd::IsoReader& reader) {
 			return left.entry.entryOffs.lsb < right.entry.entryOffs.lsb;
 		});
 
+	// Process DA tracks and add them to the entries list
+	auto DAfiles = processDAfiles(reader, entries);
+	
 	ExtractFiles(reader, entries, param::outPath);
     SaveLicense(*license);
 
@@ -1001,53 +1061,14 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 
 			const fs::path xmlPath = param::xmlFile.parent_path().lexically_normal();
+			const fs::path sourcePath = param::outPath.lexically_proximate(xmlPath);
 
-			{
-				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
-				newElement->SetAttribute(xml::attrib::LICENSE_FILE,
-					(param::outPath / "license_data.dat").lexically_proximate(xmlPath).generic_u8string().c_str());
-			}
+			// Add license element to the xml
+			tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
+			newElement->SetAttribute(xml::attrib::LICENSE_FILE,	(sourcePath / "license_data.dat").lexically_proximate(xmlPath).generic_u8string().c_str());
 
 			// Create <default_attributes> now so it lands before the directory tree
 			tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
-
-			const fs::path sourcePath = param::outPath.lexically_proximate(xmlPath);
-
-			// process DA "files" to tracks and add to the dirs so the XML looks nicer
-			std::vector<std::list<cd::IsoDirEntries::Entry>::const_iterator> dafiles;
-			for(auto it = entries.begin(); it != entries.end(); ++it)
-			{
-				if(GetXAEntryType(((*it).extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA)
-				{
-					dafiles.emplace_back(it);
-				}
-			}
-			std::vector<cdtrack> tracks;
-			for(const auto& dafile : dafiles)
-			{
-				auto tracksource = GetRealDAFilePath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier)).lexically_normal();
-
-				// add to make track element later
-				tracks.emplace_back(
-					dafile->entry.entryOffs.lsb,
-					dafile->entry.entrySize.lsb,
-					tracksource.generic_u8string()
-				);
-
-				// add back in to the rest of the files
-				for(auto it = entries.begin(); it != entries.end(); ++it)
-				{
-				    fs::path vpath = (*it).virtualPath / CleanIdentifier((*it).identifier);
-					if(dafile->virtualPath == vpath)
-					{
-						do {
-							++it;
-						} while((it != entries.end()) && ((*it).virtualPath == dafile->virtualPath));
-						entries.splice(it, entries, dafile);
-						break;
-					}
-				}
-			}
 
 			EntryAttributeCounters attributeCounters;
 			unsigned currentLBA = descriptor.rootDirRecord.entryOffs.lsb;
@@ -1063,79 +1084,74 @@ void ParseISO(cd::IsoReader& reader) {
 			tinyxml2::XMLElement *dirtree = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
 			SimplifyDefaultXMLAttributes(dirtree, EstablishXMLAttributeDefaults(defaultAttributesElement, attributeCounters));
 
-			// write CDDA tracks
+			// Write the DATA track postgap
+			// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, postgap should be always >= 150 sectors for CD-DA discs and optionally for non CD-DA.
+			unsigned int postGap = 150;
+			unsigned int totalLenLBA = descriptor.volumeSize.lsb;
+			if (!global::cueFile.tracks.empty()) {
+				postGap = global::cueFile.tracks.front().endSector - currentLBA;
+			}
+			else if (totalLenLBA - currentLBA < postGap) {
+				postGap = totalLenLBA - currentLBA;
+				if (postGap) {
+					printf("Warning: This %u sectors gap could mean that there are missing files or the image was previously modified.\n", postGap);
+				}
+			}
+			// There are some CD-DA games that have a non-zero adrress ECC calculation in the last postgap sector. So, we are checking it.
+			// Idk if this behavior could happen in other sectors, but apparently it is only related to postgaps in CD-DA games.
+			cd::SECTOR_M2F1 sector;
+			reader.SeekToSector(currentLBA + postGap - 1);
+			reader.ReadBytesXA(sector.subHead, 2336);
+			if (sector.ecc[0] != 0 || sector.ecc[1] != 0 || sector.ecc[2] != 0 || sector.ecc[3] != 0) {
+				WriteXMLGap(postGap - 1, dirtree, currentLBA, reader);
+				WriteXMLGap(1, dirtree, currentLBA, reader);
+				dirtree->LastChildElement("dummy")->SetAttribute(xml::attrib::ECC_ADDRES, true);
+			}
+			else {
+				WriteXMLGap(postGap, dirtree, currentLBA, reader);
+			}
+			currentLBA += postGap;
+
+			// Write CD-DA tracks
 			tinyxml2::XMLNode *modifyProject = trackElement->Parent();
 			tinyxml2::XMLElement *addAfter = trackElement;
-			unsigned tracknum = 2;
-			for(const auto& track : tracks)
+			for(const auto& dafile : DAfiles)
 			{
-				unsigned pregap_sectors = 0;
-				if(track.lba != currentLBA)
+				// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, pause should be always >= 150 sectors.
+				unsigned pregap_sectors = 150;
+				dafile->virtualPath = GetRealDAFilePath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier)).lexically_normal();
+				if(dafile->entry.entryOffs.lsb != currentLBA)
 				{
-					unsigned delta = (track.lba - currentLBA);
-					// HACK add dummy sectors, assumes a 150 sector pregap if this a gap of more sectors
-					if((delta > 150) && (tracknum == 2))
-					{
-					/* There are some games like SLUS-00152, SLUS-00282, SLES-00024 that have some kind of data in the ECC bytes of the last pregap sector.
-					   Idk what this data could mean, but I leave an approach on how to handle it if someone wants to implement it in the future.
-
-						cd::SECTOR_M2F1 sector;
-						reader.SeekToSector(currentLBA + (delta - 151));
-						reader.ReadBytesXA(sector.subHead, 2336);
-						if (sector.ecc[0] != 0 || sector.ecc[1] != 0 || sector.ecc[2] != 0 || sector.ecc[3] != 0) {
-							WriteXMLGap(delta - 151, dirtree, currentLBA, reader);
-							dirtree->InsertNewChildElement("dummy_ECC");
-						}
-						else {
-							WriteXMLGap(delta - 150, dirtree, currentLBA, reader);
-						}*/
-						WriteXMLGap(delta-150, dirtree, currentLBA, reader);
-						currentLBA += (delta-150);
-						delta = 150;
-					}
-					currentLBA += delta;
-					pregap_sectors = delta;
+					pregap_sectors = dafile->entry.entryOffs.lsb - currentLBA;
+					currentLBA += pregap_sectors;
 				}
-				currentLBA += GetSizeInSectors(track.size);
-				char tidbuf[3];
-				snprintf(tidbuf, sizeof(tidbuf), "%02u", tracknum);
+				currentLBA += GetSizeInSectors(dafile->entry.entrySize.lsb);
 				tinyxml2::XMLElement *newtrack = xmldoc.NewElement(xml::elem::TRACK);
 				newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
-				newtrack->SetAttribute(xml::attrib::TRACK_ID, tidbuf);
-				newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, track.source.c_str());
+				if (!dafile->trackid.empty()) {
+					newtrack->SetAttribute(xml::attrib::TRACK_ID, dafile->trackid.c_str());
+				}
+				newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, dafile->virtualPath.generic_u8string().c_str());
 				// only write the pregap element if it's non default
-	            if(pregap_sectors != 150)
-	            {
-                    tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
-	                pregap->SetAttribute(xml::attrib::PREGAP_DURATION, SectorsToTimecode(pregap_sectors).c_str());
-                }
+				if(pregap_sectors != 150)
+				{
+					tinyxml2::XMLElement *pregap = newtrack->InsertNewChildElement(xml::elem::TRACK_PREGAP);
+					pregap->SetAttribute(xml::attrib::PREGAP_DURATION, SectorsToTimecode(pregap_sectors).c_str());
+				}
 
-                modifyProject->InsertAfterChild(addAfter, newtrack);
-	            addAfter = newtrack;
-				tracknum++;
+				modifyProject->InsertAfterChild(addAfter, newtrack);
+				addAfter = newtrack;
 			}
 
-			// HACK until some better way to get track sizes is implemented, like getting them from a .cue file
-			// Check for a EoF gap, usually 150 sectors for single track games
-			unsigned int totalLenLBA = descriptor.volumeSize.lsb;
+			// Check if there is still an EoF gap
 			if (currentLBA < totalLenLBA) {
-				int numSectors = totalLenLBA - currentLBA;
-				if (numSectors == 150) {
-					WriteXMLGap(numSectors, dirtree, currentLBA, reader);
-					printf(	"Adding %d dummy sectors...\n", numSectors);
-				}
-				else if (numSectors < 150) {
-					WriteXMLGap(numSectors, dirtree, currentLBA, reader);
-					printf(	"Adding %d dummy sectors...\n\n"
-							"Warning: This %d sectors gap could mean that there are missing files or the image was previously modified.\n"
-							"\t If there are DA files, check that the dummy is before them, otherwise the built image will be corrupted.\n", numSectors, numSectors);
+				printf( "Warning: There is still a gap of %u sectors at the end.\n"
+						"\t This could mean that there are missing files or tracks.\n", totalLenLBA - currentLBA);
+				if (global::cueFile.tracks.empty()) {
+					printf("\t Try using a .cue file (in single bin format) instead of an ISO image file.\n");
 				}
 				else {
-					WriteXMLGap(150, dirtree, currentLBA, reader);
-					printf( "Adding 150 dummy sectors...\n\n"
-							"Warning: There is still a gap of %d sectors at the end.\n"
-							"\t This could mean that there are missing files or tracks.\n"
-							"\t Unfortunately, current version can't dump unreferenced tracks.\n", (numSectors - 150));
+					printf("\t Try using the -pt command, it could help if the game has an obfuscated file system.\n");
 				}
 			}
 
@@ -1149,7 +1165,7 @@ int Main(int argc, char *argv[])
 {
 	static constexpr const char* HELP_TEXT =
 		"dumpsxiso [-h|--help] [-x <path>] [-s <path>.xml] <isofile>\n\n"
-		"  <isofile> - File name of ISO file (supports any 2352 byte/sector images).\n"
+		"  <isofile> - File name of the bin/cue file (supports any 2352 byte/sector images but no in multi-bin cue format).\n"
 		"  -x <path> - Optional destination directory for extracted files. (Defaults to dumpsxiso dir)\n"
 		"  -s <path>.xml - Optional XML name/destination of MKPSXISO compatible script for later rebuilding. (Defaults to dumpsxiso dir)\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
@@ -1255,11 +1271,16 @@ int Main(int argc, char *argv[])
 		param::xmlFile = param::isoFile.stem() += ".xml";
 	}
 
+	if (CompareICase(param::isoFile.extension().generic_u8string(), ".cue"))
+	{
+		global::cueFile = parseCueFile(param::isoFile);
+	}
+
 	cd::IsoReader reader;
 
 	if (!reader.Open(param::isoFile)) {
 
-		printf("ERROR: Cannot open file %" PRFILESYSTEM_PATH "...\n", param::isoFile.lexically_normal().c_str());
+		printf("ERROR: Cannot open file \"%" PRFILESYSTEM_PATH "\"...\n", param::isoFile.lexically_normal().c_str());
 		return EXIT_FAILURE;
 
 	}
@@ -1277,7 +1298,7 @@ int Main(int argc, char *argv[])
 		}
 	}
 
-	printf("Output directory : %" PRFILESYSTEM_PATH "\n", param::outPath.lexically_normal().c_str());
+	printf("Output directory : \"%" PRFILESYSTEM_PATH "\"\n", param::outPath.lexically_normal().c_str());
 
     ParseISO(reader);
 	return EXIT_SUCCESS;

@@ -91,7 +91,7 @@ iso::DirTreeClass::~DirTreeClass()
 {
 }
 
-iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate)
+iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate, const bool hiddenFlag)
 {
 	DIRENTRY entry {};
 
@@ -104,7 +104,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.length	= 0; // Length is meaningless for directories
 
 	const EntryAttributes attributes; // Leave defaults
-	entry.HF		= attributes.HFLAG;
+	entry.HF		= hiddenFlag;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -222,7 +222,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 	entry.id = std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
-	entry.HF		= attributes.HFLAG;
+	entry.HF		= (bool)attributes.HFLAG;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -258,7 +258,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 
 }
 
-void iso::DirTreeClass::AddDummyEntry(const unsigned int sectors, const unsigned char submode, const unsigned int flba)
+void iso::DirTreeClass::AddDummyEntry(const unsigned int sectors, const unsigned char submode, const unsigned int flba, const bool eccAddr)
 {
 	DIRENTRY entry {};
 
@@ -267,6 +267,7 @@ void iso::DirTreeClass::AddDummyEntry(const unsigned int sectors, const unsigned
 	entry.type		= EntryType::EntryDummy;
 	entry.length	= 2048*sectors;
 	entry.flba		= flba;
+	entry.HF		= eccAddr;
 
 	entries.emplace_back(std::move(entry));
 	entriesInDir.emplace_back(entries.back());
@@ -316,7 +317,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries, this);
-	entry.HF		= attributes.HFLAG;
+	entry.HF		= (bool)attributes.HFLAG;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -447,7 +448,7 @@ void iso::DirTreeClass::SortDirectoryEntries()
 		if ( entry.type == EntryType::EntryDir )
 		{
 			// Perform recursive call
-            if ( entry.subdir != nullptr )
+			if ( entry.subdir != nullptr )
 			{
 				entry.subdir->SortDirectoryEntries();
 			}
@@ -456,7 +457,9 @@ void iso::DirTreeClass::SortDirectoryEntries()
 
 	std::sort(entriesInDir.begin(), entriesInDir.end(), [](const auto& left, const auto& right)
 		{
-			return left.get().id < right.get().id;
+			const std::string_view idLeft = CleanIdentifier(left.get().id);
+			const std::string_view idRight = CleanIdentifier(right.get().id);
+			return idLeft < idRight;
 		});
 }
 
@@ -480,11 +483,11 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 
 		if ( entry.type == EntryType::EntryDir )
 		{
-			dirEntry->flags = 0x02 + entry.HF;
+			dirEntry->flags = 0x02 | entry.HF;
 		}
 		else
 		{
-			dirEntry->flags = 0x00 + entry.HF;
+			dirEntry->flags = 0x00 | entry.HF;
 		}
 
 		// File length correction for certain file types
@@ -534,10 +537,10 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 			identifierBuffer[0] = currentOrParent.value() ? '\1' : '\0';
 		}
 		entryLength += dirEntry->identifierLen;
+		entryLength = RoundToEven(entryLength);
 
 		if ( !global::noXA )
 		{
-			entryLength = RoundToEven(entryLength);
 			auto xa = reinterpret_cast<cdxa::ISO_XA_ATTRIB*>(buffer+entryLength);
 
 			xa->id[0] = 'X';
@@ -726,7 +729,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			const uint32_t sizeInSectors = GetSizeInSectors(entry.length);
 			auto sectorView = writer->GetSectorViewM2F1(entry.lba, sizeInSectors, isForm2 ? cd::IsoWriter::EdcEccForm::Form2 : cd::IsoWriter::EdcEccForm::Form1);
 
-			sectorView->WriteBlankSectors(sizeInSectors, entry.attribs);
+			sectorView->WriteBlankSectors(sizeInSectors, entry.attribs, entry.HF);
 		}
 	}
 
@@ -1061,7 +1064,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 		18+(pathTableSectors*4) );
 	isoDescriptor.rootDirRecord.entrySize = cd::SetPair32(
 		dirTree->CalculateDirEntryLen() );
-	isoDescriptor.rootDirRecord.flags = 0x02;
+	isoDescriptor.rootDirRecord.flags = 0x02 | root.HF;
 	isoDescriptor.rootDirRecord.volSeqNum = cd::SetPair16( 1 );
 	isoDescriptor.rootDirRecord.identifierLen = 1;
 	isoDescriptor.rootDirRecord.identifier = 0x0;
@@ -1118,7 +1121,6 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 
 	auto mpathTable2 = writer->GetSectorViewM2F1(currentHeaderLBA, pathTableSectors + ISOver, cd::IsoWriter::EdcEccForm::Form1);
 	mpathTable2->WriteMemory(sectorBuff.get(), pathTableSize);
-	currentHeaderLBA += pathTableSectors;
 }
 
 unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, bool msb)

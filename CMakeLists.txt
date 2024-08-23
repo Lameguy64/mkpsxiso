@@ -98,6 +98,7 @@ endif()
 
 add_executable(dumpsxiso
 	${dumpsxiso_dir}/cdreader.cpp
+	${dumpsxiso_dir}/cue.cpp
 	${dumpsxiso_dir}/main.cpp
 )
 target_link_libraries(dumpsxiso tinyxml2 iso_shared)
@@ -112,9 +113,10 @@ endif()
 
 ## Installation
 
+set(CMAKE_INSTALL_DATADIR "doc")
 include(GNUInstallDirs)
 install(TARGETS mkpsxiso dumpsxiso)
-install(FILES ${PROJECT_SOURCE_DIR}/README.md ${PROJECT_SOURCE_DIR}/LICENSE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/psn00bsdk/doc/mkpsxiso)
+install(FILES ${PROJECT_SOURCE_DIR}/README.md ${PROJECT_SOURCE_DIR}/LICENSE.md ${PROJECT_SOURCE_DIR}/examples/example.xml DESTINATION ${CMAKE_INSTALL_DATADIR})
 
 ## CPack (used by GitHub Actions to package releases)
 

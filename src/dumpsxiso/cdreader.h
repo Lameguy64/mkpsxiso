@@ -96,6 +96,8 @@ namespace cd {
             cdxa::ISO_XA_ATTRIB extData;
             std::string identifier;
             fs::path virtualPath;
+            EntryType type;
+            std::string trackid;
 
             std::unique_ptr<IsoDirEntries> subdir;
         };
@@ -110,5 +112,5 @@ namespace cd {
     };
 
 }
-
+extern EntryType GetXAEntryType(unsigned short xa_attr);
 #endif // _CDREADER_H

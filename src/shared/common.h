@@ -50,14 +50,14 @@ public:
 
 // Helper functions for datestamp manipulation
 cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
-cd::ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success = false);
-//cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
+cd::ISO_LONG_DATESTAMP GetLongDateFromString(const char* str);
 cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
 std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src);
 
+// Helper functions for sector conversion
 uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize = 2048);
-
 std::string SectorsToTimecode(const unsigned sectors);
+const unsigned int TimecodeToSectors(const std::string timecode);
 
 // Endianness swap
 unsigned short SwapBytes16(unsigned short val);
@@ -77,6 +77,8 @@ struct file_deleter
 using unique_file = std::unique_ptr<FILE, file_deleter>;
 unique_file OpenScopedFile(const fs::path& path, const char* mode);
 
+// Helper functions for string manipulation
+std::string_view CleanIdentifier(std::string_view id);
 bool CompareICase(std::string_view strLeft, std::string_view strRight);
 
 // Argument parsing

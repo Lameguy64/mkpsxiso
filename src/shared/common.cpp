@@ -6,41 +6,7 @@
 #include <cstdarg>
 
 using namespace cd;
-/*
-static void snprintfZeroPad(char* s, size_t n, const char* format, ...)
-{
-	// We need a temporary buffer that is 1 byte bigger than the specified one,
-	// then memcpy without the null terminator/pad with zeroes
-	auto buf = std::make_unique<char[]>(n + 1);
 
-	va_list args;
-	va_start(args, format);
-
-	const int bytesWritten = vsnprintf(buf.get(), n + 1, format, args);
-	memcpy(s, buf.get(), bytesWritten);
-	if (bytesWritten < n) {
-		std::fill(s + bytesWritten, s + n, '\0');
-	}
-
-	va_end(args);
-}
-
-ISO_LONG_DATESTAMP GetLongDateFromDate(const ISO_DATESTAMP& src)
-{
-	ISO_LONG_DATESTAMP result;
-
-	snprintfZeroPad(result.year, std::size(result.year), "%04d", src.year != 0 ? 1900 + src.year : 0);
-	snprintfZeroPad(result.month, std::size(result.month), "%02d", src.month);
-	snprintfZeroPad(result.day, std::size(result.day), "%02d", src.day);
-	snprintfZeroPad(result.hour, std::size(result.hour), "%02d", src.hour);
-	snprintfZeroPad(result.minute, std::size(result.minute), "%02d", src.minute);
-	snprintfZeroPad(result.second, std::size(result.second), "%02d", src.second);
-	strncpy(result.hsecond, "00", std::size(result.hsecond));
-	result.GMToffs = src.GMToffs;
-
-	return result;
-}
-*/
 ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 {
 	bool succeeded = false;
@@ -69,7 +35,7 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 	return result;
 }
 
-ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success)
+ISO_LONG_DATESTAMP GetLongDateFromString(const char* str)
 {
 	ISO_LONG_DATESTAMP result {};
 
@@ -101,7 +67,6 @@ ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success)
 			intToChars(second, result.second, 2);
 			intToChars(hsecond, result.hsecond, 2);
 
-			success = true;
 			return result;
 		}
 	}
@@ -149,7 +114,16 @@ std::string SectorsToTimecode(const unsigned sectors)
 	char timecode[16];
 	snprintf( timecode, sizeof(timecode), "%02u:%02u:%02u", (sectors/75)/60, (sectors/75)%60, sectors%75);
 	return std::string(timecode);
-}	                
+}
+
+const unsigned int TimecodeToSectors(const std::string timecode)
+{
+	unsigned int minutes, seconds, frames;
+	if (sscanf(timecode.c_str(), "%u:%u:%u", &minutes, &seconds, &frames) != 3 || (seconds > 59) || (frames > 74)) {
+		return EXIT_FAILURE;
+	}
+	return (minutes * 60 + seconds) * 75 + frames;
+}
 
 unsigned short SwapBytes16(unsigned short val)
 {
@@ -168,6 +142,12 @@ unsigned int SwapBytes32(unsigned int val)
 unique_file OpenScopedFile(const fs::path& path, const char* mode)
 {
 	return unique_file { OpenFile(path, mode) };
+}
+
+std::string_view CleanIdentifier(std::string_view id)
+{
+	std::string_view result(id.substr(0, id.find_last_of(';')));
+	return result;
 }
 
 bool CompareICase(std::string_view strLeft, std::string_view strRight)
