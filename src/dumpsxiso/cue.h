@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cdreader.h"
 #include <fstream>
 #include <vector>
 
@@ -21,3 +22,4 @@ struct CueFile {
 };
 
 CueFile parseCueFile(std::filesystem::path& filePath);
+bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &entry, cd::IsoReader &reader, const CueFile &cueFile);

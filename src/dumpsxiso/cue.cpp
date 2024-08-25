@@ -2,6 +2,12 @@
 #include "cue.h"
 #include "platform.h"
 
+bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &entry, cd::IsoReader &reader, const CueFile &cueFile) {
+	unsigned trackIndex = (entry.trackid.empty() ? std::stoi(entry.identifier.substr(8, 2)) : std::stoi(entry.trackid)) - 1;
+	reader.Open(cueFile.tracks[trackIndex].fileName);
+	return reader.SeekToSector(sector - cueFile.tracks[trackIndex - 1].endSector);
+}
+
 CueFile parseCueFile(std::filesystem::path& filePath) {
 	std::ifstream file(filePath);
 	std::string line, fileName, fileType;
@@ -21,7 +27,11 @@ CueFile parseCueFile(std::filesystem::path& filePath) {
 			size_t firstQuote = line.find("\"");
 			size_t lastQuote = line.rfind("\"");
 			fileName = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
-			cueFile.totalSectors += GetSize(fileName) / 2352;
+			if (GetSize(fileName) < 2352) {
+				printf("Error: Failed to get the file size for \"%s\"", fileName.c_str());
+				exit(EXIT_FAILURE);
+			}
+			cueFile.totalSectors += GetSize(fileName) / CD_SECTOR_SIZE;
 			cueFile.multiBIN = true;
 
 			if (line.find("BINARY") != std::string::npos) {

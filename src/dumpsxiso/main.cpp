@@ -202,7 +202,7 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
     fclose(outFile);
 }
 
-void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const int isInvalid)
+void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const bool isInvalid)
 {
 	int bytesLeft = cddaSize;
 	while (bytesLeft > 0) {
@@ -223,7 +223,7 @@ void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, c
     }
 }
 
-void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const int isInvalid)
+void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const bool isInvalid)
 {
     cd::RIFF_HEADER riffHeader;
     prepareRIFFHeader(&riffHeader, cddaSize);
@@ -233,7 +233,7 @@ void writeWaveFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, 
 }
 
 #ifndef MKPSXISO_NO_LIBFLAC
-void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, const int isInvalid)
+void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, const bool isInvalid)
 {
 	FLAC__bool ok = true;
 	FLAC__StreamEncoder *encoder = 0;
@@ -365,7 +365,7 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_PERMISSIONS, defaultAttributes.XAPerm);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_GID, defaultAttributes.GID);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_UID, defaultAttributes.UID);
-	if (defaultAttributes.HFLAG) {
+	if (defaultAttributes.HFLAG) { // Set only if not zero
 		defaultAttributesElement->SetAttribute(xml::attrib::HIDDEN_FLAG, 0x01);
 	}
 
@@ -591,14 +591,14 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			entry.type = EntryType::EntryDA;
 
 			// Additional safety check in case the .cue file had a wrong pause size
-			// For ex, Mega Man X3 track 30 had a 149 sectors pause, but at redump.org says it was a standard 150 one
+			// For ex, Mega Man X3 track 30 had a 149 sectors pause, but at redump.org says it was a 150 standard one
 			unsigned char sectorBuff[CD_SECTOR_SIZE];
 			unsigned char emptyBuff[CD_SECTOR_SIZE] = {0};
 			while (true) {
-				if (reader.SeekToSector(entry.entry.entryOffs.lsb - 1) < 0) {
+				if (!reader.SeekToSector(entry.entry.entryOffs.lsb - 1) && !multiBinSeeker(entry.entry.entryOffs.lsb - 1, entry, reader, global::cueFile)) {
 					break;
 				}
-				reader.ReadBytesDA(sectorBuff, CD_SECTOR_SIZE);
+				reader.ReadBytesDA(sectorBuff, CD_SECTOR_SIZE, true);
 				if (std::memcmp(sectorBuff, emptyBuff, CD_SECTOR_SIZE)) {
 					entry.entry.entryOffs.lsb--;
 					entry.entry.entrySize.lsb += 2048;
@@ -641,6 +641,9 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 				tracknum++;
 			}
 		}
+
+		// Reopen the first file for safety
+		reader.Open(global::cueFile.tracks[0].fileName);
 	}
 
 	return DAfiles;
@@ -701,16 +704,13 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			else if (entry.type == EntryType::EntryDA)
 			{
 				// Extract CDDA file
-				int result = reader.SeekToSector(entry.entry.entryOffs.lsb);
+				bool isInvalid = !global::cueFile.multiBIN ? !reader.SeekToSector(entry.entry.entryOffs.lsb) : !multiBinSeeker(entry.entry.entryOffs.lsb, entry, reader, global::cueFile);
 
-				if (result) {
+				if (isInvalid) {
 					printf("WARNING: The CDDA file \"%" PRFILESYSTEM_PATH "\" is out of the iso file bounds.\n", outputPath.lexically_normal().c_str());
 					printf("This usually means that the game has audio tracks, and they are on separate files.\n");
-					if (global::cueFile.multiBIN) {
-						printf("Multi .bin cue file currently is not supported, you need to use a cue in single binary format.\n\n");
-					}
-					else {
-						printf("You should use a single bin/cue file containing all tracks.\n\n");
+					if (global::cueFile.tracks.empty()) {
+						printf("Try using a .cue file instead of an ISO image file.\n\n");
 					}
 					printf("DUMPSXISO will write the file as a dummy (silent) cdda file.\n");
 					printf("This is generally fine, when the real CDDA file is also a dummy file.\n");
@@ -730,23 +730,27 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				if(param::encodingFormat == EAF_WAV)
 				{
-					writeWaveFile(outFile.get(), reader, cddaSize, result);
+					writeWaveFile(outFile.get(), reader, cddaSize, isInvalid);
 				}
 #ifndef MKPSXISO_NO_LIBFLAC
 				else if(param::encodingFormat == EAF_FLAC)
 				{
 					// libflac closes outFile
-					writeFLACFile(outFile.release(), reader, cddaSize, result);
+					writeFLACFile(outFile.release(), reader, cddaSize, isInvalid);
 				}
 #endif
 				else if(param::encodingFormat == EAF_PCM)
 				{
-					writePCMFile(outFile.get(), reader, cddaSize, result);
+					writePCMFile(outFile.get(), reader, cddaSize, isInvalid);
 				}
 				else
 				{
 					printf("ERROR: support for encoding format is not implemented\n");
 					return;
+				}
+
+				if (global::cueFile.multiBIN) {
+					reader.Open(global::cueFile.tracks[0].fileName);
 				}
 			}
 			else if (entry.type == EntryType::EntryFile)
@@ -1148,7 +1152,7 @@ void ParseISO(cd::IsoReader& reader) {
 				printf( "Warning: There is still a gap of %u sectors at the end.\n"
 						"\t This could mean that there are missing files or tracks.\n", totalLenLBA - currentLBA);
 				if (global::cueFile.tracks.empty()) {
-					printf("\t Try using a .cue file (in single bin format) instead of an ISO image file.\n");
+					printf("\t Try using a .cue file instead of an ISO image file.\n");
 				}
 				else {
 					printf("\t Try using the -pt command, it could help if the game has an obfuscated file system.\n");
@@ -1165,7 +1169,7 @@ int Main(int argc, char *argv[])
 {
 	static constexpr const char* HELP_TEXT =
 		"dumpsxiso [-h|--help] [-x <path>] [-s <path>.xml] <isofile>\n\n"
-		"  <isofile> - File name of the bin/cue file (supports any 2352 byte/sector images but no in multi-bin cue format).\n"
+		"  <isofile> - File name of the bin/cue file (supports any 2352 byte/sector images).\n"
 		"  -x <path> - Optional destination directory for extracted files. (Defaults to dumpsxiso dir)\n"
 		"  -s <path>.xml - Optional XML name/destination of MKPSXISO compatible script for later rebuilding. (Defaults to dumpsxiso dir)\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
