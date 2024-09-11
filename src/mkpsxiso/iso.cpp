@@ -31,9 +31,18 @@ static bool icompare(const std::string& a, const std::string& b)
 	}
 }
 
-static cd::ISO_DATESTAMP GetISODateStamp(const time_t time, signed char GMToffs)
+static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 {
-	const tm timestamp = CustomLocalTime(time);
+	tm timestamp;
+	if (global::new_type.has_value()) {
+		timestamp = CustomLocalTime(time);
+	}
+	else {
+		// GMToffs is specified in 15 minute units
+		const time_t GMToffsSeconds = static_cast<time_t>(15) * 60 * GMToffs;
+		time += GMToffsSeconds;
+		timestamp = *gmtime( &time );
+	}
 
 	cd::ISO_DATESTAMP result;
 	result.hour		= timestamp.tm_hour;
@@ -89,7 +98,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries);
 	entry.date		= volumeDate;
-	if (global::old_type) {
+	if (!*global::new_type) {
 		entry.date.year = volumeDate.year % 0x64; // Root overflows dates past 1999 for games built with old(<2003) mastering tool
 	}
 	entry.length	= 0; // Length is meaningless for directories
@@ -121,7 +130,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 		printf("ERROR: File not found: %" PRFILESYSTEM_PATH "\n", srcfile.lexically_normal().c_str());
 		return false;
     }
-	GetSrcTime(srcfile, fileAttrib->st_ctime);
+	GetSrcTime(srcfile, fileAttrib->st_mtime);
 
 	// Check if XA data is valid
 	if ( type == EntryType::EntryXA )
@@ -240,7 +249,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 		entry.length = fileAttrib->st_size;
 	}
 
-    entry.date = GetISODateStamp( fileAttrib->st_ctime, attributes.GMTOffs );
+    entry.date = GetISODateStamp( fileAttrib->st_mtime, attributes.GMTOffs );
 
 	entries.emplace_back(std::move(entry));
 	entriesInDir.emplace_back(entries.back());
@@ -580,7 +589,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 		const DIRENTRY& entry = e.get();
 		if ( !entry.id.empty() )
 		{
-			if (!global::old_type && this->name != "<root>" && entry.type == EntryType::EntryDir) {
+			if (*global::new_type && this->name != "<root>" && entry.type == EntryType::EntryDir) {
 				dirQueue.push(entry);
 			}
 			else {
@@ -1073,10 +1082,10 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 
 	// Write the descriptor
 	unsigned int currentHeaderLBA = 16;
-	const unsigned char ISOver = global::old_type ? 0 : 1;
+	const unsigned char ISOver = *global::new_type ? 1 : 0;
 
 	auto isoDescriptorSectors = writer->GetSectorViewM2F1(currentHeaderLBA, 2 + ISOver, cd::IsoWriter::EdcEccForm::Form1);
-	isoDescriptorSectors->SetSubheader(global::old_type ? cd::IsoWriter::SubEOL : cd::IsoWriter::SubData);
+	isoDescriptorSectors->SetSubheader(*global::new_type ? cd::IsoWriter::SubData : cd::IsoWriter::SubEOL);
 
 	isoDescriptorSectors->WriteMemory(&isoDescriptor, sizeof(isoDescriptor));
 

@@ -175,9 +175,9 @@ const bool CheckISOver(cd::IsoReader &reader) {
 	reader.SeekToSector(16);
 	reader.ReadBytesXA(sector.data, 2336);
  	if (sector.data[2] & 0x01) {
-		return true;
+		return false;
 	}
-	return false;
+	return true;
 }
 
 std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
@@ -888,7 +888,7 @@ void ParseISO(cd::IsoReader& reader) {
     cd::ISO_DESCRIPTOR descriptor;
 	auto license = ReadLicense(reader);
 	const bool xa_edc = CheckEDCXA(reader);
-	const bool old_type = CheckISOver(reader);
+	const bool new_type = CheckISOver(reader);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -973,7 +973,7 @@ void ParseISO(cd::IsoReader& reader) {
 			tinyxml2::XMLElement *trackElement = baseElement->InsertNewChildElement(xml::elem::TRACK);
 			trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 			trackElement->SetAttribute(xml::attrib::XA_EDC, xa_edc);
-			trackElement->SetAttribute(xml::attrib::OLD_TYPE, old_type);
+			trackElement->SetAttribute(xml::attrib::NEW_TYPE, new_type);
 
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::IDENTIFIERS);

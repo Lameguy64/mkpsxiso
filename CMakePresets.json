@@ -12,7 +12,8 @@
 			"description": "Use this preset when building mkpsxiso for local installation.",
 			"binaryDir":   "${sourceDir}/build",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release"
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE": "Release"
 			}
 		},
 		{

@@ -27,13 +27,13 @@ namespace global
 {
 	time_t		BuildTime;
 	bool		xa_edc;
-	bool		old_type;
 	int			QuietMode	= false;
 	int			Overwrite	= false;
 
 	int			trackNum	= 1;
 	int			noXA		= false;
 
+	std::optional<bool> new_type;
 	std::optional<std::string> volid_override;
 	fs::path XMLscript;
 	fs::path LBAfile;
@@ -528,8 +528,12 @@ int Main(int argc, char* argv[])
 			{
 				dataTrack = trackElement;
 				global::xa_edc = trackElement->BoolAttribute(xml::attrib::XA_EDC, true);
-				global::old_type = trackElement->BoolAttribute(xml::attrib::OLD_TYPE, true);
-				
+
+				// This check is necessary so as to leave an empty value for compatibility with <=v2.04 dumped files timestamps
+				if ( trackElement->Attribute(xml::attrib::NEW_TYPE) != nullptr ) {
+					global::new_type = trackElement->BoolAttribute(xml::attrib::NEW_TYPE);
+				}
+
 				if ( global::trackNum != 1 )
 				{
 					if ( !global::QuietMode )
@@ -848,7 +852,7 @@ int Main(int argc, char* argv[])
 			}
 
 			// Write directory entries
-			dirTree->WriteDirectoryRecords( &writer, root, root, global::old_type ? 0 : dirTree->GetDirCountTotal() );
+			dirTree->WriteDirectoryRecords( &writer, root, root, *global::new_type ? dirTree->GetDirCountTotal() : 0 );
 
 			// Write file system descriptors to finish the image
 	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLenLBA );
@@ -1201,7 +1205,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
 
 	// Sort directory entries, calculate tree LBAs and retrieve size of image
-	if (global::old_type) {
+	if (!*global::new_type) {
 		dirTree->SortDirectoryEntries();
 	}
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);

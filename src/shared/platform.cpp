@@ -207,7 +207,7 @@ bool GetSrcTime(const fs::path& path, time_t& outTime) {
         return false;
     }
 
-    outTime = fileAttrib.st_ctime;
+    outTime = fileAttrib.st_mtime;
     return true;
 #endif
 }

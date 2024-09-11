@@ -2,15 +2,16 @@
 #define _GLOBAL_H
 
 #include <ctime>
+#include <optional>
 
 namespace global {
 
-	extern time_t		BuildTime;
-	extern bool			xa_edc;
-	extern bool			old_type;
-	extern int			QuietMode;
-	extern int			trackNum;
-	extern int			noXA;
+	extern time_t				BuildTime;
+	extern bool					xa_edc;
+	extern int					QuietMode;
+	extern int					trackNum;
+	extern int					noXA;
+	extern std::optional<bool>	new_type;
 };
 
 #endif // _GLOBAL_H
