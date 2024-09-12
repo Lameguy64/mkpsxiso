@@ -643,7 +643,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 		}
 
 		// Reopen the first file for safety
-		reader.Open(global::cueFile.tracks[0].fileName);
+		reader.Open(global::cueFile.tracks[0].filePath);
 	}
 
 	return DAfiles;
@@ -750,7 +750,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				}
 
 				if (global::cueFile.multiBIN) {
-					reader.Open(global::cueFile.tracks[0].fileName);
+					reader.Open(global::cueFile.tracks[0].filePath);
 				}
 			}
 			else if (entry.type == EntryType::EntryFile)

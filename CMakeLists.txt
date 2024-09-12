@@ -113,9 +113,14 @@ endif()
 
 ## Installation
 
-set(CMAKE_INSTALL_DATADIR "doc")
 include(GNUInstallDirs)
-install(TARGETS mkpsxiso dumpsxiso)
+if (WIN32)
+	set(CMAKE_INSTALL_BINDIR .)
+	set(CMAKE_INSTALL_DATADIR "doc")
+else()
+	set(CMAKE_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/doc/mkpsxiso")
+endif()
+install(TARGETS mkpsxiso dumpsxiso RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES ${PROJECT_SOURCE_DIR}/README.md ${PROJECT_SOURCE_DIR}/LICENSE.md ${PROJECT_SOURCE_DIR}/examples/example.xml DESTINATION ${CMAKE_INSTALL_DATADIR})
 
 ## CPack (used by GitHub Actions to package releases)

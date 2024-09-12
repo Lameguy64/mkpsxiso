@@ -4,13 +4,14 @@
 
 bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &entry, cd::IsoReader &reader, const CueFile &cueFile) {
 	unsigned trackIndex = (entry.trackid.empty() ? std::stoi(entry.identifier.substr(8, 2)) : std::stoi(entry.trackid)) - 1;
-	reader.Open(cueFile.tracks[trackIndex].fileName);
+	reader.Open(cueFile.tracks[trackIndex].filePath);
 	return reader.SeekToSector(sector - cueFile.tracks[trackIndex - 1].endSector);
 }
 
-CueFile parseCueFile(std::filesystem::path& filePath) {
-	std::ifstream file(filePath);
-	std::string line, fileName, fileType;
+CueFile parseCueFile(std::filesystem::path& inputFile) {
+	std::ifstream file(inputFile);
+	std::filesystem::path filePath;
+	std::string line, fileType;
 	CueFile cueFile;
 	unsigned int previousStartSector = 0;
 	unsigned int pauseStartSector = 1;
@@ -26,13 +27,15 @@ CueFile parseCueFile(std::filesystem::path& filePath) {
 
 			size_t firstQuote = line.find("\"");
 			size_t lastQuote = line.rfind("\"");
-			fileName = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
-			if (GetSize(fileName) < 2352) {
-				printf("Error: Failed to get the file size for \"%s\"", fileName.c_str());
+			filePath = inputFile.parent_path() / line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+			if (int64_t sectors = GetSize(filePath) / CD_SECTOR_SIZE; sectors < 1) {
+				printf("Error: Failed to get the file size for \"%s\"\n", filePath.filename().c_str());
 				exit(EXIT_FAILURE);
 			}
-			cueFile.totalSectors += GetSize(fileName) / CD_SECTOR_SIZE;
-			cueFile.multiBIN = true;
+			else {
+				cueFile.totalSectors += sectors;
+				cueFile.multiBIN = true;
+			}
 
 			if (line.find("BINARY") != std::string::npos) {
 				fileType = "BINARY";
@@ -42,7 +45,7 @@ CueFile parseCueFile(std::filesystem::path& filePath) {
 			}
 
 			if (cueFile.tracks.empty()) {
-				filePath.replace_filename(fileName);
+				inputFile = filePath;
 				cueFile.multiBIN = false;
 			}
 		}
@@ -50,7 +53,7 @@ CueFile parseCueFile(std::filesystem::path& filePath) {
 			TrackInfo track;
 			size_t trackNumStart = line.find("TRACK") + 6;
 			track.number = line.substr(trackNumStart, 2);
-			track.fileName = fileName;
+			track.filePath = filePath;
 			track.fileType = fileType;
 
 			if (line.find("AUDIO") != std::string::npos) {
