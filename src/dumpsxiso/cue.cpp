@@ -29,7 +29,7 @@ CueFile parseCueFile(std::filesystem::path& inputFile) {
 			size_t lastQuote = line.rfind("\"");
 			filePath = inputFile.parent_path() / line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
 			if (int64_t sectors = GetSize(filePath) / CD_SECTOR_SIZE; sectors < 1) {
-				printf("Error: Failed to get the file size for \"%s\"\n", filePath.filename().c_str());
+				printf("Error: Failed to get the file size for \"%s\"\n", filePath.filename().u8string().c_str());
 				exit(EXIT_FAILURE);
 			}
 			else {
