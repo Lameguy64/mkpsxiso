@@ -185,7 +185,6 @@ struct tm CustomLocalTime(time_t seconds) {
 
 bool GetSrcTime(const fs::path& path, time_t& outTime) {
 #ifdef _WIN32
-	
     if (HANDLE hFile = HandleFile(path)) {
         
 	    FILETIME ftCreation, ftLastAccess, ftLastWrite;
@@ -225,7 +224,6 @@ void UpdateTimestamps(const fs::path& path, const cd::ISO_DATESTAMP& entryDate)
 
 // utime can't update timestamps of directories on Windows, so a platform-specific approach is needed
 #ifdef _WIN32
-
 	if (HANDLE hFile = HandleFile(path)) {
 		const FILETIME ft = TimetToFileTime(time);
 		if(0 == SetFileTime(hFile, &ft, nullptr, &ft))
