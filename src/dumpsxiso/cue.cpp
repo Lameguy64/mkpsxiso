@@ -8,13 +8,13 @@ bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &e
 	return reader.SeekToSector(sector - cueFile.tracks[trackIndex - 1].endSector);
 }
 
-CueFile parseCueFile(std::filesystem::path& inputFile) {
-	std::ifstream file(inputFile);
-	std::filesystem::path filePath;
-	std::string line, fileType;
+CueFile parseCueFile(fs::path& inputFile) {
 	CueFile cueFile;
-	unsigned int previousStartSector = 0;
+	std::string line, fileType;
+	std::ifstream file(inputFile);
+	fs::path filePath = inputFile;
 	unsigned int pauseStartSector = 1;
+	unsigned int previousStartSector = 0;
 
 	while (std::getline(file, line)) {
 		if (line.find("FILE") != std::string::npos) {
@@ -23,18 +23,19 @@ CueFile parseCueFile(std::filesystem::path& inputFile) {
 				TrackInfo &lastTrack = cueFile.tracks.back();
 				lastTrack.sizeInSectors = cueFile.totalSectors - lastTrack.startSector;
 				lastTrack.endSector = lastTrack.startSector + lastTrack.sizeInSectors;
+				cueFile.multiBIN = true;
 			}
 
 			size_t firstQuote = line.find("\"");
 			size_t lastQuote = line.rfind("\"");
-			filePath = inputFile.parent_path() / line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+			std::string fileName = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+			filePath.replace_filename(fileName);
 			if (int64_t sectors = GetSize(filePath) / CD_SECTOR_SIZE; sectors < 1) {
-				printf("Error: Failed to get the file size for \"%s\"\n", filePath.filename().u8string().c_str());
+				printf("Error: Failed to get the file size for \"%s\"\n", fileName.c_str());
 				exit(EXIT_FAILURE);
 			}
 			else {
 				cueFile.totalSectors += sectors;
-				cueFile.multiBIN = true;
 			}
 
 			if (line.find("BINARY") != std::string::npos) {
@@ -46,7 +47,6 @@ CueFile parseCueFile(std::filesystem::path& inputFile) {
 
 			if (cueFile.tracks.empty()) {
 				inputFile = filePath;
-				cueFile.multiBIN = false;
 			}
 		}
 		else if (line.find("TRACK") != std::string::npos) {

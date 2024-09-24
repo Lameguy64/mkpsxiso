@@ -5,7 +5,7 @@
 #include <vector>
 
 struct TrackInfo {
-	std::filesystem::path filePath;
+	fs::path filePath;
 	std::string fileType;
 	std::string number;
 	std::string type;
@@ -21,5 +21,5 @@ struct CueFile {
 	std::vector<TrackInfo> tracks;
 };
 
-CueFile parseCueFile(std::filesystem::path& inputFile);
+CueFile parseCueFile(fs::path& inputFile);
 bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &entry, cd::IsoReader &reader, const CueFile &cueFile);

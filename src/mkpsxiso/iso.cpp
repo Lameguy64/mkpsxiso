@@ -592,11 +592,15 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 		const DIRENTRY& entry = e.get();
 		if ( !entry.id.empty() )
 		{
+			// Games built with the 2003 mastering tool has different subfolder directory sort.
+			// Currently, I've only tested this with 2 games, so idk if this behavior is the same for all.
+			// Maybe the sort could be like PS2 CDVDGEN, which depends on the order the files were added to the program
+			// instead of a normal sort, in that case another approach would be needed, like adding the custom order to the xml.
 			if (global::new_type.value_or(false) && this->name != "<root>" && entry.type == EntryType::EntryDir) {
 				dirQueue.push(entry);
 			}
 			else {
-			writeOneEntry(entry);
+				writeOneEntry(entry);
 			}
 		}
 	}
