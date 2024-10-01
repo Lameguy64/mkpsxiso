@@ -793,41 +793,40 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		const DIRENTRY& entry = e.get();
 		fprintf( fp, "    " );
 
-		if ( !entry.id.empty() )
+		if ( entry.id.empty() )
 		{
-			if ( entry.type == EntryType::EntryFile )
-			{
-				fprintf( fp, "File  " );
-			}
-			else if ( entry.type == EntryType::EntryDir )
-			{
-				fprintf( fp, "Dir   " );
-			}
-			else if ( ( entry.type == EntryType::EntryXA ) ||
-				( entry.type == EntryType::EntryXA_DO ) )
-			{
-				fprintf( fp, "XA    " );
-			}
-			else if ( entry.type == EntryType::EntryDA )
-			{
-				fprintf( fp, "CDDA  " );
-			}
-
-			fprintf( fp, "%-17s", entry.id.c_str() );
-		} else {
-
 			fprintf( fp, "Dummy <DUMMY>          " );
-
-		}
-
-		// Write size in sector units
-		if (entry.type != EntryType::EntryDir)
-		{
 			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length) );
 		}
-		else
+		else if ( entry.type == EntryType::EntryFile )
 		{
+			fprintf( fp, "File  " );
+			fprintf( fp, "%-17s", entry.id.c_str() );
+			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length) );
+		}
+		else if ( entry.type == EntryType::EntryDir )
+		{
+			fprintf( fp, "Dir   " );
+			fprintf( fp, "%-17s", entry.id.c_str() );
 			fprintf( fp, "%-10s", "" );
+		}
+		else if ( entry.type == EntryType::EntryXA )
+		{
+			fprintf( fp, "XA    " );
+			fprintf( fp, "%-17s", entry.id.c_str() );
+			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length, 2336) );
+		}
+		else if ( entry.type == EntryType::EntryXA_DO )
+		{
+			fprintf( fp, "XA    " );
+			fprintf( fp, "%-17s", entry.id.c_str() );
+			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length) );
+		}
+		else if ( entry.type == EntryType::EntryDA )
+		{
+			fprintf( fp, "CDDA  " );
+			fprintf( fp, "%-17s", entry.id.c_str() );
+			fprintf( fp, "%-10" PRIu32, 150 + GetSizeInSectors(entry.length, CD_SECTOR_SIZE) );
 		}
 
 		// Write LBA offset
