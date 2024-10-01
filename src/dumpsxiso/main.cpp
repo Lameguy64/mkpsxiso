@@ -152,6 +152,34 @@ void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
 	memcpy(header->subchunk2ID, "data", 4);
 	header->subchunk2Size = dataSize;
 }
+
+// This will ensure that the EDC remains the same as in the original file. Games built with an old, buggy Sony's mastering tool version
+// don't have EDC Form2 data (this can be checked at redump.org) and some games rely on this to do anti-piracy checks like DDR.
+const bool CheckEDCXA(cd::IsoReader &reader) {
+	cd::SECTOR_M2F2 sector;
+	while (reader.ReadBytesXA(sector.data, 2336)) {
+ 		if (sector.data[2] & 0x20) {
+			if (sector.data[2332] == 0 && sector.data[2333] == 0 && sector.data[2334] == 0 && sector.data[2335] == 0) {
+				return false;
+			}
+			return true;
+		}
+	}
+	return true;
+}
+
+// Games from 2003 and onwards apparenly has built with a newer Sony's mastering tool.
+// This has different subheader in the descriptor sectors, correct root year and files are sorted by LBA and not by name.
+const bool CheckISOver(cd::IsoReader &reader) {
+	cd::SECTOR_M2F2 sector;
+	reader.SeekToSector(16);
+	reader.ReadBytesXA(sector.data, 2336);
+ 	if (sector.data[2] & 0x01) {
+		return false;
+	}
+	return true;
+}
+
 std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
 	auto license = std::make_unique<cd::ISO_LICENSE>();
 
@@ -281,6 +309,7 @@ writeFLACFile_cleanup:
 struct EntryAttributeCounters
 {
 	std::map<int, unsigned int> GMTOffs;
+	std::map<int, unsigned int> HFLAG;
 	std::map<int, unsigned int> XAAttrib;
 	std::map<int, unsigned int> XAPerm;
 	std::map<int, unsigned int> GID;
@@ -291,6 +320,8 @@ static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::Iso
 {
 	element->SetAttribute(xml::attrib::GMT_OFFSET, entry.entry.entryDate.GMToffs);
 	++attributeCounters.GMTOffs[entry.entry.entryDate.GMToffs];
+
+	++attributeCounters.HFLAG[entry.entry.flags];
 
 	// xa_attrib only makes sense on XA files
 	if (type == EntryType::EntryXA)
@@ -314,11 +345,15 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 	// First establish "defaults" - that is, the most commonly occurring attributes
 	auto findMaxElement = [](const auto& map)
 	{
-		return std::max_element(map.begin(), map.end(), [](const auto& left, const auto& right) { return left.second < right.second; })->first;
+		if (!map.empty()) {
+			return std::max_element(map.begin(), map.end(), [](const auto& left, const auto& right) { return left.second < right.second; })->first;
+		}
+		return 0;
 	};
 
 	EntryAttributes defaultAttributes;
 	defaultAttributes.GMTOffs = static_cast<signed char>(findMaxElement(attributeCounters.GMTOffs));
+	defaultAttributes.HFLAG = static_cast<unsigned char>(findMaxElement(attributeCounters.HFLAG));
 	defaultAttributes.XAAttrib = static_cast<unsigned char>(findMaxElement(attributeCounters.XAAttrib));
 	defaultAttributes.XAPerm = static_cast<unsigned short>(findMaxElement(attributeCounters.XAPerm));
 	defaultAttributes.GID = static_cast<unsigned short>(findMaxElement(attributeCounters.GID));
@@ -330,6 +365,9 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_PERMISSIONS, defaultAttributes.XAPerm);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_GID, defaultAttributes.GID);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_UID, defaultAttributes.UID);
+	if (defaultAttributes.HFLAG & 0x01) {
+		defaultAttributesElement->SetAttribute(xml::attrib::HIDDEN_FLAG, 1);
+	}
 
 	return defaultAttributes;
 }
@@ -356,6 +394,7 @@ static void SimplifyDefaultXMLAttributes(tinyxml2::XMLElement* element, const En
 	};
 
 	deleteAttribute(xml::attrib::GMT_OFFSET, defaults.GMTOffs);
+	deleteAttribute(xml::attrib::HIDDEN_FLAG, defaults.HFLAG);
 	deleteAttribute(xml::attrib::XA_ATTRIBUTES, defaults.XAAttrib);
 	deleteAttribute(xml::attrib::XA_PERMISSIONS, defaults.XAPerm);
 	deleteAttribute(xml::attrib::XA_GID, defaults.GID);
@@ -565,9 +604,9 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					if (bytesToRead > 2336)
 						bytesToRead = 2336;
 
-					reader.ReadBytesXA(copyBuff, 2336);
+					reader.ReadBytesXA(copyBuff, bytesToRead);
 
-					fwrite(copyBuff, 1, 2336, outFile);
+					fwrite(copyBuff, 1, bytesToRead, outFile);
 
 					bytesLeft -= bytesToRead;
 
@@ -741,15 +780,24 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 	return dirElement;
 }
 
-void WriteXMLGap(unsigned int numSectors, tinyxml2::XMLElement* dirElement)
+void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement, const unsigned int startSector, cd::IsoReader &reader)
 {
-	// TODO: Detect if gap needs checksums and reflect it accordingly here
+	if (numSectors < 1) {
+		return;
+	}
+	cd::SECTOR_M2F1 sector;
+	reader.SeekToSector(startSector);
+	reader.ReadBytesXA(sector.subHead, 2336);
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
+	newelement->SetAttribute(xml::attrib::ENTRY_TYPE, sector.subHead[2]);
+	if (param::pathTable) {
+		newelement->SetAttribute(xml::attrib::OFFSET, startSector);
+	}
 }
 
 void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
-	EntryAttributeCounters& attributeCounters)
+	EntryAttributeCounters& attributeCounters, cd::IsoReader &reader)
 {
 	fs::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
 	unsigned tracknum = 2;
@@ -757,13 +805,13 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 	{
 		const bool isDA = GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8) == EntryType::EntryDA;
 
-		// only check for gaps, update LBA if it's inside the iso filesystem
+		// if this is a DA file we are at the end of filesystem
 		if(!isDA)
 		{
+			// only check for gaps, update LBA if it's inside the iso filesystem
 			if (entry.entry.entryOffs.lsb > expectedLBA)
 			{
-				// if this is a DA file we are at the end of filesystem, flag to write the gap after DA files
-				WriteXMLGap(entry.entry.entryOffs.lsb - expectedLBA, dirElement);
+				WriteXMLGap(entry.entry.entryOffs.lsb - expectedLBA, dirElement, expectedLBA, reader);
 			}
 			expectedLBA = entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb);
 		}
@@ -839,6 +887,8 @@ void ParseISO(cd::IsoReader& reader) {
 
     cd::ISO_DESCRIPTOR descriptor;
 	auto license = ReadLicense(reader);
+	const bool xa_edc = CheckEDCXA(reader);
+	const bool new_type = CheckISOver(reader);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -922,6 +972,8 @@ void ParseISO(cd::IsoReader& reader) {
 
 			tinyxml2::XMLElement *trackElement = baseElement->InsertNewChildElement(xml::elem::TRACK);
 			trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
+			trackElement->SetAttribute(xml::attrib::XA_EDC, xa_edc);
+			trackElement->SetAttribute(xml::attrib::NEW_TYPE, new_type);
 
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::IDENTIFIERS);
@@ -1005,7 +1057,7 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 			else
 			{
-				WriteXMLByLBA(entries, trackElement, sourcePath, currentLBA, attributeCounters);
+				WriteXMLByLBA(entries, trackElement, sourcePath, currentLBA, attributeCounters, reader);
 			}
 
 			tinyxml2::XMLElement *dirtree = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
@@ -1024,7 +1076,20 @@ void ParseISO(cd::IsoReader& reader) {
 					// HACK add dummy sectors, assumes a 150 sector pregap if this a gap of more sectors
 					if((delta > 150) && (tracknum == 2))
 					{
-						WriteXMLGap(delta-150, dirtree);
+					/* There are some games like SLUS-00152, SLUS-00282, SLES-00024 that have some kind of data in the ECC bytes of the last pregap sector.
+					   Idk what this data could mean, but I leave an approach on how to handle it if someone wants to implement it in the future.
+
+						cd::SECTOR_M2F1 sector;
+						reader.SeekToSector(currentLBA + (delta - 151));
+						reader.ReadBytesXA(sector.subHead, 2336);
+						if (sector.ecc[0] != 0 || sector.ecc[1] != 0 || sector.ecc[2] != 0 || sector.ecc[3] != 0) {
+							WriteXMLGap(delta - 151, dirtree, currentLBA, reader);
+							dirtree->InsertNewChildElement("dummy_ECC");
+						}
+						else {
+							WriteXMLGap(delta - 150, dirtree, currentLBA, reader);
+						}*/
+						WriteXMLGap(delta-150, dirtree, currentLBA, reader);
 						currentLBA += (delta-150);
 						delta = 150;
 					}
@@ -1050,6 +1115,30 @@ void ParseISO(cd::IsoReader& reader) {
 				tracknum++;
 			}
 
+			// HACK until some better way to get track sizes is implemented, like getting them from a .cue file
+			// Check for a EoF gap, usually 150 sectors for single track games
+			unsigned int totalLenLBA = descriptor.volumeSize.lsb;
+			if (currentLBA < totalLenLBA) {
+				int numSectors = totalLenLBA - currentLBA;
+				if (numSectors == 150) {
+					WriteXMLGap(numSectors, dirtree, currentLBA, reader);
+					printf(	"Adding %d dummy sectors...\n", numSectors);
+				}
+				else if (numSectors < 150) {
+					WriteXMLGap(numSectors, dirtree, currentLBA, reader);
+					printf(	"Adding %d dummy sectors...\n\n"
+							"Warning: This %d sectors gap could mean that there are missing files or the image was previously modified.\n"
+							"\t If there are DA files, check that the dummy is before them, otherwise the built image will be corrupted.\n", numSectors, numSectors);
+				}
+				else {
+					WriteXMLGap(150, dirtree, currentLBA, reader);
+					printf( "Adding 150 dummy sectors...\n\n"
+							"Warning: There is still a gap of %d sectors at the end.\n"
+							"\t This could mean that there are missing files or tracks.\n"
+							"\t Unfortunately, current version can't dump unreferenced tracks.\n", (numSectors - 150));
+				}
+			}
+
 			xmldoc.SaveFile(file);
 			fclose(file);
 		}
@@ -1059,13 +1148,13 @@ void ParseISO(cd::IsoReader& reader) {
 int Main(int argc, char *argv[])
 {
 	static constexpr const char* HELP_TEXT =
-		"dumpsxiso [-h|--help] [-x <path>] [-s <path>] <isofile>\n\n"
-		"  <isofile>  - File name of ISO file (supports any 2352 byte/sector images).\n"
-		"  -x <path>  - Specified destination directory of extracted files.\n"
-		"  -s <path>  - Outputs an MKPSXISO compatible XML script for later rebuilding.\n"
+		"dumpsxiso [-h|--help] [-x <path>] [-s <path>.xml] <isofile>\n\n"
+		"  <isofile> - File name of ISO file (supports any 2352 byte/sector images).\n"
+		"  -x <path> - Optional destination directory for extracted files. (Defaults to dumpsxiso dir)\n"
+		"  -s <path>.xml - Optional XML name/destination of MKPSXISO compatible script for later rebuilding. (Defaults to dumpsxiso dir)\n"
 		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
 		"  -e|--encode <codec> - Codec to encode CDDA/DA audio. wave is default. Supported codecs: " SUPPORTED_CODEC_TEXT "\n"
-		"  -h|--help  - Show this help text\n"
+		"  -h|--help - Show this help text\n"
 		"  -pt|--path-table - instead of going through the file system, go to every known directory in order; helps with deobfuscating\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
@@ -1156,6 +1245,15 @@ int Main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	if (param::outPath.empty())
+	{
+		param::outPath = param::isoFile.stem();
+	}
+
+	if (param::xmlFile.empty())
+	{
+		param::xmlFile = param::isoFile.stem() += ".xml";
+	}
 
 	cd::IsoReader reader;
 
@@ -1179,10 +1277,7 @@ int Main(int argc, char *argv[])
 		}
 	}
 
-	if (!param::outPath.empty())
-	{
-		printf("Output directory : %" PRFILESYSTEM_PATH "\n", param::outPath.lexically_normal().c_str());
-	}
+	printf("Output directory : %" PRFILESYSTEM_PATH "\n", param::outPath.lexically_normal().c_str());
 
     ParseISO(reader);
 	return EXIT_SUCCESS;

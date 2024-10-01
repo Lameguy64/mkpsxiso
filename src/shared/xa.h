@@ -10,8 +10,8 @@ namespace cdxa {
 		unsigned short	ownergroupid;	// Usually 0x0000
 		unsigned short	owneruserid;	// Usually 0x0000
 		unsigned short	attributes;
-		char id[2];
-		unsigned char	filenum;		// Usually 0x00
+		char			id[2];
+		unsigned char	filenum;		// For XA files is the same as its 1st subheader byte or at least 0x01, 0x00 otherwise
 		unsigned char	reserved[5];
 	};
 

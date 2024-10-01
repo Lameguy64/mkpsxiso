@@ -26,12 +26,14 @@
 namespace global
 {
 	time_t		BuildTime;
+	bool		xa_edc;
 	int			QuietMode	= false;
 	int			Overwrite	= false;
 
 	int			trackNum	= 1;
 	int			noXA		= false;
 
+	std::optional<bool> new_type;
 	std::optional<std::string> volid_override;
 	fs::path XMLscript;
 	fs::path LBAfile;
@@ -115,6 +117,12 @@ int Main(int argc, char* argv[])
 			}
 			if (auto lbaHead = ParsePathArgument(args, "lbahead"); lbaHead.has_value())
 			{
+				if (CompareICase(lbaHead->extension().string(), ".xml"))
+				{
+					args--;
+					global::LBAheaderFile = lbaHead->stem() += "_LBA.c";
+					continue;
+				}
 				global::LBAheaderFile = *lbaHead;
 				continue;
 			}
@@ -130,6 +138,12 @@ int Main(int argc, char* argv[])
 			}
 			if (auto lbaFile = ParsePathArgument(args, "lba"); lbaFile.has_value())
 			{
+				if (CompareICase(lbaFile->extension().string(), ".xml"))
+				{
+					args--;
+					global::LBAfile = lbaFile->stem() += "_LBA.txt";
+					continue;
+				}
 				global::LBAfile	= *lbaFile;
 				continue;
 			}
@@ -195,6 +209,16 @@ int Main(int argc, char* argv[])
 	{
 		printf( "No XML script specified.\n" );
 		return EXIT_FAILURE;
+	}
+
+	if ( global::LBAfile == "-lba" )
+	{
+		global::LBAfile = global::XMLscript.stem() += "_LBA.txt";
+	}
+
+	if ( global::LBAheaderFile == "-lbahead" )
+	{
+		global::LBAheaderFile = global::XMLscript.stem() += "_LBA.c";
 	}
 
 	// Get current time to be used as date stamps for all directories
@@ -503,6 +527,13 @@ int Main(int argc, char* argv[])
 			if ( CompareICase( "data", track_type ) )
 			{
 				dataTrack = trackElement;
+				global::xa_edc = trackElement->BoolAttribute(xml::attrib::XA_EDC, true);
+
+				// This check is necessary so as to leave an empty value for compatibility with <=v2.04 dumped files timestamps
+				if ( trackElement->Attribute(xml::attrib::NEW_TYPE) != nullptr ) {
+					global::new_type = trackElement->BoolAttribute(xml::attrib::NEW_TYPE);
+				}
+
 				if ( global::trackNum != 1 )
 				{
 					if ( !global::QuietMode )
@@ -527,19 +558,13 @@ int Main(int argc, char* argv[])
 					fprintf( cuefp.get(), "    INDEX 01 00:00:00\n" );
 				}
 
-				if ( global::NoIsoGen )
-				{
-					printf( "Skipped generating ISO image.\n" );
-					break;
-				}
-
 			// Add audio track
 			}
 			else if ( CompareICase( "audio", track_type ) )
 			{
 
 				// Only allow audio tracks if the cue_sheet attribute is specified
-				if ( cuefp == nullptr )
+				if ( cuefp == nullptr && !global::NoIsoGen )
 				{
 					if ( !global::QuietMode )
 					{
@@ -568,7 +593,10 @@ int Main(int argc, char* argv[])
 				else
 				{
 					fs::path trackSource = (global::XMLscript.parent_path() / trackRelativeSource);
-					fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
+					if ( cuefp )
+					{
+						fprintf( cuefp.get(), "  TRACK %02d AUDIO\n", global::trackNum );
+					}
 
 					// pregap
 					int pregapSectors = 150; // by default 2 seconds
@@ -598,13 +626,19 @@ int Main(int argc, char* argv[])
 					}
 					if(pregapSectors > 0)
 					{
-						fprintf( cuefp.get(), "    INDEX 00 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+						if ( cuefp )
+						{
+							fprintf( cuefp.get(), "    INDEX 00 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+						}
 
 						audioTracks.emplace_back(totalLenLBA, pregapSectors * CD_SECTOR_SIZE);
 						totalLenLBA += pregapSectors;
 					}
 
-					fprintf( cuefp.get(), "    INDEX 01 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+					if ( cuefp )
+					{
+						fprintf( cuefp.get(), "    INDEX 01 %s\n", SectorsToTimecode(totalLenLBA).c_str());
+					}
 
 					const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
 					if(trackid != nullptr)
@@ -735,8 +769,6 @@ int Main(int argc, char* argv[])
 			}
 
 			// Copy the files into the disc image
-			iso::DIRENTRY& root = entries.front();
-			iso::DirTreeClass* dirTree = root.subdir.get();
 			dirTree->WriteFiles( &writer );
 
 			if ( !global::QuietMode )
@@ -819,9 +851,8 @@ int Main(int argc, char* argv[])
 				printf( "    Writing directories... " );
 			}
 
-			// Sort directory entries and write it
-			dirTree->SortDirectoryEntries();
-			dirTree->WriteDirectoryRecords( &writer, root, root );
+			// Write directory entries
+			dirTree->WriteDirectoryRecords( &writer, root, root, *global::new_type ? dirTree->GetDirCountTotal() : 0 );
 
 			// Write file system descriptors to finish the image
 	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLenLBA );
@@ -841,6 +872,10 @@ int Main(int argc, char* argv[])
 				printf( "Total image size: %d bytes (%d sectors)\n",
 					(CD_SECTOR_SIZE*totalLenLBA), totalLenLBA );
 			}
+		}
+		else
+		{
+			printf( "Skipped generating ISO image.\n" );
 		}
 
 		// Check for next <iso_project> element
@@ -869,6 +904,7 @@ EntryAttributes ReadEntryAttributes(EntryAttributes current, const tinyxml2::XML
 		};
 
 		getAttributeIfExists(current.GMTOffs, xml::attrib::GMT_OFFSET);
+		getAttributeIfExists(current.HFLAG, xml::attrib::HIDDEN_FLAG);
 		getAttributeIfExists(current.XAAttrib, xml::attrib::XA_ATTRIBUTES);
 		getAttributeIfExists(current.XAPerm, xml::attrib::XA_PERMISSIONS);
 		getAttributeIfExists(current.GID, xml::attrib::XA_GID);
@@ -1163,11 +1199,15 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		return false;
 	}
 
-	// Calculate directory tree LBAs and retrieve size of image
 	int pathTableLen = dirTree->CalculatePathTableLen(root);
 
 	// 16 license sectors + 2 header sectors
 	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
+
+	// Sort directory entries, calculate tree LBAs and retrieve size of image
+	if (!*global::new_type) {
+		dirTree->SortDirectoryEntries();
+	}
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )
@@ -1369,19 +1409,10 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 //
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
-	int dummyType = 0; // Data
-	const char* type = dirElement->Attribute(xml::attrib::ENTRY_TYPE);
-	if ( type != nullptr )
-	{
-		// TODO: Make reasonable
-		if ( CompareICase(type, "2336") )
-		{
-			dummyType = 1; // XA
-		}
-	}
 
-
-	dirTree->AddDummyEntry( atoi( dirElement->Attribute(xml::attrib::NUM_DUMMY_SECTORS) ), dummyType );
+	dirTree->AddDummyEntry( dirElement->UnsignedAttribute(xml::attrib::NUM_DUMMY_SECTORS),
+							dirElement->UnsignedAttribute(xml::attrib::ENTRY_TYPE),
+							dirElement->UnsignedAttribute(xml::attrib::OFFSET) );
 	return true;
 }
 

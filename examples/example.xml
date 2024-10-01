@@ -26,11 +26,15 @@
 		
 		Attributes:
 			type		- Track type (either data or audio).
+			xa_edc		- For data track only, specifies if the image has (true) or no (false) EDC in Form 2 sectors.
+						  If xa_edc is not specified, defaults to 'true'.
+			new_type	- For data track only, specifies if the image was created with the old(<2003) Sony's mastering tool.
+						  If new_type is not specified, defaults to 'false'.
 			source		- For audio tracks only, specifies the file name of a wav audio
 						  file as source data for the audio track.
 			
 	-->
-	<track type="data">
+	<track type="data" xa_edc="true" new_type="false">
 	
 		<!-- <identifiers>
 			Optional, Specifies the identifier strings for the data track.
@@ -159,8 +163,11 @@
 				
 				Attributes:
 					sectors	- Size of dummy file in sector units (1024 = 2MB).
+					type	- The dummy's submode value. Values between 0-255 only
+								 '0': for a Form 1 dummy (0x00).
+								'32': for a Form 2 dummy (0x20).
 			-->
-			<dummy sectors="1024"/>
+			<dummy sectors="1024" type="0"/>
 			
 			<!-- Sample DA audio file entry.
 			

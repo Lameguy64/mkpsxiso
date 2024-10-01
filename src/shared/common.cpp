@@ -6,7 +6,7 @@
 #include <cstdarg>
 
 using namespace cd;
-
+/*
 static void snprintfZeroPad(char* s, size_t n, const char* format, ...)
 {
 	// We need a temporary buffer that is 1 byte bigger than the specified one,
@@ -18,7 +18,9 @@ static void snprintfZeroPad(char* s, size_t n, const char* format, ...)
 
 	const int bytesWritten = vsnprintf(buf.get(), n + 1, format, args);
 	memcpy(s, buf.get(), bytesWritten);
-	std::fill(s + bytesWritten, s + n, '\0');
+	if (bytesWritten < n) {
+		std::fill(s + bytesWritten, s + n, '\0');
+	}
 
 	va_end(args);
 }
@@ -38,7 +40,7 @@ ISO_LONG_DATESTAMP GetLongDateFromDate(const ISO_DATESTAMP& src)
 
 	return result;
 }
-
+*/
 ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 {
 	bool succeeded = false;
@@ -55,7 +57,7 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 		if (argsRead < 7)
 		{
 			// Consider GMToffs optional
-			result.GMToffs = 0;
+			result.GMToffs = 36;
 		}
 		succeeded = true;
 	}
@@ -65,6 +67,46 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 		*success = succeeded;
 	}
 	return result;
+}
+
+ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success)
+{
+	ISO_LONG_DATESTAMP result {};
+
+	if (str) {
+		unsigned short year;
+		unsigned char month, day, hour, minute, second, hsecond;
+
+		const unsigned char argsRead = sscanf( str, "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu%02hhu%hhd",
+			&year, &month, &day, &hour, &minute, &second, &hsecond, &result.GMToffs );
+
+		if (argsRead >= 6) {
+			if (argsRead < 8) {
+				// Consider GMToffs optional
+				result.GMToffs = 36;
+			}
+
+			auto intToChars = [](unsigned short value, char* buf, unsigned char size) {
+				for (signed char i = size - 1; i >= 0; --i) {
+					buf[i] = '0' + (value % 10);
+					value /= 10;
+				}
+			};
+
+			intToChars(year, result.year, 4);
+			intToChars(month, result.month, 2);
+			intToChars(day, result.day, 2);
+			intToChars(hour, result.hour, 2);
+			intToChars(minute, result.minute, 2);
+			intToChars(second, result.second, 2);
+			intToChars(hsecond, result.hsecond, 2);
+
+			success = true;
+			return result;
+		}
+	}
+
+	return GetUnspecifiedLongDate();
 }
 
 ISO_LONG_DATESTAMP GetUnspecifiedLongDate()
@@ -155,9 +197,12 @@ bool ParseArgument(char** argv, std::string_view command, std::string_view longC
 
 std::optional<fs::path> ParsePathArgument(char**& argv, std::string_view command, std::string_view longCommand)
 {
-	if (ParseArgument(argv, command, longCommand) && *(argv+1) != nullptr)
+	if (ParseArgument(argv, command, longCommand))
 	{
-		argv++;
+		if (*(argv+1) != nullptr && **(argv+1) != '-')
+		{
+			argv++;
+		}
 		return fs::u8path(*argv);
 	}
 	return std::nullopt;

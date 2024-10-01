@@ -32,6 +32,7 @@ class EntryAttributes
 {
 private:
 	static constexpr signed char DEFAULT_GMTOFFS = 0;
+	static constexpr unsigned char DEFAULT_HIDDEN_FLAG = 0;
 	static constexpr unsigned char DEFAULT_XAATRIB = 0xFF;
 	static constexpr unsigned short DEFAULT_XAPERM = 0x555; // rx
 	static constexpr unsigned short	DEFAULT_OWNER_ID = 0;
@@ -39,6 +40,7 @@ private:
 
 public:
 	signed char GMTOffs = DEFAULT_GMTOFFS;
+	unsigned char HFLAG = DEFAULT_HIDDEN_FLAG;
 	unsigned char XAAttrib = DEFAULT_XAATRIB;
 	unsigned short XAPerm = DEFAULT_XAPERM;
 	unsigned short GID = DEFAULT_OWNER_ID;
@@ -48,8 +50,8 @@ public:
 
 // Helper functions for datestamp manipulation
 cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
-
-cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
+cd::ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success = false);
+//cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
 cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
 std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src);
 

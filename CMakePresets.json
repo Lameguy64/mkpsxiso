@@ -1,17 +1,30 @@
 {
-	"version": 2,
+	"version": 3,
 	"cmakeMinimumRequired": {
 		"major": 3,
-		"minor": 20,
+		"minor": 19,
 		"patch": 0
 	},
 	"configurePresets": [
 		{
-			"name":        "default",
-			"displayName": "Default configuration",
+			"name":        "release",
+			"displayName": "Release build",
 			"description": "Use this preset when building mkpsxiso for local installation.",
-			"generator":   "Ninja",
-			"binaryDir":   "${sourceDir}/build"
+			"binaryDir":   "${sourceDir}/build",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE": "Release"
+			}
+		},
+		{
+			"name":        "debug",
+			"displayName": "Debug configuration",
+			"description": "Use this preset when debugging mkpsxiso.",
+			"binaryDir":   "${sourceDir}/build",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG": "Debug"
+			}
 		},
 		{
 			"name":        "ci",

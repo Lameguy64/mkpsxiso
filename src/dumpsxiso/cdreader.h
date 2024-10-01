@@ -40,11 +40,13 @@ namespace cd {
         // Open ISO image
         bool Open(const fs::path& fileName);
 
-        // Read data sectors in bytes (supports sequential reading)
+        // Read form1 data(2048) sector in bytes (supports sequential reading)
         size_t ReadBytes(void* ptr, size_t bytes, bool singleSector = false);
 
+        // Read form2 subheader+data+edc(2336) sector in bytes (supports sequential reading)
         size_t ReadBytesXA(void* ptr, size_t bytes, bool singleSector = false);
 
+        // Read whole(2352) sector in bytes (supports sequential reading)
         size_t ReadBytesDA(void* ptr, size_t bytes, bool singleSector = false);
 
         // Skip bytes in data sectors (supports sequential skipping)
