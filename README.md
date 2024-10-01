@@ -95,6 +95,26 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
+**Version 2.10 (10/01/2024)**
+* Added support to read/update timestamps prior to 1970 on Windows.
+* Files are now extracted/built with the original timestamps instead of being offsetted previously and then re-calculated at build time. This is for better compatibily with the other CD authoring tools.
+* Added the ability to maintain EDC Form 2 integrity via the `xa_edc` XML string for games without it.
+* Dummy sectors now save the subheader submode value in integer form via the `type` XML string, so they can regenerate the correct values for non-standard (0x00/0x20) sectors.
+* Added the ability to maintain the files and folders "hidden" via the `h_flag` XML string.
+* Now correctly generates the descriptor's submode, year and file order for games built with newer (>=2003) Sony's mastering tool via the `new_type` XML string.
+* Prevented path arguments from parsing another argument instead of a path.
+* Other miscellaneous fixes.
+* dumpsxiso: Now outputs by default an `.xml` file with the name of the input is no `-s` argument is given (this also allow for an easy drag & drop on Windows).
+* dumpsxiso: The `-pt` command now supports dummy entries.
+* dumpsxiso: If no output dir is given with the `-x` argument, the tool extracts the files into a folder with the same name as the input file instead of spreading out all the files in the working directory.
+* mkpsxiso: Fixed calculation length of dir/file entries.
+* mkpsxiso: Dir entries are now sorted before the calculation of LBA tree.
+* mkpsxiso: Changed the way directory records are written to a linear write instead of a recursive write.
+* mkpsxiso: Changed the way descriptor directories are written from Depth-First Search to Breadth-First Search.
+* mkpsxiso: `-lba` and `-lbahead` args now output a default file if no path is given.
+* mkpsxiso: Corrected timecodes with the `-lba` argument.
+* mkpsxiso: Corrected the CD-DA sector calculation for `-lba`'s arguments.
+
 **Version 2.04 (09/18/2023)**
 * Added a `dumpsxiso` option to extract every known directory in the path table by specifying `-pt`/`--path-table`, to help with obsfuscated file systems.
 
