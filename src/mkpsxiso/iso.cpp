@@ -761,7 +761,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 			{
 				ch = std::toupper( ch );
 
-				if ( ch == '.' )
+				if ( ch == '.' || ch == ' ' || ch == '-' )
 				{
 					ch = '_';
 				}
