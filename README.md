@@ -58,6 +58,8 @@ The default installation path is `C:\Program Files (x86)\mkpsxiso` on Windows or
 
 ## Issues
 
+On ext2/3/4 filesystems, the minimum timestamp you can set is 1901/12/13, which makes some games that has files/folders dates older than that (like Vagrant Story) impossible to recreate a 1:1 copy. A workaround to this is to work on a filesystem that has better date support like ntfs, exfat, etc.
+
 The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
 
 ```xml
