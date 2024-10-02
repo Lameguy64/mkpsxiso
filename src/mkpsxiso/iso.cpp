@@ -457,9 +457,7 @@ void iso::DirTreeClass::SortDirectoryEntries()
 
 	std::sort(entriesInDir.begin(), entriesInDir.end(), [](const auto& left, const auto& right)
 		{
-			const std::string_view idLeft = CleanIdentifier(left.get().id);
-			const std::string_view idRight = CleanIdentifier(right.get().id);
-			return idLeft < idRight;
+			return CleanIdentifier(left.get().id) < CleanIdentifier(right.get().id);
 		});
 }
 
