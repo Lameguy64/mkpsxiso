@@ -786,11 +786,6 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 			entry.subdir->OutputHeaderListing( fp, level+1 );
 		}
 	}
-
-	if ( level == 0 )
-	{
-		fprintf( fp, "\n#endif\n" );
-	}
 }
 
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
@@ -840,27 +835,26 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		fprintf( fp, "%-10d", entry.lba );
 
 		// Write Timecode
-		fprintf( fp, "%-12s", SectorsToTimecode(150 + entry.lba).c_str());
-
-		// Write size in byte units
 		if (entry.type != EntryType::EntryDir)
 		{
-			fprintf( fp, "%-10" PRId64, entry.length );
+			fprintf( fp, "%-12s", SectorsToTimecode(150 + entry.lba).c_str());
+
+			// Write size in byte units
+			if ( !entry.id.empty() )
+			{
+				fprintf( fp, "%-10" PRId64, entry.length );
+
+				// Write source file path
+				fprintf( fp, "%" PRFILESYSTEM_PATH "\n", entry.srcfile.lexically_normal().c_str() );
+			}
+			else
+			{
+				fprintf( fp, "%" PRId64 "\n", entry.length );
+			}
 		}
 		else
 		{
-			fprintf( fp, "%-10s", "" );
-		}
-
-		// Write source file path
-		if ( (!entry.id.empty()) && (entry.type != EntryType::EntryDir) )
-		{
-			fprintf( fp, "%" PRFILESYSTEM_PATH, entry.srcfile.lexically_normal().c_str() );
-		}
-		fprintf( fp, "\n" );
-
-		if ( entry.type == EntryType::EntryDir )
-		{
+			fprintf( fp, "%s\n", SectorsToTimecode(150 + entry.lba).c_str());
 			entry.subdir->OutputLBAlisting( fp, level+1 );
 		}
 	}

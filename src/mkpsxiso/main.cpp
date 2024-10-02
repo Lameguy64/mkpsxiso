@@ -720,6 +720,8 @@ int Main(int argc, char* argv[])
 			{
 				dirTree->OutputHeaderListing( fp, 0 );
 
+				fprintf( fp, "\n#endif\n" );
+
 				fclose( fp );
 
 				if ( !global::QuietMode )
