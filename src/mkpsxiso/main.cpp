@@ -650,7 +650,7 @@ int Main(int argc, char* argv[])
 					else
 					{
 						auto& entry = unrefTracks.emplace_back();
-						entry.id = trackSource.stem() += ";1";
+						entry.id = trackSource.stem().generic_u8string() + ";1";
 						entry.length = audioSize;
 						entry.lba = totalLenLBA;
 						entry.srcfile = trackSource;
