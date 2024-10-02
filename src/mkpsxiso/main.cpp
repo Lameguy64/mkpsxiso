@@ -491,6 +491,7 @@ int Main(int argc, char* argv[])
 		int totalLenLBA = 0;
 
 		std::vector<cdtrack> audioTracks;
+		std::vector<iso::DIRENTRY> unrefTracks;
 
 		const tinyxml2::XMLElement* dataTrack = nullptr;
 
@@ -635,6 +636,9 @@ int Main(int argc, char* argv[])
 						fprintf( cuefp.get(), "    INDEX 01 %s\n", SectorsToTimecode(totalLenLBA).c_str());
 					}
 
+					const unsigned int audioSize = iso::DirTreeClass::GetAudioSize(trackSource);
+					audioTracks.emplace_back(totalLenLBA, audioSize, trackSource.generic_u8string());
+
 					const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
 					if(trackid != nullptr)
 					{
@@ -643,9 +647,15 @@ int Main(int argc, char* argv[])
 							return EXIT_FAILURE;
 						}
 					}
-
-					const unsigned int audioSize = iso::DirTreeClass::GetAudioSize(trackSource);
-					audioTracks.emplace_back(totalLenLBA, audioSize, trackSource.generic_u8string());
+					else
+					{
+						auto& entry = unrefTracks.emplace_back();
+						entry.id = trackSource.stem() += ";1";
+						entry.length = audioSize;
+						entry.lba = totalLenLBA;
+						entry.srcfile = trackSource;
+						entry.type = EntryType::EntryDA;
+					}
 
 					totalLenLBA += audioSize/CD_SECTOR_SIZE;
 				}
@@ -695,6 +705,16 @@ int Main(int argc, char* argv[])
 
 				dirTree->OutputLBAlisting( fp, 0 );
 
+				if (!unrefTracks.empty())
+				{
+					iso::EntryList entries;
+					iso::DirTreeClass dirTree(entries);
+					for (auto& entry : unrefTracks) {
+						dirTree.entriesInDir.push_back(std::ref(entry));
+					}
+					dirTree.OutputLBAlisting( fp, 0 );
+				}
+
 				fclose( fp );
 
 				if ( !global::QuietMode )
@@ -719,6 +739,17 @@ int Main(int argc, char* argv[])
 			if (fp != nullptr)
 			{
 				dirTree->OutputHeaderListing( fp, 0 );
+
+				if (!unrefTracks.empty())
+				{
+					iso::EntryList entries;
+					iso::DirTreeClass dirTree(entries);
+					for (auto& entry : unrefTracks) {
+						dirTree.entriesInDir.push_back(std::ref(entry));
+					}
+					fprintf( fp, "\n" );
+					dirTree.OutputHeaderListing( fp, 1 );
+				}
 
 				fprintf( fp, "\n#endif\n" );
 
