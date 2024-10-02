@@ -42,18 +42,18 @@ static std::string UTF16ToUTF8(std::wstring_view str)
 static FILETIME TimetToFileTime(time_t t)
 {
 	FILETIME ft;
-    LARGE_INTEGER ll;
+	LARGE_INTEGER ll;
 	ll.QuadPart = t * 10000000ll + 116444736000000000ll;
-    ft.dwLowDateTime = ll.LowPart;
-    ft.dwHighDateTime = ll.HighPart;
+	ft.dwLowDateTime = ll.LowPart;
+	ft.dwHighDateTime = ll.HighPart;
 	return ft;
 }
 
 static time_t FileTimeToTimet(const FILETIME& ft) {
-    LARGE_INTEGER ll;
-    ll.LowPart = ft.dwLowDateTime;
-    ll.HighPart = ft.dwHighDateTime;
-    return (ll.QuadPart / 10000000LL) - 11644473600LL;
+	LARGE_INTEGER ll;
+	ll.LowPart = ft.dwLowDateTime;
+	ll.HighPart = ft.dwHighDateTime;
+	return (ll.QuadPart / 10000000LL) - 11644473600LL;
 }
 
 HANDLE HandleFile(const fs::path& path) {
@@ -82,7 +82,7 @@ std::optional<struct stat64> Stat(const fs::path& path)
 #ifdef _WIN32
 	if (_wstat64(path.c_str(), &fileAttrib) != 0)
 #else
-    if (stat64(path.c_str(), &fileAttrib) != 0)
+	if (stat64(path.c_str(), &fileAttrib) != 0)
 #endif
 	{
 		return std::nullopt;
@@ -99,115 +99,122 @@ int64_t GetSize(const fs::path& path)
 
 // Determines if a year is a leap year
 bool IsLeapYear(int year) {
-    return (year % 4 == 0) && (year % 100 != 0 || year % 400 == 0);
+	return (year % 4 == 0) && (year % 100 != 0 || year % 400 == 0);
 }
 
 // Calculates the number of days in a given month
 int DaysInMonth(int month, int year) {
-    static const int month_days[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-    return (month == 1 && IsLeapYear(year)) ? 29 : month_days[month];
+	static const int month_days[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+	return (month == 1 && IsLeapYear(year)) ? 29 : month_days[month];
 }
 
 // Converts struct tm to time_t
 time_t CustoMkTime(struct tm* timebuf) {
+#ifdef _WIN32
 	int days = 0;
 
 	// Calculates the number of days from 1900 to a given date
-    for (int y = 1900; y < timebuf->tm_year + 1900; ++y) {
-        days += IsLeapYear(y) ? 366 : 365;
-    }
-    for (int m = 0; m < timebuf->tm_mon; ++m) {
-        days += DaysInMonth(m, timebuf->tm_year + 1900);
-    }
-	
+	for (int y = 1900; y < timebuf->tm_year + 1900; ++y) {
+		days += IsLeapYear(y) ? 366 : 365;
+	}
+	for (int m = 0; m < timebuf->tm_mon; ++m) {
+		days += DaysInMonth(m, timebuf->tm_year + 1900);
+	}
+
 	// Calculate days from 1900 to the given date minus days from 1900 to 1970
-    int days_since_epoch = days + timebuf->tm_mday - 1 - 25567;
+	int days_since_epoch = days + timebuf->tm_mday - 1 - 25567;
 
-    // Convert days and time to seconds
-    time_t total_seconds = static_cast<time_t>(days_since_epoch) * 86400 + timebuf->tm_hour * 3600 + timebuf->tm_min * 60 + timebuf->tm_sec;
+	// Convert days and time to seconds
+	time_t total_seconds = static_cast<time_t>(days_since_epoch) * 86400 + timebuf->tm_hour * 3600 + timebuf->tm_min * 60 + timebuf->tm_sec;
 
-    // Adjust total_seconds to UTC 0
+	// Adjust total_seconds to UTC 0
 	const time_t now = time(nullptr);
-    total_seconds -= (now - mktime(gmtime(&now)));
+	total_seconds -= (now - mktime(gmtime(&now)));
 
-    return total_seconds;
+	return total_seconds;
+#else
+	return mktime(timebuf);
+#endif
 }
 
 // Converts time_t to struct tm
 struct tm CustomLocalTime(time_t seconds) {
-    struct tm timebuf = {0};
+#ifdef _WIN32
+	struct tm timebuf = {0};
 	const time_t now = time(nullptr);
 	seconds += (now - mktime(gmtime(&now)));
 
-    // Calculate the number of days since the epoch
-    int remaining_seconds = seconds % 86400;
+	// Calculate the number of days since the epoch
+	int remaining_seconds = seconds % 86400;
 	if (remaining_seconds < 0) {
 		remaining_seconds += 86400;
 	}
 	int total_days = (seconds - remaining_seconds) / 86400 + 25567; // 25567 = days from 1900 to 1970
 
-    // Calculate year
-    int year = 1900;
-    while (true) {
-        int days_in_year = IsLeapYear(year) ? 366 : 365;
-        if (total_days < days_in_year) {
+	// Calculate year
+	int year = 1900;
+	while (true) {
+		int days_in_year = IsLeapYear(year) ? 366 : 365;
+		if (total_days < days_in_year) {
 			break;
 		}
-        total_days -= days_in_year;
-        ++year;
-    }
+		total_days -= days_in_year;
+		++year;
+	}
 	timebuf.tm_year = year - 1900;
 
-    // Calculate month
-    int month = 0;
-    while (true) {
-        int days_in_current_month = DaysInMonth(month, year);
-        if (total_days < days_in_current_month) {
+	// Calculate month
+	int month = 0;
+	while (true) {
+		int days_in_current_month = DaysInMonth(month, year);
+		if (total_days < days_in_current_month) {
 			break;
 		}
-        total_days -= days_in_current_month;
-        ++month;
-    }
-    timebuf.tm_mon = month;
+		total_days -= days_in_current_month;
+		++month;
+	}
+	timebuf.tm_mon = month;
 
 	// Calculate days
-    timebuf.tm_mday = total_days + 1;
+	timebuf.tm_mday = total_days + 1;
 
-    // Calculate hour, minute, second
-    timebuf.tm_hour = remaining_seconds / 3600;
-    remaining_seconds %= 3600;
-    timebuf.tm_min = remaining_seconds / 60;
-    timebuf.tm_sec = remaining_seconds % 60;
-    timebuf.tm_isdst = 0;
+	// Calculate hour, minute, second
+	timebuf.tm_hour = remaining_seconds / 3600;
+	remaining_seconds %= 3600;
+	timebuf.tm_min = remaining_seconds / 60;
+	timebuf.tm_sec = remaining_seconds % 60;
+	timebuf.tm_isdst = 0;
 
-    return timebuf;
+	return timebuf;
+#else
+	return *localtime(&seconds);
+#endif
 }
 
 bool GetSrcTime(const fs::path& path, time_t& outTime) {
 #ifdef _WIN32
-    if (HANDLE hFile = HandleFile(path)) {
-        
-	    FILETIME ftCreation, ftLastAccess, ftLastWrite;
-	    if (!GetFileTime(hFile, &ftCreation, &ftLastAccess, &ftLastWrite)) {
+	if (HANDLE hFile = HandleFile(path)) {
+		FILETIME ftCreation, ftLastAccess, ftLastWrite;
+		if (!GetFileTime(hFile, &ftCreation, &ftLastAccess, &ftLastWrite)) {
 			printf("ERROR: unable to get timestamps for %ls\n", path.c_str());
-        	CloseHandle(hFile);
-        	return false;
-    	}
-    	CloseHandle(hFile);
+			CloseHandle(hFile);
+			return false;
+		}
+		CloseHandle(hFile);
 
-    	// Convert from 100-nanosecond intervals since January 1, 1601 to seconds since January 1, 1970
-    	outTime = FileTimeToTimet(ftCreation);
-    	return true;
+		// Convert from 100-nanosecond intervals since January 1, 1601 to seconds since January 1, 1970
+		outTime = FileTimeToTimet(ftCreation);
+		return true;
 	}
 	return false;
 #else
-    if (auto fileAttrib = Stat(path); fileAttrib.has_value()) {
+	if (auto fileAttrib = Stat(path); fileAttrib.has_value()) {
 		outTime = fileAttrib->st_mtime;
-        return true;
-    }
+		return true;
+	}
 
-    printf("ERROR: unable to get timestamps for %s\n", path.c_str());
-    return false;
+	printf("ERROR: unable to get timestamps for %s\n", path.c_str());
+	return false;
 #endif
 }
 
