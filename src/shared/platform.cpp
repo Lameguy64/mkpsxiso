@@ -201,13 +201,13 @@ bool GetSrcTime(const fs::path& path, time_t& outTime) {
 	}
 	return false;
 #else
-	struct stat64 fileAttrib;
-    if (stat64(path.c_str(), &fileAttrib) != 0) {
-        return false;
+    if (auto fileAttrib = Stat(path); fileAttrib.has_value()) {
+		outTime = fileAttrib->st_mtime;
+        return true;
     }
 
-    outTime = fileAttrib.st_mtime;
-    return true;
+    printf("ERROR: unable to get timestamps for %s\n", path.c_str());
+    return false;
 #endif
 }
 
