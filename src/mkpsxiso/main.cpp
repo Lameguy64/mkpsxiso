@@ -120,7 +120,7 @@ int Main(int argc, char* argv[])
 				if (CompareICase(lbaHead->extension().generic_u8string(), ".xml"))
 				{
 					args--;
-					global::LBAheaderFile = lbaHead->stem() += "_LBA.c";
+					global::LBAheaderFile = lbaHead->stem() += "_LBA.h";
 					continue;
 				}
 				global::LBAheaderFile = *lbaHead;
@@ -218,7 +218,7 @@ int Main(int argc, char* argv[])
 
 	if ( global::LBAheaderFile == "-lbahead" )
 	{
-		global::LBAheaderFile = global::XMLscript.stem() += "_LBA.c";
+		global::LBAheaderFile = global::XMLscript.stem() += "_LBA.h";
 	}
 
 	// Get current time to be used as date stamps for all directories
