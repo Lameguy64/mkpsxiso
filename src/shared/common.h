@@ -78,7 +78,7 @@ using unique_file = std::unique_ptr<FILE, file_deleter>;
 unique_file OpenScopedFile(const fs::path& path, const char* mode);
 
 // Helper functions for string manipulation
-std::string_view CleanIdentifier(std::string_view id);
+std::string CleanIdentifier(std::string_view id);
 bool CompareICase(std::string_view strLeft, std::string_view strRight);
 
 // Argument parsing

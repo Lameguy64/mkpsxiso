@@ -144,9 +144,9 @@ unique_file OpenScopedFile(const fs::path& path, const char* mode)
 	return unique_file { OpenFile(path, mode) };
 }
 
-std::string_view CleanIdentifier(std::string_view id)
+std::string CleanIdentifier(std::string_view id)
 {
-	std::string_view result(id.substr(0, id.find_last_of(';')));
+	std::string result(id.substr(0, id.find_last_of(';')));
 	return result;
 }
 
