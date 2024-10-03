@@ -74,7 +74,7 @@ jobs:
 
     - name: Publish release
       if:   ${{ github.ref_type == 'tag' }}
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         fail_on_unmatched_files: true
         #generate_release_notes:  true
