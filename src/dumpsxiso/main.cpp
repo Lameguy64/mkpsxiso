@@ -1169,18 +1169,19 @@ int Main(int argc, char *argv[])
 {
 	static constexpr const char* HELP_TEXT =
 		"dumpsxiso [-h|--help] [-x <path>] [-s <path>.xml] <isofile>\n\n"
-		"  <isofile> - File name of the bin/cue file (supports any 2352 byte/sector images).\n"
-		"  -x <path> - Optional destination directory for extracted files. (Defaults to dumpsxiso dir)\n"
-		"  -s <path>.xml - Optional XML name/destination of MKPSXISO compatible script for later rebuilding. (Defaults to dumpsxiso dir)\n"
-		"  -S|--sort-by-dir - Outputs a \"pretty\" XML script where entries are grouped in directories, instead of strictly following their original order on the disc.\n"
-		"  -e|--encode <codec> - Codec to encode CDDA/DA audio. wave is default. Supported codecs: " SUPPORTED_CODEC_TEXT "\n"
-		"  -h|--help - Show this help text\n"
-		"  -pt|--path-table - instead of going through the file system, go to every known directory in order; helps with deobfuscating\n";
+		"  <isofile>\t\tFile name of the bin/cue file\n\t\t\t(supports any 2352 byte/sector images).\n\n"
+		"  -x <path>\t\tOptional destination directory for extracted files.\n\t\t\t(Defaults to dumpsxiso dir)\n\n"
+		"  -s <path>.xml\t\tOptional XML name/destination of MKPSXISO compatible\n\t\t\tscript for later rebuilding. (Defaults to dumpsxiso dir)\n\n"
+		"  -pt|--path-table\tInstead of going through the file system, go to every\n\t\t\tknown directory in order; helps with deobfuscating\n\n"
+		"  -e|--encode <codec>\tCodec to encode CDDA/DA audio. wave is default.\n\t\t\tSupported codecs: " SUPPORTED_CODEC_TEXT "\n\n"
+		"  -S|--sort-by-dir\tOutputs a \"pretty\" XML script where entries are grouped\n\t\t\tin directories, instead of strictly following their\n\t\t\toriginal order on the disc.\n\n"
+		"  -h|--help\t\tShow this help text\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
 			"2017 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
 			"2020 Phoenix (SadNES cITy)\n"
-			"2021-2022 Silent, Chromaryu, G4Vi, and spicyjpeg\n\n" );
+			"2021-2022 Silent, Chromaryu, G4Vi, and spicyjpeg\n"
+			"2024 Nagtan\n\n" );
 
 	if (argc == 1)
 	{
