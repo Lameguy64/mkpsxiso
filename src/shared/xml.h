@@ -57,6 +57,7 @@ namespace attrib
 	constexpr const char* MODIFICATION_DATE = "modification_date";
 
 	constexpr const char* NUM_DUMMY_SECTORS = "sectors";
+	constexpr const char* ECC_ADDRES = "ecc_addr";
 }
 
 }

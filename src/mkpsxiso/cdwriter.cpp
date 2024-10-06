@@ -85,20 +85,20 @@ void IsoWriter::SectorView::PrepareSectorHeader() const
 	sector->mode = 2; // Mode 2
 }
 
-void IsoWriter::SectorView::CalculateForm1()
+void IsoWriter::SectorView::CalculateForm1(const bool eccAddr)
 {
 	SECTOR_M2F1* sector = static_cast<SECTOR_M2F1*>(m_currentSector);
 
-	m_checksumJobs.emplace_front(m_threadPool->enqueue([](SECTOR_M2F1* sector)
+	m_checksumJobs.emplace_front(m_threadPool->enqueue([eccAddr](SECTOR_M2F1* sector)
 		{
 			// Encode EDC data
 			EDC_ECC_GEN.ComputeEdcBlock(sector->subHead, sizeof(sector->subHead) + sizeof(sector->data), sector->edc);
 
 			// Compute ECC P code
 			static const unsigned char zeroaddress[4] = { 0, 0, 0, 0 };
-			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->subHead, 86, 24, 2, 86, sector->ecc);
+			EDC_ECC_GEN.ComputeEccBlock(eccAddr ? sector->addr : zeroaddress, sector->subHead, 86, 24, 2, 86, sector->ecc);
 			// Compute ECC Q code
-			EDC_ECC_GEN.ComputeEccBlock(zeroaddress, sector->subHead, 52, 43, 86, 88, sector->ecc+172);
+			EDC_ECC_GEN.ComputeEccBlock(eccAddr ? sector->addr : zeroaddress, sector->subHead, 52, 43, 86, 88, sector->ecc+172);
 		}, sector));
 }
 
@@ -199,10 +199,9 @@ public:
 		}
 	}
 
-	void WriteBlankSectors(unsigned int count, const unsigned char submode) override
+	void WriteBlankSectors(unsigned int count, const unsigned char submode, const bool eccAddr) override
 	{
 		SectorType* sector = static_cast<SectorType*>(m_currentSector);
-		const bool isForm2 = m_edcEccForm == IsoWriter::EdcEccForm::Form2;
 
 		while (m_currentLBA < m_endLBA && count > 0)
 		{
@@ -212,7 +211,7 @@ public:
 			std::fill(std::begin(sector->data), std::end(sector->data), 0);
 			if (m_edcEccForm == IsoWriter::EdcEccForm::Form1)
 			{
-				CalculateForm1();
+				CalculateForm1(eccAddr);
 			}
 			else if (m_edcEccForm == IsoWriter::EdcEccForm::Form2)
 			{
@@ -333,7 +332,6 @@ public:
 	void WriteMemory(const void* memory, size_t size) override
 	{
 		const char* buf = static_cast<const char*>(memory);
-		const unsigned int lastLBA = m_endLBA - 1;
 
 		while (m_currentLBA < m_endLBA && size > 0)
 		{
@@ -358,10 +356,9 @@ public:
 		}
 	}
 
-	void WriteBlankSectors(unsigned int count, const unsigned char submode) override
+	void WriteBlankSectors(unsigned int count, const unsigned char submode, const bool eccAddr) override
 	{
 		SectorType* sector = static_cast<SectorType*>(m_currentSector);
-		const bool isForm2 = m_edcEccForm == IsoWriter::EdcEccForm::Form2;
 
 		while (m_currentLBA < m_endLBA && count > 0)
 		{
@@ -370,7 +367,7 @@ public:
 			std::fill(std::begin(sector->data), std::end(sector->data), 0);
 			if (m_edcEccForm == IsoWriter::EdcEccForm::Form1)
 			{
-				CalculateForm1();
+				CalculateForm1(eccAddr);
 			}
 			else if (m_edcEccForm == IsoWriter::EdcEccForm::Form2)
 			{

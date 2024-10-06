@@ -163,9 +163,12 @@
 				
 				Attributes:
 					sectors	- Size of dummy file in sector units (1024 = 2MB).
-					type	- The dummy's submode value. Values between 0-255 only
+					type	- The dummy's submode value. Values between 0-255 only.
 								 '0': for a Form 1 dummy (0x00).
 								'32': for a Form 2 dummy (0x20).
+					ecc_addr- Boolean switch that gives the ability to calculate the ECC with the real address instead of a zeroed one.
+							  This is only usefull for some CD-DA games last DATA postgap sector that has a non-standart ECC calculation.
+							  Normally this should be set to 'false' or not set at all. If ecc_addr is not specified, defaults to 'false'.
 			-->
 			<dummy sectors="1024" type="0"/>
 			
@@ -176,7 +179,7 @@
 				A DA file must have a trackid that matches with with a <track>. The trackid is just a
 				string.
 				
-				You can still use <track> elements after this, if you want to add further audio tracks
+				You can still use <dummy> or <track> elements after this, if you want to add further audio tracks
 				that are not referenced by any DA file in the data track.
 			-->
 			<file name="audio1.da" trackid="02" type="da"/>

@@ -52,8 +52,8 @@ namespace cd {
         // Skip bytes in data sectors (supports sequential skipping)
         void SkipBytes(size_t bytes, bool singleSector = false);
 
-        // Seek to a sector in the ISO image in sector units
-        int SeekToSector(int sector);
+        // Seek to a sector in the ISO image in sector units (returns true if success)
+        bool SeekToSector(int sector);
 
         // Seek to a data offset in the ISO image in byte units
         size_t SeekToByte(size_t offs);
@@ -96,6 +96,8 @@ namespace cd {
             cdxa::ISO_XA_ATTRIB extData;
             std::string identifier;
             fs::path virtualPath;
+            EntryType type;
+            std::string trackid;
 
             std::unique_ptr<IsoDirEntries> subdir;
         };
@@ -110,5 +112,5 @@ namespace cd {
     };
 
 }
-
+extern EntryType GetXAEntryType(unsigned short xa_attr);
 #endif // _CDREADER_H
