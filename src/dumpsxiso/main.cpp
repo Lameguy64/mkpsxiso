@@ -71,6 +71,7 @@ namespace param {
 
 namespace global {
 	CueFile cueFile;
+	bool new_type;
 }
 
 fs::path GetRealDAFilePath(const fs::path& inputPath)
@@ -854,6 +855,12 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 			newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
 		}
 	}
+	if (!entry.identifier.empty())
+	{
+		if (entry.order.has_value()) {
+			newelement->SetAttribute(xml::attrib::ORDER, *entry.order);
+		}
+	}
 	WriteOptionalXMLAttribs(newelement, entry, entry.type, attributeCounters);
 	return dirElement;
 }
@@ -951,7 +958,7 @@ void ParseISO(cd::IsoReader& reader) {
     cd::ISO_DESCRIPTOR descriptor;
 	auto license = ReadLicense(reader);
 	const bool xa_edc = CheckEDCXA(reader);
-	const bool new_type = CheckISOver(reader);
+	global::new_type = CheckISOver(reader);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -1037,7 +1044,7 @@ void ParseISO(cd::IsoReader& reader) {
 			tinyxml2::XMLElement *trackElement = baseElement->InsertNewChildElement(xml::elem::TRACK);
 			trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 			trackElement->SetAttribute(xml::attrib::XA_EDC, xa_edc);
-			trackElement->SetAttribute(xml::attrib::NEW_TYPE, new_type);
+			trackElement->SetAttribute(xml::attrib::NEW_TYPE, global::new_type);
 
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::IDENTIFIERS);

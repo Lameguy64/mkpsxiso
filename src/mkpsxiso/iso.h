@@ -46,6 +46,7 @@ namespace iso
 
 		cd::ISO_DATESTAMP date;
 		std::string		trackid;	/// only used for DA files
+		unsigned short	order;
 
 	};
 
@@ -172,7 +173,7 @@ namespace iso
 		 */
 		bool WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, unsigned short totalDirs);
 
-		void SortDirectoryEntries();
+		void SortDirectoryEntries(const bool byOrder, const bool byLBA = false);
 
 		int CalculatePathTableLen(const DIRENTRY& dirEntry) const;
 

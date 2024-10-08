@@ -34,6 +34,7 @@ namespace attrib
 	constexpr const char* ENTRY_NAME = "name";
 	constexpr const char* ENTRY_SOURCE = "source";
 	constexpr const char* ENTRY_TYPE = "type";
+	constexpr const char* ORDER = "order";
 	constexpr const char* OFFSET = "offs";
 
 	constexpr const char* LICENSE_FILE = "file";

@@ -219,7 +219,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 
 	DIRENTRY entry {};
 
-	entry.id = std::move(temp_name);
+	entry.id		= std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
 	entry.HF		= (bool)attributes.HFLAG;
@@ -227,6 +227,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
+	entry.order		= attributes.ORDER;
 	entry.flba		= attributes.FLBA;
 
 	if ( !srcfile.empty() )
@@ -322,6 +323,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
+	entry.order		= attributes.ORDER;
 	entry.date		= GetISODateStamp( dirTime, attributes.GMTOffs );
 	entry.length	= 0; // Length is meaningless for directories
 
@@ -439,7 +441,7 @@ int iso::DirTreeClass::CalculateDirEntryLen() const
 	return 2048 * GetSizeInSectors(dirEntryLen);
 }
 
-void iso::DirTreeClass::SortDirectoryEntries()
+void iso::DirTreeClass::SortDirectoryEntries(const bool byOrder, const bool byLBA)
 {
 	// Search for directories
 	for ( const auto& e : entriesInDir )
@@ -450,13 +452,19 @@ void iso::DirTreeClass::SortDirectoryEntries()
 			// Perform recursive call
 			if ( entry.subdir != nullptr )
 			{
-				entry.subdir->SortDirectoryEntries();
+				entry.subdir->SortDirectoryEntries(byOrder, byLBA);
 			}
 		}
 	}
 
-	std::sort(entriesInDir.begin(), entriesInDir.end(), [](const auto& left, const auto& right)
+	std::stable_sort(entriesInDir.begin(), entriesInDir.end(), [byOrder, byLBA](const auto& left, const auto& right)
 		{
+			if (byOrder) {
+				return left.get().order < right.get().order;
+			}
+			if (byLBA) {
+				return left.get().lba < right.get().lba;
+			}
 			return CleanIdentifier(left.get().id) < CleanIdentifier(right.get().id);
 		});
 }
@@ -583,29 +591,14 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 
 	writeOneEntry(dir, false);
 	writeOneEntry(parentDir, true);
-	std::queue<std::reference_wrapper<const DIRENTRY>> dirQueue;
 
 	for ( const auto& e : entriesInDir )
 	{
 		const DIRENTRY& entry = e.get();
 		if ( !entry.id.empty() )
 		{
-			// Games built with the 2003 mastering tool has different subfolder directory sort.
-			// Currently, I've only tested this with 2 games, so idk if this behavior is the same for all.
-			// Maybe the sort could be like PS2 CDVDGEN, which depends on the order the files were added to the program
-			// instead of a normal sort, in that case another approach would be needed, like adding the custom order to the xml.
-			if (global::new_type.value_or(false) && this->name != "<root>" && entry.type == EntryType::EntryDir) {
-				dirQueue.push(entry);
-			}
-			else {
-				writeOneEntry(entry);
-			}
+			writeOneEntry(entry);
 		}
-	}
-
-	while (!dirQueue.empty()) {
-		writeOneEntry(dirQueue.front());
-		dirQueue.pop();
 	}
 
 	return true;

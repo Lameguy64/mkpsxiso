@@ -317,6 +317,7 @@ cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
 void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors, bool skipFolders)
 {
 	size_t numEntries = 0; // Used to skip the first two entries, . and ..
+	unsigned short order = 0;
     for (int sec = 0; sec < sectors; sec++)
     {
         reader->SeekToSector(lba + sec);
@@ -331,6 +332,9 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 
 			if (numEntries++ >= 2 && !(skipFolders && entry.value().entry.flags & 0x2))
 			{
+				if (global::new_type) {
+					entry->order = order++;
+				}
 				dirEntryList.emplace(std::move(entry.value()));
 			}
 		}
@@ -341,6 +345,23 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 		{
 			return left.get().entry.entryOffs.lsb < right.get().entry.entryOffs.lsb;
 		});
+
+	// Delete correct orders so as to not populate the xml with unnecessary strings
+	if (global::new_type) {
+		auto& entriesInDir = dirEntryList.GetView();
+		bool diffOrder = false;
+		for (unsigned short index = 0; index < entriesInDir.size(); index++) {
+			if (*entriesInDir[index].get().order != index) {
+				diffOrder = true;
+				break;
+			}
+		}
+		if (!diffOrder) {
+			for (auto& entry : entriesInDir) {
+				entry.get().order.reset();
+			}
+		}
+	}
 }
 
 std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoReader* reader) const

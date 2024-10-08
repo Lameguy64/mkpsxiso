@@ -36,6 +36,7 @@ private:
 	static constexpr unsigned char DEFAULT_XAATRIB = 0xFF;
 	static constexpr unsigned short DEFAULT_XAPERM = 0x555; // rx
 	static constexpr unsigned short	DEFAULT_OWNER_ID = 0;
+	static constexpr unsigned short	DEFAULT_ORDER = 10;
 	static constexpr unsigned short	DEFAULT_FORCE_LBA = 0;
 
 public:
@@ -45,6 +46,7 @@ public:
 	unsigned short XAPerm = DEFAULT_XAPERM;
 	unsigned short GID = DEFAULT_OWNER_ID;
 	unsigned short UID = DEFAULT_OWNER_ID;
+	unsigned short ORDER = DEFAULT_ORDER;
 	unsigned int FLBA = DEFAULT_FORCE_LBA;
 };
 

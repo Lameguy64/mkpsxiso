@@ -938,6 +938,7 @@ EntryAttributes ReadEntryAttributes(EntryAttributes current, const tinyxml2::XML
 		getAttributeIfExists(current.XAPerm, xml::attrib::XA_PERMISSIONS);
 		getAttributeIfExists(current.GID, xml::attrib::XA_GID);
 		getAttributeIfExists(current.UID, xml::attrib::XA_UID);
+		getAttributeIfExists(current.ORDER, xml::attrib::ORDER);
 		getAttributeIfExists(current.FLBA, xml::attrib::OFFSET);
 	}
 
@@ -1235,9 +1236,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
 
 	// Sort directory entries, calculate tree LBAs and retrieve size of image
-	if (!global::new_type.value_or(false)) {
-		dirTree->SortDirectoryEntries();
-	}
+	dirTree->SortDirectoryEntries(*global::new_type);
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )

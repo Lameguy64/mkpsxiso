@@ -98,6 +98,7 @@ namespace cd {
             fs::path virtualPath;
             EntryType type;
             std::string trackid;
+            std::optional<unsigned short> order;
 
             std::unique_ptr<IsoDirEntries> subdir;
         };
@@ -113,4 +114,7 @@ namespace cd {
 
 }
 extern EntryType GetXAEntryType(unsigned short xa_attr);
+namespace global {
+    extern bool new_type;
+}
 #endif // _CDREADER_H
