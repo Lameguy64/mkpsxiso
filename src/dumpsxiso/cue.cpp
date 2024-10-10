@@ -3,7 +3,7 @@
 #include "platform.h"
 
 bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &entry, cd::IsoReader &reader, const CueFile &cueFile) {
-	unsigned trackIndex = (entry.trackid.empty() ? std::stoi(entry.identifier.substr(8, 2)) : std::stoi(entry.trackid)) - 1;
+	unsigned trackIndex = (entry.trackid.empty() ? std::stoi(entry.identifier.substr(6, 2)) : std::stoi(entry.trackid)) - 1;
 	reader.Open(cueFile.tracks[trackIndex].filePath);
 	return reader.SeekToSector(sector - cueFile.tracks[trackIndex - 1].endSector);
 }

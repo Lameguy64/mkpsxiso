@@ -573,7 +573,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 		if(it->type == EntryType::EntryDA) {
 			it->trackid = (tracknum < 10 ? "0" : "") + std::to_string(tracknum);
 			tracknum++;
-			DAfiles.emplace_back(it);
+			DAfiles.push_back(it);
 		}
 	}
 
@@ -622,7 +622,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 		// Add unreferenced DA files in entries for further extraction
 		for (auto& entry : unrefDAbuff) {
 			entries.emplace_back(std::move(entry));
-			DAfiles.emplace_back(std::prev(entries.end()));
+			DAfiles.push_back(std::prev(entries.end()));
 		}
 
 		// Sort DA files by LBA
@@ -1108,18 +1108,23 @@ void ParseISO(cd::IsoReader& reader) {
 					printf("Warning: This %u sectors gap could mean that there are missing files or the image was previously modified.\n", postGap);
 				}
 			}
+			else if (!DAfiles.empty() && DAfiles[0]->entry.entryOffs.lsb - postGap == currentLBA) {
+				postGap = 0;
+			}
 			// There are some CD-DA games that have a non-zero adrress ECC calculation in the last postgap sector. So, we are checking it.
 			// Idk if this behavior could happen in other sectors, but apparently it is only related to postgaps in CD-DA games.
-			cd::SECTOR_M2F1 sector;
-			reader.SeekToSector(currentLBA + postGap - 1);
-			reader.ReadBytesXA(sector.subHead, 2336);
-			if (sector.ecc[0] != 0 || sector.ecc[1] != 0 || sector.ecc[2] != 0 || sector.ecc[3] != 0) {
-				WriteXMLGap(postGap - 1, dirtree, currentLBA, reader);
-				WriteXMLGap(1, dirtree, currentLBA, reader);
-				dirtree->LastChildElement("dummy")->SetAttribute(xml::attrib::ECC_ADDRES, true);
-			}
-			else {
-				WriteXMLGap(postGap, dirtree, currentLBA, reader);
+			if (postGap) {
+				cd::SECTOR_M2F1 sector;
+				reader.SeekToSector(currentLBA + postGap - 1);
+				reader.ReadBytesXA(sector.subHead, 2336);
+				if (sector.ecc[0] != 0 || sector.ecc[1] != 0 || sector.ecc[2] != 0 || sector.ecc[3] != 0) {
+					WriteXMLGap(postGap - 1, dirtree, currentLBA, reader);
+					WriteXMLGap(1, dirtree, currentLBA + postGap - 1, reader);
+					dirtree->LastChildElement("dummy")->SetAttribute(xml::attrib::ECC_ADDRES, true);
+				}
+				else {
+					WriteXMLGap(postGap, dirtree, currentLBA, reader);
+				}
 			}
 			currentLBA += postGap;
 
