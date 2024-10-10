@@ -12,8 +12,6 @@
 #include <cstdarg>
 #include <fstream>
 
-char rootname[] = { "<root>" };
-
 static bool icompare_func(unsigned char a, unsigned char b)
 {
 	return std::tolower( a ) == std::tolower( b );
@@ -82,8 +80,8 @@ int iso::DirTreeClass::GetAudioSize(const fs::path& audioFile)
 	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), CD_SECTOR_SIZE)*CD_SECTOR_SIZE;
 }
 
-iso::DirTreeClass::DirTreeClass(EntryList& entries, DirTreeClass* parent)
-	: name(rootname), entries(entries), parent(parent)
+iso::DirTreeClass::DirTreeClass(EntryList& entries, DirTreeClass* parent, std::string name)
+	: name(name), entries(entries), parent(parent)
 {
 }
 

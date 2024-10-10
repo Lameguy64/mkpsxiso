@@ -79,7 +79,7 @@ namespace iso
 
 		DIRENTRY* entry = nullptr;
 
-		DirTreeClass* parent = nullptr; // Non-owning
+		DirTreeClass* parent; // Non-owning
 		
 		/// Internal function for generating and writing directory records
 		bool WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, const unsigned short totalDirs) const;
@@ -92,7 +92,7 @@ namespace iso
 		EntryList& entries; // List of all entries on the disc
 		std::vector<std::reference_wrapper<iso::DIRENTRY>> entriesInDir; // References to entries in this directory
 
-		DirTreeClass(EntryList& entries, DirTreeClass* parent = nullptr);
+		DirTreeClass(EntryList& entries, DirTreeClass* parent = nullptr, std::string name = "<root>");
 		~DirTreeClass();
 
 		static DIRENTRY& CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate, const bool hiddenFlag);
