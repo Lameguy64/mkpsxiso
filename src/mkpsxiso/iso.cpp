@@ -782,31 +782,19 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 	// Helper lambda to print common details
 	auto printEntryDetails = [&](const char* type, const char* name, const char* sectors, const DIRENTRY& entry) {
 		// Write entry type with 4 spaces at start
-		fprintf(fp, "%*s%-6s", level + 4, "", type);
+		fprintf(fp, "%*s%-6s|", level + 4, "", type);
 		// Write entry name
-		fprintf(fp, "%-17s", name);
+		fprintf(fp, "%-17s|", name);
 		// Write entry length in sectors
-		fprintf(fp, "%-10s", sectors);
+		fprintf(fp, "%-10s|", sectors);
 		// Write LBA offset
-		fprintf(fp, "%-10d", entry.lba);
-		if (entry.type != EntryType::EntryDir) {
-			// Write timecode
-			fprintf(fp, "%-12s", SectorsToTimecode(150 + entry.lba).c_str());
-			if (entry.type != EntryType::EntryDummy) {
-				// Write size in byte units
-				fprintf(fp, "%-10" PRId64, entry.length);
-				// Write source file path
-				fprintf(fp, "%" PRFILESYSTEM_PATH "\n", entry.srcfile.lexically_normal().c_str());
-			}
-			else {
-				// Write size in byte units without spaces at end
-				fprintf(fp, "%" PRId64 "\n", entry.length);
-			}
-		}
-		else {
-			// Write timecode without spaces at end
-			fprintf(fp, "%s\n", SectorsToTimecode(150 + entry.lba).c_str());
-		}
+		fprintf(fp, "%-10d|", entry.lba);
+		// Write timecode
+		fprintf(fp, "%-12s|", SectorsToTimecode(150 + entry.lba).c_str());
+		// Write size in byte units
+		fprintf(fp, "%-10s|", entry.type != EntryType::EntryDir ? std::to_string(entry.length).c_str() : "");
+		// Write source file path
+		fprintf(fp, "%" PRFILESYSTEM_PATH "\n", entry.srcfile.lexically_normal().c_str());
 	};
 
 	int maxlba = 0;
@@ -871,7 +859,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 
 	if ( level > 0 )
 	{
-		fprintf( fp, "%*sEnd   %s\n", level + 3, "", name.c_str() );
+		fprintf(fp, "%*sEnd   |%-17s|%-10s|%-10s|%-12s|%-10s|\n", level + 3, "", name.c_str(), "", "", "", "");
 	}
 }
 
