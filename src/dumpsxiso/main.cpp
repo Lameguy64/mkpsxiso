@@ -588,7 +588,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			auto& entry = unrefDAbuff.emplace_back();
 			entry.entry.entryOffs.lsb = track.startSector;
 			entry.entry.entrySize.lsb = track.sizeInSectors * 2048; // We are using this size instead of 2352 because of how the code was written
-			entry.identifier = GetRealDAFilePath("TRACK - " + track.number).generic_u8string() + ";1";
+			entry.identifier = GetRealDAFilePath("TRACK-" + track.number).generic_u8string() + ";1";
 			entry.type = EntryType::EntryDA;
 
 			// Additional safety check in case the .cue file had a wrong pause size

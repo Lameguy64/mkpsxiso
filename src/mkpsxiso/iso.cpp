@@ -739,7 +739,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 		fprintf( fp, "#define _ISO_FILES\n\n" );
 	}
 
-	fprintf( fp, "/* %s */\n", !entriesInDir.empty() && entriesInDir[0].get().id.substr(0, 8) == "TRACK - " ? "UNREFERENCED TRACKS" : name.c_str() );
+	fprintf( fp, "/* %s */\n", !entriesInDir.empty() && entriesInDir[0].get().id.substr(0, 6) == "TRACK-" ? "UNREFERENCED TRACKS" : name.c_str() );
 
 	for ( const auto& e : entriesInDir )
 	{
