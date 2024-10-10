@@ -492,7 +492,7 @@ int Main(int argc, char* argv[])
 		int totalLenLBA = 0;
 
 		std::vector<cdtrack> audioTracks;
-		std::vector<iso::DIRENTRY> unrefTracks;
+		iso::EntryList unrefTracks;
 
 		const tinyxml2::XMLElement* dataTrack = nullptr;
 
@@ -711,9 +711,9 @@ int Main(int argc, char* argv[])
 
 				if (!unrefTracks.empty())
 				{
-					dirTree.entriesInDir.clear();
+					iso::DirTreeClass dirTree(unrefTracks, nullptr, "UNREFERENCED TRACKS");
 					for (auto& entry : unrefTracks) {
-						dirTree.entriesInDir.push_back(std::ref(entry));
+						dirTree.entriesInDir.push_back(entry);
 					}
 					dirTree.OutputLBAlisting( fp, 0 );
 				}
@@ -748,9 +748,9 @@ int Main(int argc, char* argv[])
 
 				if (!unrefTracks.empty())
 				{
-					dirTree.entriesInDir.clear();
+					iso::DirTreeClass dirTree(unrefTracks, nullptr, "UNREFERENCED TRACKS");
 					for (auto& entry : unrefTracks) {
-						dirTree.entriesInDir.push_back(std::ref(entry));
+						dirTree.entriesInDir.push_back(entry);
 					}
 					fprintf( fp, "\n" );
 					dirTree.OutputHeaderListing( fp, 1 );

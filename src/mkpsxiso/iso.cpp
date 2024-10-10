@@ -455,7 +455,7 @@ void iso::DirTreeClass::SortDirectoryEntries(const bool byOrder, const bool byLB
 		}
 	}
 
-	std::stable_sort(entriesInDir.begin(), entriesInDir.end(), [byOrder, byLBA](const auto& left, const auto& right)
+	std::stable_sort(entriesInDir.begin(), entriesInDir.end(), [&](const auto& left, const auto& right)
 		{
 			if (byOrder) {
 				return left.get().order < right.get().order;
@@ -737,7 +737,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 		fprintf( fp, "#define _ISO_FILES\n\n" );
 	}
 
-	fprintf( fp, "/* %s */\n", !entriesInDir.empty() && entriesInDir[0].get().id.substr(0, 6) == "TRACK-" ? "UNREFERENCED TRACKS" : name.c_str() );
+	fprintf( fp, "/* %s */\n", name.c_str() );
 
 	for ( const auto& e : entriesInDir )
 	{
