@@ -739,7 +739,7 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 		fprintf( fp, "#define _ISO_FILES\n\n" );
 	}
 
-	fprintf( fp, "/* %s */\n", entriesInDir[0].get().id.substr(0, 8) == "TRACK - " ? "UNREFERENCED TRACKS" : name.c_str() );
+	fprintf( fp, "/* %s */\n", !entriesInDir.empty() && entriesInDir[0].get().id.substr(0, 8) == "TRACK - " ? "UNREFERENCED TRACKS" : name.c_str() );
 
 	for ( const auto& e : entriesInDir )
 	{
@@ -781,78 +781,99 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 {
-	for ( const auto& e : entriesInDir )
-	{
-		const DIRENTRY& entry = e.get();
-		fprintf( fp, "    " );
-
-		if ( entry.id.empty() )
-		{
-			fprintf( fp, "Dummy <DUMMY>          " );
-			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length) );
-		}
-		else if ( entry.type == EntryType::EntryFile )
-		{
-			fprintf( fp, "File  " );
-			fprintf( fp, "%-17s", CleanIdentifier(entry.id).c_str() );
-			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length) );
-		}
-		else if ( entry.type == EntryType::EntryDir )
-		{
-			fprintf( fp, "Dir   " );
-			fprintf( fp, "%-17s", CleanIdentifier(entry.id).c_str() );
-			fprintf( fp, "%-10s", "" );
-		}
-		else if ( entry.type == EntryType::EntryXA )
-		{
-			fprintf( fp, "XA    " );
-			fprintf( fp, "%-17s", CleanIdentifier(entry.id).c_str() );
-			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length, 2336) );
-		}
-		else if ( entry.type == EntryType::EntryXA_DO )
-		{
-			fprintf( fp, "XA    " );
-			fprintf( fp, "%-17s", CleanIdentifier(entry.id).c_str() );
-			fprintf( fp, "%-10" PRIu32, GetSizeInSectors(entry.length) );
-		}
-		else if ( entry.type == EntryType::EntryDA )
-		{
-			fprintf( fp, "CDDA  " );
-			fprintf( fp, "%-17s", CleanIdentifier(entry.id).c_str() );
-			fprintf( fp, "%-10" PRIu32, 150 + GetSizeInSectors(entry.length, CD_SECTOR_SIZE) );
-		}
-
+	// Helper lambda to print common details
+	auto printEntryDetails = [&](const char* type, const char* name, const char* sectors, const DIRENTRY& entry) {
+		// Write entry type with 4 spaces at start
+		fprintf(fp, "%*s%-6s", level + 4, "", type);
+		// Write entry name
+		fprintf(fp, "%-17s", name);
+		// Write entry length in sectors
+		fprintf(fp, "%-10s", sectors);
 		// Write LBA offset
-		fprintf( fp, "%-10d", entry.lba );
-
-		// Write Timecode
-		if (entry.type != EntryType::EntryDir)
-		{
-			fprintf( fp, "%-12s", SectorsToTimecode(150 + entry.lba).c_str());
-
-			// Write size in byte units
-			if ( !entry.id.empty() )
-			{
-				fprintf( fp, "%-10" PRId64, entry.length );
-
+		fprintf(fp, "%-10d", entry.lba);
+		if (entry.type != EntryType::EntryDir) {
+			// Write timecode
+			fprintf(fp, "%-12s", SectorsToTimecode(150 + entry.lba).c_str());
+			if (entry.type != EntryType::EntryDummy) {
+				// Write size in byte units
+				fprintf(fp, "%-10" PRId64, entry.length);
 				// Write source file path
-				fprintf( fp, "%" PRFILESYSTEM_PATH "\n", entry.srcfile.lexically_normal().c_str() );
+				fprintf(fp, "%" PRFILESYSTEM_PATH "\n", entry.srcfile.lexically_normal().c_str());
 			}
-			else
-			{
-				fprintf( fp, "%" PRId64 "\n", entry.length );
+			else {
+				// Write size in byte units without spaces at end
+				fprintf(fp, "%" PRId64 "\n", entry.length);
 			}
 		}
-		else
-		{
-			fprintf( fp, "%s\n", SectorsToTimecode(150 + entry.lba).c_str());
+		else {
+			// Write timecode without spaces at end
+			fprintf(fp, "%s\n", SectorsToTimecode(150 + entry.lba).c_str());
+		}
+	};
+
+	int maxlba = 0;
+	if (level == 0) {
+		for (const auto& e : entriesInDir) {
+			const DIRENTRY& entry = e.get();
+			if (entry.type != EntryType::EntryDummy && entry.type != EntryType::EntryDA) {
+				maxlba = std::max(entry.lba, maxlba);
+			}
+		}
+	}
+
+	// Print first the files in the directory
+	for (const auto& e : entriesInDir) {
+		const DIRENTRY& entry = e.get();
+		if (entry.type == EntryType::EntryDir || (entry.type == EntryType::EntryDummy && level == 0 && entry.lba > maxlba)) {
+			continue;
+		}
+
+		const char* typeStr = "";
+		std::string nameStr = CleanIdentifier(entry.id);
+		uint32_t sectors = GetSizeInSectors(entry.length);
+
+		switch (entry.type) {
+			case EntryType::EntryFile:
+				typeStr = "File";
+				break;
+			case EntryType::EntryXA_DO:
+				typeStr = "XA";
+				break;
+			case EntryType::EntryDummy:
+				typeStr = "Dummy";
+				nameStr = "<DUMMY>";
+				break;
+			case EntryType::EntryXA:
+				typeStr = "XA";
+				sectors = GetSizeInSectors(entry.length, 2336);
+				break;
+			case EntryType::EntryDA:
+				typeStr = "CDDA";
+				sectors = 150 + GetSizeInSectors(entry.length, CD_SECTOR_SIZE);
+				break;
+			default:
+				continue;
+		}
+
+		// Print the entry details
+		printEntryDetails(typeStr, nameStr.c_str(), std::to_string(sectors).c_str(), entry);
+	}
+
+	// Print directories and postgap dummy
+	for (const auto& e : entriesInDir) {
+		const DIRENTRY& entry = e.get();
+		if (entry.type == EntryType::EntryDir) {
+			printEntryDetails("Dir", CleanIdentifier(entry.id).c_str(), "", entry);
 			entry.subdir->OutputLBAlisting( fp, level+1 );
+		}
+		else if (entry.type == EntryType::EntryDummy && level == 0 && entry.lba > maxlba) {
+			printEntryDetails("Dummy", "<DUMMY>", std::to_string(GetSizeInSectors(entry.length)).c_str(), entry);
 		}
 	}
 
 	if ( level > 0 )
 	{
-		fprintf( fp, "    End   %s\n", name.c_str() );
+		fprintf( fp, "%*sEnd   %s\n", level + 3, "", name.c_str() );
 	}
 }
 
