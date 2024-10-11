@@ -79,28 +79,29 @@ bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const un
 int Main(int argc, char* argv[])
 {
 	static constexpr const char* HELP_TEXT =
-		"mkpsxiso [-h|--help] [-y] [-q|--quiet] [-o|--output <file>] [-lba <file>]\n"
-		"  \t [-lbahead <file>] [-rebuildxml <file>] [-noisogen] <xml>\n\n"
-		"  -y\t\tAlways overwrite ISO image files\n\n"
-		"  -q|--quiet\tQuiet mode (suppress all but warnings and errors)\n\n"
-		"  -o|--output\tSpecify output file (overrides image_name attribute)\n\n"
-		"  -c|--cuefile\tSpecify cue sheet file (overrides cue_sheet attribute)\n\n"
-		"  -l|--label\tSpecify volume ID (overrides volume element)\n\n"
-		"  <xml>\t\tFile name of disc image project in XML document format\n\n"
-		"  -lba\t\tGenerate a log of file LBA locations in disc image\n\n"
-		"  -lbahead\tGenerate a C header of file LBA locations in disc image\n\n"
+		"Usage: mkpsxiso [options <file>] <xmlfile>\n\n"
+		"  <xmlfile>\tFile name of disc image project in XML document format\n\n"
+		"Options:\n"
+		"  -y\t\tAlways overwrite ISO image files\n"
+		"  -q|--quiet\tQuiet mode (suppress all but warnings and errors)\n"
+		"  -o|--output\tSpecify output file (overrides image_name attribute)\n"
+		"  -c|--cuefile\tSpecify cue sheet file (overrides cue_sheet attribute)\n"
+		"  -l|--label\tSpecify volume ID (overrides volume element)\n"
+		"  -lba\t\tGenerate a log of file LBA locations in disc image\n"
+		"  -lbahead\tGenerate a C header of file LBA locations in disc image\n"
 		"  -noisogen\tDo not generate ISO, but calculate file LBA locations only\n"
-		"\t\t(for use with -lba or -lbahead)\n\n"
+		"\t\t(for use with -lba or -lbahead)\n"
 		"  -noxa\t\tDo not generate CD-XA extended file attributes (plain ISO9660)\n"
-		"\t\t(XA data can still be included but not recommended)\n\n"
-		"  -rebuildxml\tRebuild the XML using our newest schema\n\n"
+		"\t\t(XA data can still be included but not recommended)\n"
+		"  -rebuildxml\tRebuild the XML using our newest schema\n"
 		"  -h|--help\tShow this help text\n";
 
 	static constexpr const char* VERSION_TEXT =
 		"MKPSXISO " VERSION " - PlayStation ISO Image Maker\n"
-		"2017-2022 Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
-		"2021-2022 Silent, Chromaryu, G4Vi, and spicyjpeg\n"
-		"2024\t  Nagtan\n\n";
+		"Get the latest version from https://github.com/Lameguy64/mkpsxiso\n"
+		"Original work: Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
+		"Maintained by: Silent (CookiePLMonster) and spicyjpeg\n"
+		"Contributors : marco-calautti, G4Vi, Nagtan and all the ones from github\n\n";
 
 	bool OutputOverride = false;
 
