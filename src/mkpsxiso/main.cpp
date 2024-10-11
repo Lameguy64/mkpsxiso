@@ -117,6 +117,26 @@ int Main(int argc, char* argv[])
 				printf(HELP_TEXT);
 				return EXIT_SUCCESS;
 			}
+			if (ParseArgument(args, "noisogen"))
+			{
+				global::NoIsoGen = true;
+				continue;
+			}
+			if (ParseArgument(args, "q", "quiet"))
+			{
+				global::QuietMode = true;
+				continue;
+			}
+			if (ParseArgument(args, "y"))
+			{
+				global::Overwrite = true;
+				continue;
+			}
+			if (ParseArgument(args, "noxa"))
+			{
+				global::noXA = true;
+				continue;
+			}
 			if (auto lbaHead = ParsePathArgument(args, "lbahead"); lbaHead.has_value())
 			{
 				if (CompareICase(lbaHead->extension().generic_u8string(), ".xml"))
@@ -126,16 +146,6 @@ int Main(int argc, char* argv[])
 					continue;
 				}
 				global::LBAheaderFile = *lbaHead;
-				continue;
-			}
-			if (ParseArgument(args, "noisogen"))
-			{
-				global::NoIsoGen = true;
-				continue;
-			}
-			if (ParseArgument(args, "q", "quiet"))
-			{
-				global::QuietMode = true;
 				continue;
 			}
 			if (auto lbaFile = ParsePathArgument(args, "lba"); lbaFile.has_value())
@@ -161,24 +171,14 @@ int Main(int argc, char* argv[])
 				OutputOverride = true;
 				continue;
 			}
-			if (auto label = ParseStringArgument(args, "l", "label"); label.has_value())
-			{
-				global::volid_override = label;
-				continue;
-			}
 			if (auto newxmlfile = ParsePathArgument(args, "rebuildxml"); newxmlfile.has_value())
 			{
 				global::RebuildXMLScript = *newxmlfile;
 				continue;
 			}
-			if (ParseArgument(args, "y"))
+			if (auto label = ParseStringArgument(args, "l", "label"); label.has_value())
 			{
-				global::Overwrite = true;
-				continue;
-			}
-			if (ParseArgument(args, "noxa"))
-			{
-				global::noXA = true;
+				global::volid_override = label;
 				continue;
 			}
 

@@ -64,6 +64,7 @@ namespace param {
     fs::path isoFile;
     fs::path outPath;
     fs::path xmlFile;
+	bool force = false;
 	bool pathTable = false;
     bool outputSortedByDir = false;
 	EncoderAudioFormats encodingFormat = EAF_WAV;
@@ -850,7 +851,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 			newelement->SetAttribute(xml::attrib::TRACK_ID, entry.trackid.c_str());
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "da");
 		}
-		if (param::pathTable)
+		if (param::force)
 		{
 			newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
 		}
@@ -876,7 +877,7 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 	newelement->SetAttribute(xml::attrib::ENTRY_TYPE, sector.subHead[2]);
-	if (param::pathTable) {
+	if (param::force) {
 		newelement->SetAttribute(xml::attrib::OFFSET, startSector);
 	}
 }
@@ -1188,6 +1189,7 @@ int Main(int argc, char *argv[])
 		"  -pt|--path-table\tInstead of going through the file system, go to every\n\t\t\tknown directory in order; helps with deobfuscating\n"
 		"  -e|--encode <codec>\tCodec to encode CDDA/DA audio. wave is default.\n\t\t\tSupported codecs: " SUPPORTED_CODEC_TEXT "\n"
 		"  -S|--sort-by-dir\tOutputs a \"pretty\" XML script where entries are grouped\n\t\t\tin directories, instead of strictly following their\n\t\t\toriginal order on the disc.\n"
+		"  -f|--force\t\tWrites all lba offsets in the xml to force them at build\n"
 		"  -h|--help\t\tShow this help text\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
@@ -1207,15 +1209,25 @@ int Main(int argc, char *argv[])
 		// Is it a switch?
 		if ((*args)[0] == '-')
 		{
-			if (ParseArgument(args, "pt", "path-table"))
-			{
-        param::pathTable = true;
-        continue;
-			}
 			if (ParseArgument(args, "h", "help"))
 			{
 				printf(HELP_TEXT);
 				return EXIT_SUCCESS;
+			}
+			if (ParseArgument(args, "f", "force"))
+			{
+				param::force = true;
+				continue;
+			}
+			if (ParseArgument(args, "pt", "path-table"))
+			{
+				param::pathTable = true;
+				continue;
+			}
+			if (ParseArgument(args, "S", "sort-by-dir"))
+			{
+				param::outputSortedByDir = true;
+				continue;
 			}
 			if (auto outPath = ParsePathArgument(args, "x"); outPath.has_value())
 			{
@@ -1225,11 +1237,6 @@ int Main(int argc, char *argv[])
 			if (auto xmlPath = ParsePathArgument(args, "s"); xmlPath.has_value())
 			{
 				param::xmlFile = *xmlPath;
-				continue;
-			}
-			if (ParseArgument(args, "S", "sort-by-dir"))
-			{
-				param::outputSortedByDir = true;
 				continue;
 			}
 			if(auto encodingStr = ParseStringArgument(args, "e", "encode"); encodingStr.has_value())
