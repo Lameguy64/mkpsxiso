@@ -1310,23 +1310,16 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 
 	if ( name.size() > 12 )
 	{
-		if ( !global::QuietMode )
-		{
-			printf( "      " );
-		}
-
 		if ( name.size() > 31 )
 		{
-			printf( "ERROR: Name entry for file '%s' is more than 31 "
-				"characters long on line %d.\n", name.c_str(),
-				dirElement->GetLineNum() );
+			printf( "ERROR: File name '%s' on line %d is more than 31 "
+				"characters long.\n", name.c_str(), dirElement->GetLineNum() );
 			return false;
 		}
-		else
+		else if ( !global::QuietMode )
 		{
-			printf( "Warning: Name entry for file '%s' is more than 12 "
-				"characters long on line %d.\n", name.c_str(),
-				dirElement->GetLineNum() );
+			printf( "      Warning: File name '%s' on line %d is more than 12 "
+				"characters long.\n", name.c_str(), dirElement->GetLineNum() );
 		}
 	}
 
@@ -1466,16 +1459,14 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 	{
 		if ( strlen( nameElement ) > 31 )
 		{
-			printf( "ERROR: Directory name %s on line %d is more than 31 "
-				"characters long.\n", nameElement,
-					dirElement->GetLineNum() );
+			printf( "ERROR: Directory name '%s' on line %d is more than 31 "
+				"characters long.\n", nameElement, dirElement->GetLineNum() );
 			return false;
 		}
-		else
+		else if ( !global::QuietMode )
 		{
-			printf( "Warning: Directory name %s on line %d is more than 12 "
-				"characters long.\n", nameElement,
-					dirElement->GetLineNum() );
+			printf( "      Warning: Directory name '%s' on line %d is more than 12 "
+				"characters long.\n", nameElement, dirElement->GetLineNum() );
 		}
 	}
 
