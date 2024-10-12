@@ -1315,11 +1315,19 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 			printf( "      " );
 		}
 
-		printf( "ERROR: Name entry for file '%s' is more than 12 "
-			"characters long on line %d.\n", name.c_str(),
-			dirElement->GetLineNum() );
-
-		return false;
+		if ( name.size() > 31 )
+		{
+			printf( "ERROR: Name entry for file '%s' is more than 31 "
+				"characters long on line %d.\n", name.c_str(),
+				dirElement->GetLineNum() );
+			return false;
+		}
+		else
+		{
+			printf( "Warning: Name entry for file '%s' is more than 12 "
+				"characters long on line %d.\n", name.c_str(),
+				dirElement->GetLineNum() );
+		}
 	}
 
 	EntryType entry = EntryType::EntryFile;
@@ -1456,10 +1464,19 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
 	if ( strlen( nameElement ) > 12 )
 	{
-		printf( "ERROR: Directory name %s on line %d is more than 12 "
-			"characters long.\n", nameElement,
-				dirElement->GetLineNum() );
-		return false;
+		if ( strlen( nameElement ) > 31 )
+		{
+			printf( "ERROR: Directory name %s on line %d is more than 31 "
+				"characters long.\n", nameElement,
+					dirElement->GetLineNum() );
+			return false;
+		}
+		else
+		{
+			printf( "Warning: Directory name %s on line %d is more than 12 "
+				"characters long.\n", nameElement,
+					dirElement->GetLineNum() );
+		}
 	}
 
 	fs::path srcDir;
