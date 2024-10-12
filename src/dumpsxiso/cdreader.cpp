@@ -392,9 +392,11 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);
 
 	// XA attributes are big endian, swap them
-	entry.extData.attributes = SwapBytes16(entry.extData.attributes);
 	entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
 	entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
+	if ((entry.extData.attributes & 0x0FFF) != 0x0800) { // HACK to check conflictive images that has the attributes written as little endian
+		entry.extData.attributes = SwapBytes16(entry.extData.attributes);
+	}
 
 	// Add the EntryType here so as not to keep calculating it everytime later
 	// Check for file number first to determine if it's a STR/XA file, because some games (Mega Man X3) have flagged them as DATA but currently they are not
