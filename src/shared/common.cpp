@@ -106,7 +106,7 @@ std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src)
 
 uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize)
 {
-	return size > 0 ? static_cast<uint32_t>((size + (sectorSize - 1)) / sectorSize) : 1;
+	return size > 0 || *global::new_type ? static_cast<uint32_t>((size + (sectorSize - 1)) / sectorSize) : 1;
 }
 
 std::string SectorsToTimecode(const unsigned sectors)

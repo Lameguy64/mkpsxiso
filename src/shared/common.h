@@ -50,6 +50,11 @@ public:
 	unsigned int FLBA = DEFAULT_FORCE_LBA;
 };
 
+// Shared by mkpsxiso and dumpsxiso
+namespace global {
+    extern std::optional<bool> new_type;
+}
+
 // Helper functions for datestamp manipulation
 cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
 cd::ISO_LONG_DATESTAMP GetLongDateFromString(const char* str);

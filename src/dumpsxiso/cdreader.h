@@ -114,7 +114,4 @@ namespace cd {
 
 }
 extern EntryType GetXAEntryType(unsigned short xa_attr);
-namespace global {
-    extern bool new_type;
-}
 #endif // _CDREADER_H

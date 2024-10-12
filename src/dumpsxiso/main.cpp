@@ -72,7 +72,7 @@ namespace param {
 
 namespace global {
 	CueFile cueFile;
-	bool new_type;
+	std::optional<bool> new_type;
 }
 
 fs::path GetRealDAFilePath(const fs::path& inputPath)
@@ -1045,7 +1045,7 @@ void ParseISO(cd::IsoReader& reader) {
 			tinyxml2::XMLElement *trackElement = baseElement->InsertNewChildElement(xml::elem::TRACK);
 			trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 			trackElement->SetAttribute(xml::attrib::XA_EDC, xa_edc);
-			trackElement->SetAttribute(xml::attrib::NEW_TYPE, global::new_type);
+			trackElement->SetAttribute(xml::attrib::NEW_TYPE, *global::new_type);
 
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::IDENTIFIERS);
@@ -1100,8 +1100,8 @@ void ParseISO(cd::IsoReader& reader) {
 			// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, postgap should be always >= 150 sectors for CD-DA discs and optionally for non CD-DA.
 			unsigned int postGap = 150;
 			unsigned int totalLenLBA = descriptor.volumeSize.lsb;
-			if (!global::cueFile.tracks.empty()) {
-				postGap = global::cueFile.tracks.front().endSector - currentLBA;
+			if (!global::cueFile.tracks.empty() && global::cueFile.tracks[0].endSector <= totalLenLBA) {
+				postGap = global::cueFile.tracks[0].endSector - currentLBA;
 			}
 			else if (totalLenLBA - currentLBA < postGap) {
 				postGap = totalLenLBA - currentLBA;
