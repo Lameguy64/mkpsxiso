@@ -982,7 +982,7 @@ void iso::WriteLicenseData(cd::IsoWriter* writer, void* data)
 }
 
 template<size_t N>
-static void CopyStringPadWithSpaces(char (&dest)[N], const char* src)
+static void CopyStringPadWithSpaces(char (&dest)[N], const char* src, const bool upper = false)
 {
 	auto begin = std::begin(dest);
 	auto end = std::end(dest);
@@ -993,7 +993,7 @@ static void CopyStringPadWithSpaces(char (&dest)[N], const char* src)
 		const size_t len = strlen(src);
 		for (; begin != end && i < len; ++begin, ++i)
 		{
-			*begin = std::toupper( src[i] );
+			*begin = upper ? std::toupper( src[i] ) : src[i];
 		}
 	}
 
@@ -1010,13 +1010,13 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	CopyStringPadWithSpaces( isoDescriptor.header.id, "CD001" );
 
 	// Set System identifier
-	CopyStringPadWithSpaces( isoDescriptor.systemID, id.SystemID );
+	CopyStringPadWithSpaces( isoDescriptor.systemID, id.SystemID, true );
 
 	// Set Volume identifier
 	CopyStringPadWithSpaces( isoDescriptor.volumeID, id.VolumeID );
 
 	// Set Application identifier
-	CopyStringPadWithSpaces( isoDescriptor.applicationIdentifier, id.Application );
+	CopyStringPadWithSpaces( isoDescriptor.applicationIdentifier, id.Application, true );
 
 	// Volume Set identifier
 	CopyStringPadWithSpaces( isoDescriptor.volumeSetIdentifier, id.VolumeSet );
