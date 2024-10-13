@@ -451,7 +451,7 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 	const fs::path& path)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
-    dirEntries->ReadDirEntries(&reader, offs, sectors, false);
+    dirEntries->ReadDirEntries(&reader, offs, sectors);
 
     for (auto& e : dirEntries->dirEntryList.GetView())
 	{
@@ -468,47 +468,39 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 	return dirEntries;
 }
 
-std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList, std::vector<cd::IsoPathTable::Entry>& sorted, int index,
+std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList, int index,
    const fs::path& path) {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
 
-		int sec = std::max(1, (int)pathTableList[index].entry.extLength);
-
-		int sindex = -1;
-		for (int i = 1; i < pathTableList.size(); i++) {
-				if (sorted[i].name == pathTableList[index].name && sorted[i].entry.parentDirIndex == pathTableList[index].entry.parentDirIndex) {
-						sindex = i;
-						break;
-				}
-		}
-	
-		do {
-			  dirEntries->ReadDirEntries(&reader, pathTableList[index].entry.dirOffs, sec, true);
-				if (dirEntries->dirEntryList.GetView().size() == 0) {
-					break;
-				}
-		
-				auto& entry = dirEntries->dirEntryList.GetView().back().get();							
-
-				const bool isDA = entry.type == EntryType::EntryDA;
-
-				if(!isDA && sindex >= 0 && sindex + 1 < pathTableList.size() && pathTableList[index].entry.extLength == 0)
-				{
-					if (sorted[sindex + 1].entry.dirOffs > entry.entry.entryOffs.lsb + GetSizeInSectors(entry.entry.entrySize.lsb))
-					{
-							sec++;
-							dirEntries->dirEntryList.ClearView();
-							continue;
-					}
-				}
-
+	// Calculate Directory Record sector size
+	int dirRecordSectors = 0;
+	if (*global::new_type && pathTableList.size() != index + 1) {
+		dirRecordSectors = pathTableList[index + 1].entry.dirOffs - pathTableList[index].entry.dirOffs;
+	}
+	else {
+		reader.SeekToSector(pathTableList[index].entry.dirOffs);
+		while (true) {
+			cd::SECTOR_M2F1 sector;
+			dirRecordSectors++;
+			reader.ReadBytesXA(sector.subHead, 2336);
+			if (sector.subHead[2] == 0x89) { // Directory records always ends with submode 0x89
 				break;
-		} while (true);
-  
+			}
+		}
+	}
+
+	dirEntries->ReadDirEntries(&reader, pathTableList[index].entry.dirOffs, dirRecordSectors);
+
+	// Only add the missing directories to the list
     for (int i = 1; i < pathTableList.size(); i++) {
         auto& e = pathTableList[i];
         if (e.entry.parentDirIndex - 1 == index) {
-            dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
+			bool found = std::any_of(dirEntries->dirEntryList.GetView().begin(), dirEntries->dirEntryList.GetView().end(), [&e](const auto& entry) {
+										return e.name == entry.get().identifier;
+									});
+			if (!found) {
+				dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
+			}
         }
     } 
 
@@ -532,7 +524,7 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 						if (index < 0) continue;
 						entry.identifier = s;
 				
-						entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, sorted, index, path / s);				
+						entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, index, path / s);				
 				}
     }
   
@@ -551,16 +543,15 @@ std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd:
 	return dirEntries;
 }
 
-std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList, std::vector<cd::IsoPathTable::Entry>& sorted)
+std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList)
 { 
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
     dirEntries->ReadRootDir(&reader, pathTableList[0].entry.dirOffs);
 
   	auto& entry = dirEntries->dirEntryList.GetView().front().get();
 
-    entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, sorted, 0,
-    CleanIdentifier(entry.identifier));
-    
+    entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, 0, CleanIdentifier(entry.identifier));
+
   	return dirEntries;
 }
 
@@ -993,11 +984,6 @@ void ParseISO(cd::IsoReader& reader) {
 
     size_t numEntries = pathTable.ReadPathTable(&reader, descriptor.pathTable1Offs);
 
-		std::vector<cd::IsoPathTable::Entry> sorted(pathTable.pathTableList);
-		std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
-				return a.entry.dirOffs < b.entry.dirOffs;	
-		});
-
     if (numEntries == 0) {
         printf("   No files to find.\n");
         return;
@@ -1017,7 +1003,7 @@ void ParseISO(cd::IsoReader& reader) {
 
 	std::list<cd::IsoDirEntries::Entry> entries;
 	std::unique_ptr<cd::IsoDirEntries> rootDir = (param::pathTable
-		? ParseRootPathTable(reader, ListView(entries), pathTable.pathTableList, sorted)
+		? ParseRootPathTable(reader, ListView(entries), pathTable.pathTableList)
 		: ParseRoot(reader,	ListView(entries), descriptor.rootDirRecord.entryOffs.lsb));
 
 	// Sort files by LBA for "strict" output
