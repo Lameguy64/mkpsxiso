@@ -183,7 +183,7 @@ namespace iso
 		void OutputLBAlisting(FILE* fp, int level) const;
 	};
 
-	void WriteLicenseData(cd::IsoWriter* writer, void* data);
+	void WriteLicenseData(cd::IsoWriter* writer, void* data, const bool& ps2);
 
 	void WriteDescriptor(cd::IsoWriter* writer, const IDENTIFIERS& id, const DIRENTRY& root, int imageLen);
 

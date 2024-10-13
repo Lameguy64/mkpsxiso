@@ -973,13 +973,19 @@ int iso::DirTreeClass::GetDirCountTotal() const
     return numdirs;
 }
 
-void iso::WriteLicenseData(cd::IsoWriter* writer, void* data)
+void iso::WriteLicenseData(cd::IsoWriter* writer, void* data, const bool& ps2)
 {
 	auto licenseSectors = writer->GetSectorViewM2F2(0, 12, cd::IsoWriter::EdcEccForm::Form1);
 	licenseSectors->WriteMemory(data, 2336 * 12);
 
-	auto licenseBlankSectors = writer->GetSectorViewM2F1(12, 4, cd::IsoWriter::EdcEccForm::Form2);
-	licenseBlankSectors->WriteBlankSectors(4);
+	if (!ps2) {
+		auto licenseBlankSectors = writer->GetSectorViewM2F1(12, 4, cd::IsoWriter::EdcEccForm::Form2);
+		licenseBlankSectors->WriteBlankSectors(4);
+	}
+	else {
+		auto licenseBlankSectors = writer->GetSectorViewM2F1(12, 4, cd::IsoWriter::EdcEccForm::Form1);
+		licenseBlankSectors->WriteBlankSectors(4, 0x08);
+	}
 }
 
 template<size_t N>

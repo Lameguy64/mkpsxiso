@@ -158,7 +158,7 @@ void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
 // don't have EDC Form2 data (this can be checked at redump.org) and some games rely on this to do anti-piracy checks like DDR.
 const bool CheckEDCXA(cd::IsoReader &reader) {
 	cd::SECTOR_M2F2 sector;
-	while (reader.ReadBytesXA(sector.data, 2336)) {
+	while (reader.ReadBytesXA(sector.data, 2336, true)) {
  		if (sector.data[2] & 0x20) {
 			if (sector.data[2332] == 0 && sector.data[2333] == 0 && sector.data[2334] == 0 && sector.data[2335] == 0) {
 				return false;
@@ -171,10 +171,14 @@ const bool CheckEDCXA(cd::IsoReader &reader) {
 
 // Games from 2003 and onwards apparenly has built with a newer Sony's mastering tool.
 // These has different submode in the descriptor sectors, a correct root year value and files are sorted by LBA instead by name.
-const bool CheckISOver(cd::IsoReader &reader) {
+const bool CheckISOver(cd::IsoReader &reader, bool& ps2) {
 	cd::SECTOR_M2F2 sector;
-	reader.SeekToSector(16);
+	reader.SeekToSector(15);
 	reader.ReadBytesXA(sector.data, 2336);
+ 	if (sector.data[2] & 0x08) {
+		ps2 = true;
+	}
+	reader.ReadBytesXA(sector.data, 2336, true);
  	if (sector.data[2] & 0x01) {
 		return false;
 	}
@@ -949,9 +953,10 @@ void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElem
 void ParseISO(cd::IsoReader& reader) {
 
     cd::ISO_DESCRIPTOR descriptor;
+	bool ps2 = false;
 	auto license = ReadLicense(reader);
 	const bool xa_edc = CheckEDCXA(reader);
-	global::new_type = CheckISOver(reader);
+	global::new_type = CheckISOver(reader, ps2);
 
     reader.SeekToSector(16);
     reader.ReadBytes(&descriptor, 2048);
@@ -1033,6 +1038,9 @@ void ParseISO(cd::IsoReader& reader) {
 			trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 			trackElement->SetAttribute(xml::attrib::XA_EDC, xa_edc);
 			trackElement->SetAttribute(xml::attrib::NEW_TYPE, *global::new_type);
+			if (ps2) {
+				trackElement->SetAttribute(xml::attrib::PS2, ps2);
+			}
 
 			{
 				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::IDENTIFIERS);

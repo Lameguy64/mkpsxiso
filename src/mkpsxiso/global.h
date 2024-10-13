@@ -6,11 +6,11 @@
 
 namespace global {
 
-	extern time_t				BuildTime;
-	extern bool					xa_edc;
-	extern int					QuietMode;
-	extern int					trackNum;
-	extern int					noXA;
+	extern time_t	BuildTime;
+	extern bool		xa_edc;
+	extern bool		QuietMode;
+	extern bool		noXA;
+	extern int		trackNum;
 };
 
 #endif // _GLOBAL_H

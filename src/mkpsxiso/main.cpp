@@ -25,23 +25,22 @@
 
 namespace global
 {
-	time_t		BuildTime;
-	bool		xa_edc;
-	int			QuietMode	= false;
-	int			Overwrite	= false;
-
-	int			trackNum	= 1;
-	int			noXA		= false;
+	time_t	BuildTime;
+	bool	xa_edc		= true;
+	bool	ps2			= false;
+	bool	QuietMode	= false;
+	bool	Overwrite	= false;
+	bool	NoIsoGen 	= false;
+	bool	noXA		= false;
+	int		trackNum	= 1;
 
 	std::optional<bool> new_type;
 	std::optional<std::string> volid_override;
+	std::optional<fs::path> cuefile;
 	fs::path XMLscript;
 	fs::path LBAfile;
 	fs::path LBAheaderFile;
 	fs::path ImageName;
-
-	std::optional<fs::path> cuefile;
-	int			NoIsoGen = false;
 	fs::path RebuildXMLScript;
 
 	tinyxml2::XMLDocument xmlIdFile;
@@ -414,7 +413,7 @@ int Main(int argc, char* argv[])
 			printf( "\n" );
 		}
 
-		global::noXA = projectElement->IntAttribute( xml::attrib::NO_XA, 0 );
+		global::noXA = projectElement->BoolAttribute( xml::attrib::NO_XA );
 
 		if ( ( !global::Overwrite ) && ( !global::NoIsoGen ) )
 		{
@@ -535,6 +534,9 @@ int Main(int argc, char* argv[])
 				// This check is necessary so as to leave an empty value for compatibility with <=v2.04 dumped files timestamps
 				if ( trackElement->Attribute(xml::attrib::NEW_TYPE) != nullptr ) {
 					global::new_type = trackElement->BoolAttribute(xml::attrib::NEW_TYPE);
+				}
+				if ( global::ps2 = trackElement->BoolAttribute(xml::attrib::PS2) ) {
+					global::new_type = true; // Force true if it's an PS2 disc
 				}
 
 				if ( global::trackNum != 1 )
@@ -861,7 +863,7 @@ int Main(int argc, char* argv[])
 							printf( "    Writing license data..." );
 						}
 
-						iso::WriteLicenseData( &writer, license->data );
+						iso::WriteLicenseData( &writer, license->data, global::ps2 );
 
 						if ( !global::QuietMode )
 						{
