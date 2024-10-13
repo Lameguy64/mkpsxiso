@@ -170,7 +170,7 @@ const bool CheckEDCXA(cd::IsoReader &reader) {
 }
 
 // Games from 2003 and onwards apparenly has built with a newer Sony's mastering tool.
-// This has different subheader in the descriptor sectors, correct root year and files are sorted by LBA and not by name.
+// These has different submode in the descriptor sectors, a correct root year value and files are sorted by LBA instead by name.
 const bool CheckISOver(cd::IsoReader &reader) {
 	cd::SECTOR_M2F2 sector;
 	reader.SeekToSector(16);
@@ -196,7 +196,7 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
 	FILE* outFile = OpenFile(outputPath, "wb");
 
     if (outFile == NULL) {
-		printf("ERROR: Cannot create license file \"%" PRFILESYSTEM_PATH "\"...", outputPath.lexically_normal().c_str());
+		printf("ERROR: Cannot create license file \"%" PRFILESYSTEM_PATH "\"...\n", outputPath.lexically_normal().c_str());
         return;
     }
 
@@ -584,7 +584,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			entry.type = EntryType::EntryDA;
 
 			// Additional safety check in case the .cue file had a wrong pause size
-			// For ex, Mega Man X3 track 30 had a 149 sectors pause, but at redump.org says it was a 150 standard one
+			// For ex, Mega Man X3 track 30 had 149 sectors pause, but redump.org says it was a 150 standard one
 			unsigned char sectorBuff[CD_SECTOR_SIZE];
 			unsigned char emptyBuff[CD_SECTOR_SIZE] = {0};
 			while (true) {
@@ -669,7 +669,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...", outputPath.lexically_normal().c_str());
+					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", outputPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -714,7 +714,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				auto outFile = OpenScopedFile(daOutPath, "wb");
 
 				if (!outFile) {
-					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...", daOutPath.lexically_normal().c_str());
+					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", daOutPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -755,7 +755,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...", outputPath.lexically_normal().c_str());
+					printf("ERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", outputPath.lexically_normal().c_str());
 					return;
 				}
 
@@ -780,7 +780,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			}
 			else
 			{
-				printf("ERROR: File %s is of invalid type", entry.identifier.c_str());
+				printf("ERROR: File %s is of invalid type\n", entry.identifier.c_str());
 				continue;
 			}
         }
@@ -842,14 +842,15 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 			newelement->SetAttribute(xml::attrib::TRACK_ID, entry.trackid.c_str());
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "da");
 		}
+	}
+	if (!entry.identifier.empty())
+	{
 		if (param::force)
 		{
 			newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
 		}
-	}
-	if (!entry.identifier.empty())
-	{
-		if (entry.order.has_value()) {
+		if (entry.order.has_value())
+		{
 			newelement->SetAttribute(xml::attrib::ORDER, *entry.order);
 		}
 	}
@@ -1182,7 +1183,7 @@ int Main(int argc, char *argv[])
 			"Get the latest version from https://github.com/Lameguy64/mkpsxiso\n"
 			"Original work: Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
 			"Maintained by: Silent (CookiePLMonster) and spicyjpeg\n"
-			"Contributors : marco-calautti, G4Vi, Nagtan and all the ones from github\n\n" );
+			"Contributions: marco-calautti, G4Vi, Nagtan and all the ones from github\n\n" );
 
 	if (argc == 1)
 	{

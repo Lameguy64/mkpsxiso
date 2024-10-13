@@ -100,9 +100,9 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 		entry.date.year = volumeDate.year % 0x64; // Root overflows dates past 1999 for games built with old(<2003) mastering tool
 	}
 	entry.length	= 0; // Length is meaningless for directories
+	entry.HF		= hiddenFlag;
 
 	const EntryAttributes attributes; // Leave defaults
-	entry.HF		= hiddenFlag;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -322,6 +322,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 	entry.GID		= attributes.GID;
 	entry.UID		= attributes.UID;
 	entry.order		= attributes.ORDER;
+	entry.flba		= attributes.FLBA;
 	entry.date		= GetISODateStamp( dirTime, attributes.GMTOffs );
 	entry.length	= 0; // Length is meaningless for directories
 

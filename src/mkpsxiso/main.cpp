@@ -101,7 +101,7 @@ int Main(int argc, char* argv[])
 		"Get the latest version from https://github.com/Lameguy64/mkpsxiso\n"
 		"Original work: Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
 		"Maintained by: Silent (CookiePLMonster) and spicyjpeg\n"
-		"Contributors : marco-calautti, G4Vi, Nagtan and all the ones from github\n\n";
+		"Contributions: marco-calautti, G4Vi, Nagtan and all the ones from github\n\n";
 
 	bool OutputOverride = false;
 
