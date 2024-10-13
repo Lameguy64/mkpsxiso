@@ -704,8 +704,8 @@ int Main(int argc, char* argv[])
 				}
 
 				fprintf( fp, "\nFile System:\n\n" );
-				fprintf( fp, "     Type |      Name       |  Length  |   LBA    "
-					"|  Timecode  |  Bytes   |    Source File\n\n" );
+				fprintf( fp, "     Type |     Name     | Length |  LBA  "
+					"| Timecode |   Bytes   |    Source File\n\n" );
 
 				dirTree->OutputLBAlisting( fp, 0 );
 

@@ -785,15 +785,15 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write entry type with 4 spaces at start
 		fprintf(fp, "%*s%-6s|", level + 4, "", type);
 		// Write entry name
-		fprintf(fp, "%-17s|", name);
+		fprintf(fp, "%-14s|", name);
 		// Write entry length in sectors
-		fprintf(fp, "%-10s|", sectors);
+		fprintf(fp, "%-8s|", sectors);
 		// Write LBA offset
-		fprintf(fp, "%-10d|", entry.lba);
+		fprintf(fp, "%-7d|", entry.lba);
 		// Write timecode
-		fprintf(fp, "%-12s|", SectorsToTimecode(150 + entry.lba).c_str());
+		fprintf(fp, "%-10s|", SectorsToTimecode(150 + entry.lba).c_str());
 		// Write size in byte units
-		fprintf(fp, "%-10s|", entry.type != EntryType::EntryDir ? std::to_string(entry.length).c_str() : "");
+		fprintf(fp, "%-11s|", entry.type != EntryType::EntryDir ? std::to_string(entry.length).c_str() : "");
 		// Write source file path
 		fprintf(fp, "%" PRFILESYSTEM_PATH "\n", entry.srcfile.lexically_normal().c_str());
 	};
@@ -821,21 +821,21 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 
 		switch (entry.type) {
 			case EntryType::EntryFile:
-				typeStr = "File";
+				typeStr = " File";
 				break;
 			case EntryType::EntryXA_DO:
-				typeStr = "XA";
+				typeStr = "   XA";
 				break;
 			case EntryType::EntryDummy:
 				typeStr = "Dummy";
 				nameStr = "<DUMMY>";
 				break;
 			case EntryType::EntryXA:
-				typeStr = "XA";
+				typeStr = "   XA";
 				sectors = GetSizeInSectors(entry.length, 2336);
 				break;
 			case EntryType::EntryDA:
-				typeStr = "CDDA";
+				typeStr = " CDDA";
 				sectors = 150 + GetSizeInSectors(entry.length, CD_SECTOR_SIZE);
 				break;
 			default:
@@ -850,7 +850,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 	for (const auto& e : entriesInDir) {
 		const DIRENTRY& entry = e.get();
 		if (entry.type == EntryType::EntryDir) {
-			printEntryDetails("Dir", CleanIdentifier(entry.id).c_str(), "", entry);
+			printEntryDetails(" Dir", CleanIdentifier(entry.id).c_str(), "", entry);
 			entry.subdir->OutputLBAlisting( fp, level+1 );
 		}
 		else if (entry.type == EntryType::EntryDummy && level == 0 && entry.lba > maxlba) {
@@ -860,7 +860,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 
 	if ( level > 0 )
 	{
-		fprintf(fp, "%*sEnd   |%-17s|%-10s|%-10s|%-12s|%-10s|\n", level + 3, "", name.c_str(), "", "", "", "");
+		fprintf(fp, "%*s End  |%-14s|%-8s|%-7s|%-10s|%-11s|\n", level + 3, "", name.c_str(), "", "", "", "");
 	}
 }
 
