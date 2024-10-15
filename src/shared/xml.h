@@ -41,7 +41,7 @@ namespace attrib
 	constexpr const char* LICENSE_FILE = "file";
 
 	constexpr const char* GMT_OFFSET = "gmt_offs";
-	constexpr const char* HIDDEN_FLAG = "h_flag";
+	constexpr const char* HIDDEN_FLAG = "hidden";
 	constexpr const char* XA_ATTRIBUTES = "xa_attrib";
 	constexpr const char* XA_PERMISSIONS = "xa_perm";
 	constexpr const char* XA_GID = "xa_gid";
