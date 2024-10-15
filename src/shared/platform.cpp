@@ -196,7 +196,6 @@ bool GetSrcTime(const fs::path& path, time_t& outTime) {
 	if (HANDLE hFile = HandleFile(path)) {
 		FILETIME ftCreation, ftLastAccess, ftLastWrite;
 		if (!GetFileTime(hFile, &ftCreation, &ftLastAccess, &ftLastWrite)) {
-			printf("ERROR: unable to get timestamps for %ls\n", path.c_str());
 			CloseHandle(hFile);
 			return false;
 		}
@@ -212,8 +211,6 @@ bool GetSrcTime(const fs::path& path, time_t& outTime) {
 		outTime = fileAttrib->st_mtime;
 		return true;
 	}
-
-	printf("ERROR: unable to get timestamps for %s\n", path.c_str());
 	return false;
 #endif
 }

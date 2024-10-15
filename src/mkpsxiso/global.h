@@ -2,7 +2,6 @@
 #define _GLOBAL_H
 
 #include <ctime>
-#include <optional>
 
 namespace global {
 
