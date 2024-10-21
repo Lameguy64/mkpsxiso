@@ -377,7 +377,7 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 
 	// Read identifier string
 	entry.identifier.resize(entry.entry.identifierLen);
-	reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen, true);
+	bytesRead += reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen, true);
 
 	// Strip trailing zeroes, if any
 	entry.identifier.resize(strlen(entry.identifier.c_str()));
@@ -386,16 +386,22 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	if ((entry.entry.identifierLen % 2) == 0)
     {
         reader->SkipBytes(1);
+		bytesRead += 1;
     }
 
 	// Read XA attribute data
-	reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);
+	bytesRead += reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);
 
 	// XA attributes are big endian, swap them
 	entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
 	entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
-	if ((entry.extData.attributes & 0x0FFF) != 0x0800) { // HACK to check conflictive images that has the attributes written as little endian
+	if ((entry.extData.attributes & 0x0FFF) != 0x0800) { // HACK for conflictive images that has the attributes written as little endian
 		entry.extData.attributes = SwapBytes16(entry.extData.attributes);
+	}
+
+	// Check to detect corrupted directory records
+	if (bytesRead != entry.entry.entryLength) {
+		return std::nullopt;
 	}
 
 	// Add the EntryType here so as not to keep calculating it everytime later
