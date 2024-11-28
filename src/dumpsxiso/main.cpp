@@ -1185,7 +1185,7 @@ int Main(int argc, char *argv[])
 		"Options:\n"
 		"  -x <path>\t\tOptional destination directory for extracted files.\n\t\t\t(Defaults to dumpsxiso dir)\n"
 		"  -s <path>.xml\t\tOptional XML name/destination of MKPSXISO compatible\n\t\t\tscript for later rebuilding. (Defaults to dumpsxiso dir)\n"
-		"  -pt|--path-table\tInstead of going through the file system, go to every\n\t\t\tknown directory in order; helps with deobfuscating\n"
+		"  -pt|--path-table\tGo through every known directory in order; helps to\n\t\t\tdeobfuscate some games, like DMW3\n"
 		"  -e|--encode <codec>\tCodec to encode CDDA/DA audio. wave is default.\n\t\t\tSupported codecs: " SUPPORTED_CODEC_TEXT "\n"
 		"  -S|--sort-by-dir\tOutputs a \"pretty\" XML script where entries are grouped\n\t\t\tin directories, instead of strictly following their\n\t\t\toriginal order on the disc.\n"
 		"  -f|--force\t\tWrites all lba offsets in the xml to force them at build\n"
