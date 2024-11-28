@@ -1002,6 +1002,10 @@ void ParseISO(cd::IsoReader& reader) {
 
 		std::error_code ec;
 		fs::create_directories(dirPath, ec);
+		if (ec) {
+			printf("ERROR: Cannot create directory \"%" PRFILESYSTEM_PATH "\"... %s\n", dirPath.parent_path().c_str(), ec.message().c_str());
+			exit(EXIT_FAILURE);
+		}
 	}
 
     printf("ISO contents:\n\n");
