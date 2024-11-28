@@ -24,13 +24,13 @@ MA_API ma_result ma_decoder_init_path_pcm(const fs::path& pFilePath, ma_decoder_
 
 #if defined(MINIAUDIO_IMPLEMENTATION) || defined(MA_IMPLEMENTATION)
 
-static size_t virtual_wav_read(ma_decoder *pDecoder, void *pBufferOut, size_t bytesToRead)
+static ma_result virtual_wav_read(ma_decoder *pDecoder, void *pBufferOut, size_t bytesToRead, size_t *pBytesRead)
 {
     VirtualWav *vw = (VirtualWav *)pDecoder->pUserData;
     size_t bytesRead = 0;
     if(vw->vpos < 44)
     {
-        const size_t headerread = drwav_min(bytesToRead, 44-vw->vpos);
+        const size_t headerread = ma_dr_wav_min(bytesToRead, 44-vw->vpos);
         memcpy(pBufferOut, &vw->header[vw->vpos], headerread);
         vw->vpos += headerread;
         bytesRead += headerread;
@@ -44,32 +44,33 @@ static size_t virtual_wav_read(ma_decoder *pDecoder, void *pBufferOut, size_t by
         vw->vpos += actualread;
         vw->pos += actualread;
     }
-    return bytesRead;
+    *pBytesRead = bytesRead;
+    return MA_SUCCESS;
 }
 
-static ma_bool32 virtual_wav_seek(ma_decoder *pDecoder, ma_int64 byteOffset, ma_seek_origin origin)
+static ma_result virtual_wav_seek(ma_decoder *pDecoder, ma_int64 byteOffset, ma_seek_origin origin)
 {
     int whence;
     int result;
     VirtualWav *vw = (VirtualWav *)pDecoder->pUserData;
 
     if (origin == ma_seek_origin_start) {
-        if(byteOffset < 0) return MA_FALSE;
-        if(byteOffset > vw->vsize) return MA_FALSE;
+        if(byteOffset < 0) return MA_ERROR;
+        if(byteOffset > vw->vsize) return MA_ERROR;
         vw->vpos = byteOffset;
-        byteOffset = drwav_max(byteOffset - 44, 0);
+        byteOffset = ma_dr_wav_max(byteOffset - 44, 0);
         vw->pos = byteOffset;
         whence = SEEK_SET;
     } else if (origin == ma_seek_origin_end) {
-        if(byteOffset > 0) return MA_FALSE;
-        if((byteOffset + vw->vsize) < 0) return MA_FALSE;
+        if(byteOffset > 0) return MA_ERROR;
+        if((byteOffset + vw->vsize) < 0) return MA_ERROR;
         vw->vpos = vw->vsize + byteOffset;
-        byteOffset = drwav_max(byteOffset, -(vw->vsize - 44));
+        byteOffset = ma_dr_wav_max(byteOffset, -(vw->vsize - 44));
         vw->pos = (vw->vsize - 44) + byteOffset;
         whence = SEEK_END;
     } else {
-        if((byteOffset+vw->vpos) > vw->vsize) return MA_FALSE;
-        if((byteOffset+vw->vpos) < 0) return MA_FALSE;
+        if((byteOffset+vw->vpos) > vw->vsize) return MA_ERROR;
+        if((byteOffset+vw->vpos) < 0) return MA_ERROR;
         vw->vpos += byteOffset;
         uint64_t abspos = vw->pos + byteOffset;
         if(abspos < 0)
@@ -90,7 +91,7 @@ static ma_bool32 virtual_wav_seek(ma_decoder *pDecoder, ma_int64 byteOffset, ma_
     #else
         /* No _fseeki64() so restrict to 31 bits. */
         if (origin > 0x7FFFFFFF) {
-            return MA_FALSE;
+            return MA_ERROR;
         }
 
         result = fseek(vw->file, (int)byteOffset, whence);
@@ -99,10 +100,10 @@ static ma_bool32 virtual_wav_seek(ma_decoder *pDecoder, ma_int64 byteOffset, ma_
     result = fseek(vw->file, (long int)byteOffset, whence);
 #endif
     if (result != 0) {
-        return MA_FALSE;
+        return MA_ERROR;
     }
 
-    return MA_TRUE;
+    return MA_SUCCESS;
 }
 
 #if !defined(_MSC_VER) && !((defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_POSIX_SOURCE)) && !defined(MA_BSD)
@@ -136,18 +137,18 @@ MA_API ma_result ma_decoder_init_FILE_pcm(FILE *file, ma_decoder_config* pConfig
     uint64_t pcmSize;
     if(stdio_file_size(file, &pcmSize) != MA_SUCCESS)
     {
-        return !MA_SUCCESS;
+        return MA_ERROR;
     }
     else if(pcmSize == 0)
 	{
 		printf("    ERROR: (PCM) byte count is 0\n");
-        return !MA_SUCCESS;
+        return MA_ERROR;
 	}
 	// 2 channels of 16 bit samples
 	else if((pcmSize % (2 * sizeof(int16_t))) != 0)
 	{
 		printf("    ERROR: (PCM) byte count indicates non-integer sample count\n");
-        return !MA_SUCCESS;
+        return MA_ERROR;
 	}
 
     pUserData->pos = 0;
@@ -199,7 +200,7 @@ MA_API ma_result ma_decoder_init_FILE_pcm(FILE *file, ma_decoder_config* pConfig
     pConfig->encodingFormat = ma_encoding_format_wav;
     if(ma_decoder_init(&virtual_wav_read, &virtual_wav_seek, pUserData, pConfig, pDecoder) != MA_SUCCESS)
     {
-        return !MA_SUCCESS;
+        return MA_ERROR;
     }
 
     return MA_SUCCESS;
@@ -211,11 +212,11 @@ MA_API ma_result ma_decoder_init_path_pcm(const fs::path& pFilePath, ma_decoder_
     unique_file file(OpenFile(pFilePath, "rb"));
     if(!file)
     {
-        return !MA_SUCCESS;
+        return MA_ERROR;
     }
     if(ma_decoder_init_FILE_pcm(file.get(), pConfig, pDecoder, pUserData) != MA_SUCCESS)
     {
-        return !MA_SUCCESS;
+        return MA_ERROR;
     }
     pUserData->pcmFp = std::move(file);
     return MA_SUCCESS;

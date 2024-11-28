@@ -33,7 +33,7 @@ ma_result ma_redbook_decoder_init_path_by_ext(const fs::path& filePath, ma_decod
 	ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_s16, 2, 44100);	
 	isLossy = false;
 
-    DecoderAudioFormats tryorder[4] = {DAF_WAV, DAF_FLAC, DAF_MP3, DAF_PCM};
+	DecoderAudioFormats tryorder[4] = {DAF_WAV, DAF_FLAC, DAF_MP3, DAF_PCM};
 	const auto& extension = filePath.extension().u8string();
 
 	// determine which format to try based on magic numbers
@@ -85,34 +85,34 @@ ma_result ma_redbook_decoder_init_path_by_ext(const fs::path& filePath, ma_decod
 	{
 		if(tryorder[i] == DAF_WAV)
 		{
-	        decoderConfig.encodingFormat = ma_encoding_format_wav;
-	        if(MA_SUCCESS == ma_decoder_init_path(filePath, &decoderConfig, pDecoder)) break;				
+			decoderConfig.encodingFormat = ma_encoding_format_wav;
+			if(MA_SUCCESS == ma_decoder_init_path(filePath, &decoderConfig, pDecoder)) break;				
 		}
-        else if(tryorder[i] == DAF_FLAC)
+		else if(tryorder[i] == DAF_FLAC)
 		{
-	        decoderConfig.encodingFormat = ma_encoding_format_flac;
-	        if(MA_SUCCESS == ma_decoder_init_path(filePath, &decoderConfig, pDecoder)) break;
+			decoderConfig.encodingFormat = ma_encoding_format_flac;
+			if(MA_SUCCESS == ma_decoder_init_path(filePath, &decoderConfig, pDecoder)) break;
 		}
 		else if(tryorder[i] == DAF_MP3)
 		{
-	        decoderConfig.encodingFormat = ma_encoding_format_mp3;
-	        if(MA_SUCCESS == ma_decoder_init_path(filePath, &decoderConfig, pDecoder))
-	        {
-	        	isLossy = true;
-	        	break;
-	        }
+			decoderConfig.encodingFormat = ma_encoding_format_mp3;
+			if(MA_SUCCESS == ma_decoder_init_path(filePath, &decoderConfig, pDecoder))
+			{
+				isLossy = true;
+				break;
+			}
 		}
 		else if(tryorder[i] == DAF_PCM)
 		{
-			printf("\n    WARN: Guessing it's just signed 16 bit stereo @ 44100 kHz pcm audio\n");
+			printf("\n    WARN: Guessing it's just signed 16 bit stereo @ 44100 kHz pcm audio... ");
 			if(MA_SUCCESS == ma_decoder_init_path_pcm(filePath, &decoderConfig, pDecoder, vw)) break;
 		}
 	}
 	if(i == num_tries)
 	{
 		// no more formats to try, return false
-	    printf("    ERROR: No valid format found\n");
-	    return !MA_SUCCESS;	
+		printf("    ERROR: No valid format found\n");
+		return MA_ERROR;
 	}
 	return MA_SUCCESS;
 }

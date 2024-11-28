@@ -66,17 +66,19 @@ int iso::DirTreeClass::GetAudioSize(const fs::path& audioFile)
 	bool isLossy;
 	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy) != MA_SUCCESS)
 	{
+		ma_decoder_uninit(&decoder);
 		return 0;
 	}
 
-	const ma_uint64 expectedPCMFrames = ma_decoder_get_length_in_pcm_frames(&decoder);
-	ma_decoder_uninit(&decoder);
-    if(expectedPCMFrames == 0)
+	ma_uint64 expectedPCMFrames;
+	if(ma_decoder_get_length_in_pcm_frames(&decoder, &expectedPCMFrames) != MA_SUCCESS)
 	{
 		printf("\n    ERROR: corrupt file? unable to get_length_in_pcm_frames\n");
-        return 0;
+		ma_decoder_uninit(&decoder);
+		return 0;
 	}
 
+	ma_decoder_uninit(&decoder);
 	return GetSizeInSectors(expectedPCMFrames * 2 * (sizeof(int16_t)), CD_SECTOR_SIZE)*CD_SECTOR_SIZE;
 }
 

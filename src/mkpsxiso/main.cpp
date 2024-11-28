@@ -50,7 +50,7 @@ namespace global
 bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const fs::path& xmlPath, const EntryAttributes& parentAttribs, bool& found_da);
 int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
 
-int PackFileAsCDDA(void* buffer, size_t bufSize, const fs::path& audioFile);
+bool PackFileAsCDDA(void* buffer, const fs::path& audioFile);
 
 bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const unsigned lba)
 {
@@ -827,7 +827,7 @@ int Main(int argc, char* argv[])
 						printf( "      Packing audio %s... ", track.source.c_str() );
 					}
 
-					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), track.size, fs::u8path(track.source) ) )
+					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), fs::u8path(track.source) ) )
 					{
 						if ( !global::QuietMode )
 						{
@@ -1534,43 +1534,45 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 	return true;
 }
 
-int PackFileAsCDDA(void* buffer, size_t bufSize, const fs::path& audioFile)
+bool PackFileAsCDDA(void* buffer, const fs::path& audioFile)
 {
 	// open the decoder
-    ma_decoder decoder;
+	ma_decoder decoder;
 	VirtualWavEx vw;
 	bool isLossy;
 	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy) != MA_SUCCESS)
 	{
-		return 0;
+		ma_decoder_uninit(&decoder);
+		return false;
 	}
 
-    //  note if there's some data converting going on
-    ma_format internalFormat;
+	// note if there's some data converting going on
+	ma_format internalFormat;
 	ma_uint32 internalChannels;
 	ma_uint32 internalSampleRate;
-	if(MA_SUCCESS != ma_data_source_get_data_format(decoder.pBackend, &internalFormat, &internalChannels, &internalSampleRate))
+	if(ma_data_source_get_data_format(decoder.pBackend, &internalFormat, &internalChannels, &internalSampleRate, NULL, 0) != MA_SUCCESS)
 	{
 		printf("\n    ERROR: unable to get internal metadata for \"%" PRFILESYSTEM_PATH "\"\n", audioFile.c_str());
 		ma_decoder_uninit(&decoder);
-	    return false;
+		return false;
 	}
 	if((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100) || isLossy)
 	{
-		printf("\n    WARN: This is not Redbook audio, converting.\n    ");
+		printf("\n    WARN: This is not Redbook audio, converting... ");
 	}
 
 	// get expected pcm frame count (if your file isn't redbook this can vary from the input file's amount)
 	// unfortunately it needs to decode the whole file to determine this for mp3
-	const ma_uint64 expectedPCMFrames = ma_decoder_get_length_in_pcm_frames(&decoder);
-    if(expectedPCMFrames == 0)
+	ma_uint64 expectedPCMFrames;
+	if(ma_decoder_get_length_in_pcm_frames(&decoder, &expectedPCMFrames) != MA_SUCCESS)
 	{
 		printf("\n    ERROR: corrupt file? unable to get_length_in_pcm_frames\n");
 		ma_decoder_uninit(&decoder);
-        return false;
+		return false;
 	}
 
-	ma_uint64 framesRead = ma_decoder_read_pcm_frames(&decoder, buffer, expectedPCMFrames);
+	ma_uint64 framesRead;
+	ma_decoder_read_pcm_frames(&decoder, buffer, expectedPCMFrames, &framesRead);
 	ma_decoder_uninit(&decoder);
 
 	if(framesRead != expectedPCMFrames)
@@ -1578,5 +1580,5 @@ int PackFileAsCDDA(void* buffer, size_t bufSize, const fs::path& audioFile)
 		printf("\n    ERROR: corrupt file? (framesRead != expectedPCMFrames)\n");
 		return false;
 	}
-    return true;
+	return true;
 }
