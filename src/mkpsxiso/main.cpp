@@ -659,6 +659,10 @@ int Main(int argc, char* argv[])
 						entry.lba = totalLenLBA;
 						entry.srcfile = trackSource;
 						entry.type = EntryType::EntryDA;
+						if (!global::QuietMode)
+						{
+							printf("    DA File %s\n", trackSource.filename().generic_u8string().c_str());
+						}
 					}
 
 					totalLenLBA += audioSize/CD_SECTOR_SIZE;
