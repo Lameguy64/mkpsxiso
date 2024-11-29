@@ -653,7 +653,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 		const fs::path outputPath = rootPath / entry.virtualPath / CleanIdentifier(entry.identifier);
         if (entry.subdir == nullptr) // Do not extract directories, they're already prepared
 		{
-			printf("   Extracting %s...\n%" PRFILESYSTEM_PATH "\n", entry.identifier.c_str(), outputPath.lexically_normal().c_str());
+			printf("   Extracting %s...\n", entry.identifier.c_str());
 
 			if (entry.type == EntryType::EntryXA)
 			{
@@ -697,6 +697,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				fclose(outFile);
 
+				printf("%" PRFILESYSTEM_PATH "\n", outputPath.lexically_normal().c_str());
 			}
 			else if (entry.type == EntryType::EntryDA)
 			{
@@ -746,6 +747,8 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					return;
 				}
 
+				printf("%" PRFILESYSTEM_PATH "\n", daOutPath.lexically_normal().c_str());
+
 				if (global::cueFile.multiBIN) {
 					reader.Open(global::cueFile.tracks[0].filePath);
 				}
@@ -781,6 +784,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				fclose(outFile);
 
+				printf("%" PRFILESYSTEM_PATH "\n", outputPath.lexically_normal().c_str());
 			}
 			else
 			{
@@ -1003,7 +1007,7 @@ void ParseISO(cd::IsoReader& reader) {
 		std::error_code ec;
 		fs::create_directories(dirPath, ec);
 		if (ec) {
-			printf("ERROR: Cannot create directory \"%" PRFILESYSTEM_PATH "\"... %s\n", dirPath.parent_path().c_str(), ec.message().c_str());
+			printf("ERROR: Cannot create directory \"%" PRFILESYSTEM_PATH "\"... %s\n", dirPath.parent_path().lexically_normal().c_str(), ec.message().c_str());
 			exit(EXIT_FAILURE);
 		}
 	}

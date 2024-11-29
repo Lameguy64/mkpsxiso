@@ -1068,47 +1068,47 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		if ( !global::QuietMode )
 		{
 			printf("    Identifiers:\n");
-			printf( "      System       : %s%s\n",
+			printf( "      System           : %s%s\n",
 				isoIdentifiers.SystemID,
 				hasSystemID ? "" : " (default)" );
 
-			printf( "      Application  : %s%s\n",
+			printf( "      Application      : %s%s\n",
 				isoIdentifiers.Application,
 				hasApplication ? "" : " (default)" );
 
 			if ( isoIdentifiers.VolumeID != nullptr )
 			{
-				printf( "      Volume       : %s\n",
+				printf( "      Volume           : %s\n",
 					isoIdentifiers.VolumeID );
 			}
 			if ( isoIdentifiers.VolumeSet != nullptr )
 			{
-				printf( "      Volume Set   : %s\n",
+				printf( "      Volume Set       : %s\n",
 					isoIdentifiers.VolumeSet );
 			}
 			if ( isoIdentifiers.Publisher != nullptr )
 			{
-				printf( "      Publisher    : %s\n",
+				printf( "      Publisher        : %s\n",
 					isoIdentifiers.Publisher );
 			}
 			if ( isoIdentifiers.DataPreparer != nullptr )
 			{
-				printf( "      Data Preparer: %s\n",
+				printf( "      Data Preparer    : %s\n",
 					isoIdentifiers.DataPreparer );
 			}
 			if ( isoIdentifiers.Copyright != nullptr )
 			{
-				printf( "      Copyright    : %s\n",
+				printf( "      Copyright        : %s\n",
 					isoIdentifiers.Copyright );
 			}
 			if ( isoIdentifiers.CreationDate != nullptr )
 			{
-				printf( "      Creation Date : %s\n",
+				printf( "      Creation Date    : %s\n",
 					isoIdentifiers.CreationDate );
 			}
 			if ( isoIdentifiers.ModificationDate != nullptr )
 			{
-				printf( "      Modification Date : %s\n",
+				printf( "      Modification Date: %s\n",
 					isoIdentifiers.ModificationDate );
 			}
 			printf( "\n" );
