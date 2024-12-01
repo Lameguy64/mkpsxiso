@@ -1552,7 +1552,7 @@ bool PackFileAsCDDA(void* buffer, const fs::path& audioFile)
 	}
 	else if (isPCM && !global::QuietMode)
 	{
-		printf("\n    WARN: Guessing it's just signed 16 bit stereo @ 44100 kHz pcm audio... ");
+		printf("\n        WARN: Guessing it's signed 16 bit stereo @ 44100 kHz pcm audio... ");
 	}
 
 	// note if there's some data converting going on
