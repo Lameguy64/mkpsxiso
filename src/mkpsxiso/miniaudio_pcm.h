@@ -212,11 +212,11 @@ MA_API ma_result ma_decoder_init_path_pcm(const fs::path& pFilePath, ma_decoder_
     unique_file file(OpenFile(pFilePath, "rb"));
     if(!file)
     {
-        return MA_ERROR;
+        return MA_INVALID_FILE;
     }
     if(ma_decoder_init_FILE_pcm(file.get(), pConfig, pDecoder, pUserData) != MA_SUCCESS)
     {
-        return MA_ERROR;
+        return MA_NO_BACKEND;
     }
     pUserData->pcmFp = std::move(file);
     return MA_SUCCESS;

@@ -66,7 +66,7 @@ bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const un
 		if ( !global::QuietMode )
 		{
 			std::string_view id(entry.id);
-			printf("    DA File %s\n", std::string(id.substr(0, id.find_last_of(';'))).c_str());
+			printf("    DA File \"%s\"\n", std::string(id.substr(0, id.find_last_of(';'))).c_str());
 		}
 		return true;
 	}
@@ -661,7 +661,7 @@ int Main(int argc, char* argv[])
 						entry.type = EntryType::EntryDA;
 						if (!global::QuietMode)
 						{
-							printf("    DA File %s\n", trackSource.filename().generic_u8string().c_str());
+							printf("    DA File \"%s\"\n", trackSource.filename().generic_u8string().c_str());
 						}
 					}
 
@@ -804,7 +804,7 @@ int Main(int argc, char* argv[])
 			// Write the file system
 			if ( !global::QuietMode )
 			{
-				printf("Writing ISO\n");
+				printf("Writing ISO...\n");
 				printf( "    Writing files...\n" );
 			}
 
@@ -828,7 +828,7 @@ int Main(int argc, char* argv[])
 					// Pack the audio file
 					if ( !global::QuietMode )
 					{
-						printf( "      Packing audio %s... ", track.source.c_str() );
+						printf( "      Packing audio \"%s\"... ", track.source.c_str() );
 					}
 
 					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), fs::u8path(track.source) ) )
@@ -1068,47 +1068,47 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		if ( !global::QuietMode )
 		{
 			printf("    Identifiers:\n");
-			printf( "      System           : %s%s\n",
+			printf( "      System       : %s%s\n",
 				isoIdentifiers.SystemID,
 				hasSystemID ? "" : " (default)" );
 
-			printf( "      Application      : %s%s\n",
+			printf( "      Application  : %s%s\n",
 				isoIdentifiers.Application,
 				hasApplication ? "" : " (default)" );
 
 			if ( isoIdentifiers.VolumeID != nullptr )
 			{
-				printf( "      Volume           : %s\n",
+				printf( "      Volume       : %s\n",
 					isoIdentifiers.VolumeID );
 			}
 			if ( isoIdentifiers.VolumeSet != nullptr )
 			{
-				printf( "      Volume Set       : %s\n",
+				printf( "      Volume Set   : %s\n",
 					isoIdentifiers.VolumeSet );
 			}
 			if ( isoIdentifiers.Publisher != nullptr )
 			{
-				printf( "      Publisher        : %s\n",
+				printf( "      Publisher    : %s\n",
 					isoIdentifiers.Publisher );
 			}
 			if ( isoIdentifiers.DataPreparer != nullptr )
 			{
-				printf( "      Data Preparer    : %s\n",
+				printf( "      Data Preparer: %s\n",
 					isoIdentifiers.DataPreparer );
 			}
 			if ( isoIdentifiers.Copyright != nullptr )
 			{
-				printf( "      Copyright        : %s\n",
+				printf( "      Copyright    : %s\n",
 					isoIdentifiers.Copyright );
 			}
 			if ( isoIdentifiers.CreationDate != nullptr )
 			{
-				printf( "      Creation Date    : %s\n",
+				printf( "      Create Date  : %s\n",
 					isoIdentifiers.CreationDate );
 			}
 			if ( isoIdentifiers.ModificationDate != nullptr )
 			{
-				printf( "      Modification Date: %s\n",
+				printf( "      Modify Date  : %s\n",
 					isoIdentifiers.ModificationDate );
 			}
 			printf( "\n" );
@@ -1544,10 +1544,15 @@ bool PackFileAsCDDA(void* buffer, const fs::path& audioFile)
 	ma_decoder decoder;
 	VirtualWavEx vw;
 	bool isLossy;
-	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy) != MA_SUCCESS)
+	bool isPCM;
+	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy, isPCM) != MA_SUCCESS)
 	{
 		ma_decoder_uninit(&decoder);
 		return false;
+	}
+	else if (isPCM && !global::QuietMode)
+	{
+		printf("\n    WARN: Guessing it's just signed 16 bit stereo @ 44100 kHz pcm audio... ");
 	}
 
 	// note if there's some data converting going on

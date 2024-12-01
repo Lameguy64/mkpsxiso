@@ -64,7 +64,8 @@ int iso::DirTreeClass::GetAudioSize(const fs::path& audioFile)
 	ma_decoder decoder;
 	VirtualWavEx vw;
 	bool isLossy;
-	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy) != MA_SUCCESS)
+	bool isPCM;
+	if(ma_redbook_decoder_init_path_by_ext(audioFile, &decoder, &vw, isLossy, isPCM) != MA_SUCCESS)
 	{
 		ma_decoder_uninit(&decoder);
 		return 0;
@@ -640,7 +641,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
+					printf( "      Packing \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -666,7 +667,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		{
 			if ( !global::QuietMode )
 			{
-				printf( "      Packing XA %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
+				printf( "      Packing XA \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
 			}
 
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -691,7 +692,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing XA-DO %" PRFILESYSTEM_PATH "... ", entry.srcfile.lexically_normal().c_str() );
+					printf( "      Packing XA-DO \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );

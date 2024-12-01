@@ -697,7 +697,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				fclose(outFile);
 
-				printf("%" PRFILESYSTEM_PATH "\n", outputPath.lexically_normal().c_str());
+				printf("\"%" PRFILESYSTEM_PATH "\"... Done.\n", outputPath.lexically_normal().c_str());
 			}
 			else if (entry.type == EntryType::EntryDA)
 			{
@@ -747,7 +747,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					return;
 				}
 
-				printf("%" PRFILESYSTEM_PATH "\n", daOutPath.lexically_normal().c_str());
+				printf("\"%" PRFILESYSTEM_PATH "\"... Done.\n", daOutPath.lexically_normal().c_str());
 
 				if (global::cueFile.multiBIN) {
 					reader.Open(global::cueFile.tracks[0].filePath);
@@ -784,7 +784,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				fclose(outFile);
 
-				printf("%" PRFILESYSTEM_PATH "\n", outputPath.lexically_normal().c_str());
+				printf("\"%" PRFILESYSTEM_PATH "\"... Done.\n", outputPath.lexically_normal().c_str());
 			}
 			else
 			{
