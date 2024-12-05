@@ -1,17 +1,9 @@
 #ifndef _ISO_H
 #define _ISO_H
 
-#include <ctime>
-#include <stdlib.h>
-#include <list>
-#include <memory>
-#include <optional>
-#include <string>
-#include <utility>
-#include <vector>
-#include "fs.h"
 #include "cdwriter.h"
 #include "common.h"
+#include <list>
 
 namespace iso
 {

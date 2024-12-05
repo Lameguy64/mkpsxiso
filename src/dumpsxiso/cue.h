@@ -1,8 +1,6 @@
 #pragma once
 
 #include "cdreader.h"
-#include <fstream>
-#include <vector>
 
 struct TrackInfo {
 	fs::path filePath;

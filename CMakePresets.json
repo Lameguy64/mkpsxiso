@@ -30,7 +30,6 @@
 			"name":        "ci",
 			"displayName": "CI build",
 			"description": "This preset is used by GitHub Actions to build mkpsxiso.",
-			"generator":   "Ninja",
 			"binaryDir":   "${sourceDir}/../build",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release"

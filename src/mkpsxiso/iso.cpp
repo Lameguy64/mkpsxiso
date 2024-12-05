@@ -1,15 +1,9 @@
 #include "global.h"
 #include "iso.h"
-#include "common.h"
-#include "cd.h"
 #include "xa.h"
-#include "platform.h"
 #include "miniaudio_helpers.h"
-
 #include <algorithm>
-#include <cinttypes>
 #include <cstring>
-#include <cstdarg>
 #include <fstream>
 
 static bool icompare_func(unsigned char a, unsigned char b)
@@ -131,7 +125,6 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 		printf("ERROR: File not found: %" PRFILESYSTEM_PATH "\n", srcfile.lexically_normal().c_str());
 		return false;
     }
-	GetSrcTime(srcfile, fileAttrib->st_mtime);
 
 	// Check if XA data is valid
 	if ( type == EntryType::EntryXA )
@@ -291,9 +284,10 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 		}
 	}
 
-	time_t dirTime;
-	if (!GetSrcTime(srcDir, dirTime)) {
-		dirTime = global::BuildTime;
+	auto fileAttrib = Stat(srcDir);
+	if (!fileAttrib.has_value())
+	{
+		fileAttrib.emplace().st_mtime = global::BuildTime;
 	
 		if ( id != nullptr )
 		{
@@ -326,7 +320,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 	entry.UID		= attributes.UID;
 	entry.order		= attributes.ORDER;
 	entry.flba		= attributes.FLBA;
-	entry.date		= GetISODateStamp( dirTime, attributes.GMTOffs );
+	entry.date		= GetISODateStamp( fileAttrib->st_mtime, attributes.GMTOffs );
 	entry.length	= 0; // Length is meaningless for directories
 
 	entries.emplace_back(std::move(entry));
@@ -806,7 +800,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		for (const auto& e : entriesInDir) {
 			const DIRENTRY& entry = e.get();
 			if (entry.type != EntryType::EntryDummy && entry.type != EntryType::EntryDA) {
-				maxlba = std::max(entry.lba, maxlba);
+				maxlba = std::max<int>(entry.lba, maxlba);
 			}
 		}
 	}

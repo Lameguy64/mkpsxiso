@@ -1,14 +1,8 @@
 #ifndef _CDREADER_H
 #define _CDREADER_H
 
-#include "cd.h"
 #include "xa.h"
 #include "listview.h"
-#include "fs.h"
-#include <memory>
-#include <optional>
-#include <vector>
-#include <string>
 
 namespace cd {
 

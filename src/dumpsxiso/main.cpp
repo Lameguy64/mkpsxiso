@@ -1,33 +1,14 @@
-#include <stdio.h>
-
-#ifdef _WIN32
-#define NOMINMAX
-#include <windows.h>
-
-#else
-#include <unistd.h>
-#endif
-
-
-#include <string>
-#include <vector>
-#include <map>
-#include <memory>
-
 #include "platform.h"
 #include "common.h"
-#include "fs.h"
-#include "cd.h"
-#include "xa.h"
-#include "cdreader.h"
 #include "xml.h"
 #include "cue.h"
+#include <map>
 
 #ifndef MKPSXISO_NO_LIBFLAC
 #include "FLAC/stream_encoder.h"
 #endif
 
-#include <time.h>
+//#include <time.h>
 
 typedef enum {
 	EAF_WAV  = 1 << 0,
@@ -213,7 +194,7 @@ void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, c
 	int bytesLeft = cddaSize;
 	while (bytesLeft > 0) {
 
-		u_char copyBuff[2352]{};
+		unsigned char copyBuff[2352]{};
 
     	int bytesToRead = bytesLeft;
 
@@ -280,7 +261,7 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
     std::unique_ptr<int32_t[]> pcm(new int32_t[channels * max_pcmframe_read]);
 	while (left && ok) {
 
-		u_char copyBuff[2352]{};
+		unsigned char copyBuff[2352]{};
 
 		size_t need = (left > max_pcmframe_read ? max_pcmframe_read : left);
 		size_t needBytes = need * (channels * (bps/8));
@@ -680,7 +661,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				// Copy loop
 				while(bytesLeft > 0) {
 
-					u_char copyBuff[2336];
+					unsigned char copyBuff[2336];
 
 					int bytesToRead = bytesLeft;
 
@@ -769,7 +750,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				size_t bytesLeft = entry.entry.entrySize.lsb;
 				while(bytesLeft > 0) {
 
-					u_char copyBuff[2048];
+					unsigned char copyBuff[2048];
 					size_t bytesToRead = bytesLeft;
 
 					if (bytesToRead > 2048)
@@ -1075,12 +1056,12 @@ void ParseISO(cd::IsoReader& reader) {
 				}
 			}
 
-			const fs::path xmlPath = param::xmlFile.parent_path().lexically_normal();
-			const fs::path sourcePath = param::outPath.lexically_proximate(xmlPath);
+			const fs::path xmlPath = fs::absolute(param::xmlFile).parent_path();
+			const fs::path sourcePath = fs::absolute(param::outPath).lexically_proximate(xmlPath);
 
 			// Add license element to the xml
 			tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
-			newElement->SetAttribute(xml::attrib::LICENSE_FILE,	(sourcePath / "license_data.dat").lexically_proximate(xmlPath).generic_u8string().c_str());
+			newElement->SetAttribute(xml::attrib::LICENSE_FILE,	(sourcePath / "license_data.dat").generic_u8string().c_str());
 
 			// Create <default_attributes> now so it lands before the directory tree
 			tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
@@ -1178,6 +1159,10 @@ void ParseISO(cd::IsoReader& reader) {
 			xmldoc.SaveFile(file);
 			fclose(file);
 		}
+		else
+		{
+			printf("ERROR: Cannot create xml file \"%" PRFILESYSTEM_PATH "\".\n", param::xmlFile.lexically_normal().c_str());
+		}
 	}
 }
 
@@ -1185,18 +1170,19 @@ int Main(int argc, char *argv[])
 {
 	static constexpr const char* HELP_TEXT =
 		"Usage: dumpsxiso [options <file>] <isofile>\n\n"
-		"  <isofile>\t\tFile name of the bin/cue file\n\t\t\t(supports any 2352 byte/sector images).\n"
+		"  <isofile>\t\tFile name of the bin/cue file (supports any 2352 byte/sector images)\n\n"
 		"Options:\n"
-		"  -x <path>\t\tOptional destination directory for extracted files.\n\t\t\t(Defaults to dumpsxiso dir)\n"
-		"  -s <path>.xml\t\tOptional XML name/destination of MKPSXISO compatible\n\t\t\tscript for later rebuilding. (Defaults to dumpsxiso dir)\n"
-		"  -pt|--path-table\tGo through every known directory in order; helps to\n\t\t\tdeobfuscate some games, like DMW3\n"
-		"  -e|--encode <codec>\tCodec to encode CDDA/DA audio. wave is default.\n\t\t\tSupported codecs: " SUPPORTED_CODEC_TEXT "\n"
-		"  -S|--sort-by-dir\tOutputs a \"pretty\" XML script where entries are grouped\n\t\t\tin directories, instead of strictly following their\n\t\t\toriginal order on the disc.\n"
+		"  -h|--help\t\tShows this help text\n"
+		"  -x <path>\t\tOptional destination directory for extracted files (defaults to working dir)\n"
+		"  -s <file>\t\tOptional XML name/destination for MKPSXISO script (defaults to working dir)\n"
+		"  -pt|--path-table\tGo through every known directory in order; helps to deobfuscate some games (like DMW3)\n"
+		"  -e|--encode <codec>\tCodec to encode CDDA/DA audio; supports " SUPPORTED_CODEC_TEXT " (defaults to wave)\n"
 		"  -f|--force\t\tWrites all lba offsets in the xml to force them at build\n"
-		"  -h|--help\t\tShow this help text\n";
+		"  -S|--sort-by-dir\tOutputs a \"pretty\" XML script where entries are grouped in directories\n"
+		"\t\t\t(instead of strictly following their original order on the disc)\n";
 
     printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
-			"Get the latest version from https://github.com/Lameguy64/mkpsxiso\n"
+			"Get the latest version at https://github.com/Lameguy64/mkpsxiso\n"
 			"Original work: Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
 			"Maintained by: Silent (CookiePLMonster) and spicyjpeg\n"
 			"Contributions: marco-calautti, G4Vi, Nagtan and all the ones from github\n\n" );

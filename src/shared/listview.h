@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <list>
-#include <utility>
 #include <vector>
 
 template<typename T>

@@ -1,17 +1,6 @@
 #ifndef _CD_H
 #define _CD_H
 
-#include <stdio.h>
-
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
 // Sector size in bytes (do not change)
 #define CD_SECTOR_SIZE		2352
 

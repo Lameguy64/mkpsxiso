@@ -1,15 +1,9 @@
 #pragma once
 
-#include <cstdio>
-#include <cstdint>
 #include <optional>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-
 #include "fs.h"
 
-// Printf format for fs::path::c_str()
+// PRFILESYSTEM_PATH printf format for fs::path::c_str()
 #ifdef _WIN32
 #define stat64 _stat64
 #define PRFILESYSTEM_PATH "ls"
@@ -20,6 +14,7 @@
 #define stat64 stat
 #define PRFILESYSTEM_PATH "s"
 #else
+#include <sys/stat.h>
 #define PRFILESYSTEM_PATH "s"
 #endif
 
@@ -32,6 +27,5 @@ FILE* OpenFile(const fs::path& path, const char* mode);
 std::optional<struct stat64> Stat(const fs::path& path);
 int64_t GetSize(const fs::path& path);
 void UpdateTimestamps(const fs::path& path, const cd::ISO_DATESTAMP& entryDate);
-time_t CustoMkTime(struct tm* timebuf);
-struct tm CustomLocalTime(time_t seconds);
-bool GetSrcTime(const fs::path& path, time_t& outTime);
+time_t CustomMkTime(struct tm* timeBuf);
+struct tm CustomLocalTime(time_t timeSec);

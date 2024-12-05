@@ -2,8 +2,6 @@
 #include "common.h"
 #include "edcecc.h"
 #include "global.h"
-#include "platform.h"
-
 #include <algorithm>
 #include <cstring>
 

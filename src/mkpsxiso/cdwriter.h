@@ -3,10 +3,8 @@
 
 #include "cd.h"
 #include "mmappedfile.h"
-#include "fs.h"
 #include <ThreadPool.h>
 #include <forward_list>
-#include <memory>
 
 namespace cd {
 

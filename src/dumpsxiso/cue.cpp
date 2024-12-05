@@ -1,6 +1,7 @@
 #include "common.h"
 #include "cue.h"
 #include "platform.h"
+#include <fstream>
 
 bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &entry, cd::IsoReader &reader, const CueFile &cueFile) {
 	unsigned trackIndex = (entry.trackid.empty() ? std::stoi(entry.identifier.substr(6, 2)) : std::stoi(entry.trackid)) - 1;

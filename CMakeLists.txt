@@ -76,6 +76,7 @@ add_library(iso_shared OBJECT
 	${shared_dir}/mmappedfile.cpp
 	${shared_dir}/platform.cpp
 )
+set_target_properties(iso_shared PROPERTIES CXX_STANDARD 20)
 target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
 target_link_libraries(iso_shared ghc_filesystem)

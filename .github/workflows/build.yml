@@ -7,7 +7,7 @@ on:   [ push, pull_request ]
 jobs:
   build-windows:
     name:    Build mkpsxiso on Windows
-    runs-on: windows-2022
+    runs-on: windows-latest
 
     steps:
     - name: Fetch repo contents
@@ -18,7 +18,7 @@ jobs:
 
     - name: Build and package mkpsxiso
       run: |
-        cmake --preset ci -S mkpsxiso -G "Visual Studio 17 2022"
+        cmake --preset ci -S mkpsxiso
         cmake --build build --config Release -t package
 
     - name: Upload build artifacts
@@ -47,7 +47,7 @@ jobs:
 
     - name: Build and package mkpsxiso
       run: |
-        cmake --preset ci -S mkpsxiso
+        cmake --preset ci -S mkpsxiso -G "Ninja"
         cmake --build build --config Release -t package
 
     - name: Upload build artifacts

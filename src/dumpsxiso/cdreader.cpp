@@ -1,17 +1,7 @@
-#ifdef _WIN32
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
-#include "cd.h"
-#include "xa.h"
 #include "common.h"
 #include "cdreader.h"
 #include "platform.h"
-#include <string.h>
-#include <stdlib.h>
+#include <cstring>
 
 cd::IsoReader::IsoReader()
 {

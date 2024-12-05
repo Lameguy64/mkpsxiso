@@ -1,27 +1,10 @@
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
-#include <stdio.h>
-#include <string>
-#include <queue>
-
-#include "common.h"
-#include "fs.h"
-#include "cdwriter.h"	// CD image writer module
 #include "iso.h"		// ISO file system generator module
 #include "xml.h"
-#include "platform.h"
 
 #define MA_NO_THREADING
 #define MA_NO_DEVICE_IO
 #define MINIAUDIO_IMPLEMENTATION
-#include "miniaudio.h"
-#include "miniaudio_pcm.h"
 #include "miniaudio_helpers.h"
-
 
 namespace global
 {
@@ -79,25 +62,24 @@ int Main(int argc, char* argv[])
 {
 	static constexpr const char* HELP_TEXT =
 		"Usage: mkpsxiso [options <file>] <xmlfile>\n\n"
-		"  <xmlfile>\tFile name of disc image project in XML document format\n\n"
+		"  <xmlfile>\t\tFile name of disc image project in XML document format\n\n"
 		"Options:\n"
-		"  -y\t\tAlways overwrite ISO image files\n"
-		"  -q|--quiet\tQuiet mode (suppress all but warnings and errors)\n"
-		"  -o|--output\tSpecify output file (overrides image_name attribute)\n"
-		"  -c|--cuefile\tSpecify cue sheet file (overrides cue_sheet attribute)\n"
-		"  -l|--label\tSpecify volume ID (overrides volume element)\n"
-		"  -lba\t\tGenerate a log of file LBA locations in disc image\n"
-		"  -lbahead\tGenerate a C header of file LBA locations in disc image\n"
-		"  -noisogen\tDo not generate ISO, but calculate file LBA locations only\n"
-		"\t\t(for use with -lba or -lbahead)\n"
-		"  -noxa\t\tDo not generate CD-XA extended file attributes (plain ISO9660)\n"
-		"\t\t(XA data can still be included but not recommended)\n"
-		"  -rebuildxml\tRebuild the XML using our newest schema\n"
-		"  -h|--help\tShow this help text\n";
+		"  -h|--help\t\tShows this help text\n"
+		"  -q|--quiet\t\tQuiet mode (suppress all but warnings and errors)\n"
+		"  -l|--label\t\tSpecify volume ID (overrides volume element)\n"
+		"  -o|--output <file>\tSpecify output file (overrides image_name attribute)\n"
+		"  -c|--cuefile <file>\tSpecify cue sheet file (overrides cue_sheet attribute)\n"
+		"  -y\t\t\tAlways overwrite ISO image files\n"
+		"  -lba <file>\t\tGenerate a log of file LBA locations in disc image\n"
+		"  -lbahead <file>\tGenerate a C header of file LBA locations in disc image\n"
+		"  -rebuildxml\t\tRebuild the XML using our newest schema\n"
+		"  -noisogen\t\tDo not generate ISO, but calculate file LBA locations (for use with -lba or -lbahead)\n"
+		"  -noxa\t\t\tDo not generate CD-XA extended file attributes (plain ISO9660)\n"
+		"\t\t\t(XA data can still be included but not recommended)\n";
 
 	static constexpr const char* VERSION_TEXT =
 		"MKPSXISO " VERSION " - PlayStation ISO Image Maker\n"
-		"Get the latest version from https://github.com/Lameguy64/mkpsxiso\n"
+		"Get the latest version at https://github.com/Lameguy64/mkpsxiso\n"
 		"Original work: Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
 		"Maintained by: Silent (CookiePLMonster) and spicyjpeg\n"
 		"Contributions: marco-calautti, G4Vi, Nagtan and all the ones from github\n\n";
@@ -344,8 +326,8 @@ int Main(int argc, char* argv[])
 	    }
 		else
 		{
-			printf( "ERROR: Cannot open %s for writing\n", 
-				global::RebuildXMLScript.generic_u8string().c_str());
+			printf( "ERROR: Cannot open %" PRFILESYSTEM_PATH " for writing\n", 
+				global::RebuildXMLScript.lexically_normal().c_str());
 			return EXIT_FAILURE;
 		}
 		if ( !global::QuietMode )
@@ -661,7 +643,7 @@ int Main(int argc, char* argv[])
 						entry.type = EntryType::EntryDA;
 						if (!global::QuietMode)
 						{
-							printf("    DA File \"%s\"\n", trackSource.filename().generic_u8string().c_str());
+							printf("    DA File \"%" PRFILESYSTEM_PATH "\"\n", trackSource.filename().c_str());
 						}
 					}
 

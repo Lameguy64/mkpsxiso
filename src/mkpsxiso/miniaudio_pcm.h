@@ -12,7 +12,6 @@ MA_API ma_result ma_decoder_init_FILE_pcm(FILE *file, ma_decoder_config* pConfig
 
 #ifdef __cplusplus
 #include "platform.h"
-#include "common.h"
 
 class VirtualWavEx : public VirtualWav {
     public:
