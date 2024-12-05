@@ -57,11 +57,9 @@ static time_t FileTimeToTimet(const FILETIME& ft)
 FILE* OpenFile(const fs::path& path, const char* mode)
 {
 #ifdef _WIN32
-	FILE* file = nullptr;
-	_wfopen_s(&file, path.c_str(), UTF8ToUTF16(mode).c_str());
-	return file;
+	return _wfopen(path.c_str(), UTF8ToUTF16(mode).c_str());
 #else
-	return ::fopen(path.c_str(), mode);
+	return fopen(path.c_str(), mode);
 #endif
 }
 

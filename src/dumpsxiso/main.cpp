@@ -1161,7 +1161,7 @@ void ParseISO(cd::IsoReader& reader) {
 		}
 		else
 		{
-			printf("ERROR: Cannot create xml file \"%" PRFILESYSTEM_PATH "\".\n", param::xmlFile.lexically_normal().c_str());
+			printf("ERROR: Cannot create xml file \"%" PRFILESYSTEM_PATH "\". %s\n", param::xmlFile.lexically_normal().c_str(), strerror(errno));
 		}
 	}
 }
