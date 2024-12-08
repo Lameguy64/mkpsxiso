@@ -99,7 +99,7 @@ ma_result ma_redbook_decoder_init_path_by_ext(const fs::path& filePath, ma_decod
 	if(i == num_tries)
 	{
 		// no more formats to try, return false
-		printf("    ERROR: No valid format found\n");
+		printf("  ERROR: No valid format found\n");
 		return MA_ERROR;
 	}
 	return MA_SUCCESS;

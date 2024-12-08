@@ -204,6 +204,7 @@ int Main(int argc, char* argv[])
 		global::LBAheaderFile = global::XMLscript.stem() += "_LBA.h";
 	}
 
+	tzset(); // Initializes the time-related environment variables
 	// Get current time to be used as date stamps for all directories
 	time( &global::BuildTime );
 
@@ -517,7 +518,7 @@ int Main(int argc, char* argv[])
 				if ( trackElement->Attribute(xml::attrib::NEW_TYPE) != nullptr ) {
 					global::new_type = trackElement->BoolAttribute(xml::attrib::NEW_TYPE);
 				}
-				if ( global::ps2 = trackElement->BoolAttribute(xml::attrib::PS2) ) {
+				if ( (global::ps2 = trackElement->BoolAttribute(xml::attrib::PS2)) ) {
 					global::new_type = true; // Force true if it's an PS2 disc
 				}
 
@@ -711,7 +712,7 @@ int Main(int argc, char* argv[])
 
 				if ( !global::QuietMode )
 				{
-					printf( "Wrote file LBA log \"%" PRFILESYSTEM_PATH "\".\n\n",
+					printf( "Wrote file LBA log \"%" PRFILESYSTEM_PATH "\"\n\n",
 						global::LBAfile.lexically_normal().c_str() );
 				}
 			}
@@ -751,7 +752,7 @@ int Main(int argc, char* argv[])
 
 				if ( !global::QuietMode )
 				{
-					printf( "Wrote file LBA listing header \"%" PRFILESYSTEM_PATH "\".\n\n",
+					printf( "Wrote file LBA listing header \"%" PRFILESYSTEM_PATH "\"\n\n",
 						global::LBAheaderFile.lexically_normal().c_str() );
 				}
 			}
@@ -759,7 +760,7 @@ int Main(int argc, char* argv[])
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "Failed to write LBA listing header \"%" PRFILESYSTEM_PATH "\".\n\n",
+					printf( "Failed to write LBA listing header \"%" PRFILESYSTEM_PATH "\"!\n\n",
 						global::LBAheaderFile.lexically_normal().c_str() );
 				}
 			}
@@ -786,17 +787,16 @@ int Main(int argc, char* argv[])
 			// Write the file system
 			if ( !global::QuietMode )
 			{
-				printf("Writing ISO...\n");
-				printf( "    Writing files...\n" );
+				printf( "Writing ISO...\n"
+						"  Writing files...\n" );
 			}
 
 			// Copy the files into the disc image
 			dirTree->WriteFiles( &writer );
 
-			if ( !global::QuietMode )
+			if ( !global::QuietMode && !audioTracks.empty() )
 			{
-				printf("\n");
-				printf("    Writing CDDA tracks...\n");
+				printf("\n  Writing CDDA tracks...\n");
 			}
 
 			// Write out the audio tracks
@@ -810,7 +810,8 @@ int Main(int argc, char* argv[])
 					// Pack the audio file
 					if ( !global::QuietMode )
 					{
-						printf( "      Packing audio \"%s\"... ", track.source.c_str() );
+						printf( "    Packing audio \"%s\"... ", track.source.c_str() );
+						fflush(stdout);
 					}
 
 					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), fs::u8path(track.source) ) )
@@ -846,7 +847,7 @@ int Main(int argc, char* argv[])
 					{
 						if ( !global::QuietMode )
 						{
-							printf( "    Writing license data..." );
+							printf( "  Writing license data..." );
 						}
 
 						iso::WriteLicenseData( &writer, license->data, global::ps2 );
@@ -870,7 +871,7 @@ int Main(int argc, char* argv[])
 			// Write file system
 			if ( !global::QuietMode )
 			{
-				printf( "    Writing directories... " );
+				printf( "  Writing directories... " );
 			}
 
 			// Write directory entries
@@ -1050,47 +1051,48 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		if ( !global::QuietMode )
 		{
 			printf("    Identifiers:\n");
-			printf( "      System       : %s%s\n",
+			printf( "      System ID         : %s%s\n",
 				isoIdentifiers.SystemID,
 				hasSystemID ? "" : " (default)" );
 
-			printf( "      Application  : %s%s\n",
-				isoIdentifiers.Application,
-				hasApplication ? "" : " (default)" );
-
 			if ( isoIdentifiers.VolumeID != nullptr )
 			{
-				printf( "      Volume       : %s\n",
+				printf( "      Volume ID         : %s\n",
 					isoIdentifiers.VolumeID );
 			}
 			if ( isoIdentifiers.VolumeSet != nullptr )
 			{
-				printf( "      Volume Set   : %s\n",
+				printf( "      Volume Set ID     : %s\n",
 					isoIdentifiers.VolumeSet );
 			}
 			if ( isoIdentifiers.Publisher != nullptr )
 			{
-				printf( "      Publisher    : %s\n",
+				printf( "      Publisher ID      : %s\n",
 					isoIdentifiers.Publisher );
 			}
 			if ( isoIdentifiers.DataPreparer != nullptr )
 			{
-				printf( "      Data Preparer: %s\n",
+				printf( "      Data Preparer ID  : %s\n",
 					isoIdentifiers.DataPreparer );
 			}
+
+			printf( "      Application ID    : %s%s\n",
+				isoIdentifiers.Application,
+				hasApplication ? "" : " (default)" );
+
 			if ( isoIdentifiers.Copyright != nullptr )
 			{
-				printf( "      Copyright    : %s\n",
+				printf( "      Copyright ID      : %s\n",
 					isoIdentifiers.Copyright );
 			}
 			if ( isoIdentifiers.CreationDate != nullptr )
 			{
-				printf( "      Create Date  : %s\n",
+				printf( "      Creation Date     : %s\n",
 					isoIdentifiers.CreationDate );
 			}
 			if ( isoIdentifiers.ModificationDate != nullptr )
 			{
-				printf( "      Modify Date  : %s\n",
+				printf( "      Modification Date : %s\n",
 					isoIdentifiers.ModificationDate );
 			}
 			printf( "\n" );
@@ -1183,15 +1185,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		volumeDate.hour = imageTime.tm_hour;
 		volumeDate.minute = imageTime.tm_min;
 		volumeDate.second = imageTime.tm_sec;
-
-		// Calculate the GMT offset. It doesn't have to be perfect, but this should cover most/all normal cases.
-		const time_t timeUTC = global::BuildTime;
-
-		tm localTime = imageTime;
-		const time_t timeLocal = mktime(&localTime);
-
-		const double diff = difftime(timeUTC, timeLocal);
-		volumeDate.GMToffs = static_cast<signed char>(diff / 60.0 / 15.0); // Seconds to 15-minute units
+		volumeDate.GMToffs = static_cast<signed char>(-SYSTEM_TIMEZONE / 60.0 / 15.0); // Seconds to 15-minute units
 	}
 
 	// Parse directory entries in the directory_tree element
@@ -1534,7 +1528,7 @@ bool PackFileAsCDDA(void* buffer, const fs::path& audioFile)
 	}
 	else if (isPCM && !global::QuietMode)
 	{
-		printf("\n        WARN: Guessing it's signed 16 bit stereo @ 44100 kHz pcm audio... ");
+		printf("\n      WARN: Guessing it's signed 16 bit stereo @ 44100 kHz pcm audio... ");
 	}
 
 	// note if there's some data converting going on
@@ -1549,7 +1543,7 @@ bool PackFileAsCDDA(void* buffer, const fs::path& audioFile)
 	}
 	if((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100) || isLossy)
 	{
-		printf("\n    WARN: This is not Redbook audio, converting... ");
+		printf("\n      WARN: This is not Redbook audio, converting... ");
 	}
 
 	// get expected pcm frame count (if your file isn't redbook this can vary from the input file's amount)

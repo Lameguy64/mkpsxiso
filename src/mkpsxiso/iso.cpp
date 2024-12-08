@@ -27,7 +27,7 @@ static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 {
 	tm timestamp;
 	if (global::new_type.has_value()) {
-		timestamp = CustomLocalTime(time);
+		timestamp = CustomLocalTime(&time);
 	}
 	else {
 		// GMToffs is specified in 15 minute units
@@ -114,7 +114,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 
 bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::path& srcfile, const EntryAttributes& attributes, const char *trackid)
 {
-    auto fileAttrib = Stat(srcfile);
+	auto fileAttrib = Stat(srcfile);
     if ( !fileAttrib )
 	{
 		if ( !global::QuietMode )
@@ -507,7 +507,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 		{
 			if(entry.lba == iso::DA_FILE_PLACEHOLDER_LBA)
 			{
-				printf("ERROR: DA file still has placeholder value 0x%X\n", iso::DA_FILE_PLACEHOLDER_LBA);
+				printf("\nWARNING: DA file still has placeholder value 0x%X... ", iso::DA_FILE_PLACEHOLDER_LBA);
 			}
 			length = 2048 * GetSizeInSectors(entry.length, 2352);
 		}
@@ -635,7 +635,8 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+					printf( "    Packing \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+					fflush(stdout);
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -661,7 +662,8 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		{
 			if ( !global::QuietMode )
 			{
-				printf( "      Packing XA \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+				printf( "    Packing XA \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+				fflush(stdout);
 			}
 
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -686,7 +688,8 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "      Packing XA-DO \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+					printf( "    Packing XA-DO \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+					fflush(stdout);
 				}
 
 				FILE *fp = OpenFile( entry.srcfile, "rb" );
@@ -812,7 +815,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 			continue;
 		}
 
-		const char* typeStr = "";
+		const char* typeStr;
 		std::string nameStr = CleanIdentifier(entry.id);
 		uint32_t sectors = GetSizeInSectors(entry.length);
 

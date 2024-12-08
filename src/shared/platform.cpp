@@ -91,16 +91,15 @@ int64_t GetSize(const fs::path& path)
 	return fileAttrib.has_value() ? fileAttrib->st_size : -1;
 }
 
-// Converts time_t to struct tm
-struct tm CustomLocalTime(time_t timeSec)
+// Returns local UTC `struct tm` from UTC+0 `time_t`
+struct tm CustomLocalTime(const time_t* timeSec)
 {
 #ifdef _WIN32
 	using namespace std::chrono;
 	tm timeBuf {};
 
 	// Convert time_t to sys_time (compatible with std::chrono)
-	const time_t now = time(nullptr);
-	auto tp = system_clock::from_time_t(timeSec + (now - mktime(gmtime(&now))));
+	auto tp = system_clock::from_time_t(*timeSec - SYSTEM_TIMEZONE);
 
 	// Break down the time into year/month/day/hour/minute/second
 	auto num_of_days = floor<days>(tp);
@@ -120,11 +119,11 @@ struct tm CustomLocalTime(time_t timeSec)
 
 	return timeBuf;
 #else
-	return *localtime(&timeSec);
+	return *localtime(timeSec);
 #endif
 }
 
-// Converts struct tm to time_t
+// Returns UTC+0 `time_t` from local UTC `struct tm`
 time_t CustomMkTime(struct tm* timeBuf)
 {
 #ifdef _WIN32
@@ -138,9 +137,7 @@ time_t CustomMkTime(struct tm* timeBuf)
 							minutes{timeBuf->tm_min} +
 							seconds{timeBuf->tm_sec};
 
-	// Adjust to UTC 0 and return
-	const time_t now = time(nullptr);
-	return system_clock::to_time_t(chronoTime) - (now - mktime(gmtime(&now)));
+	return system_clock::to_time_t(chronoTime) + SYSTEM_TIMEZONE;
 #else
 	return mktime(timeBuf);
 #endif

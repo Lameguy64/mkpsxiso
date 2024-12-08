@@ -100,7 +100,7 @@ namespace cd {
 		unsigned char extLength;	/// Number of sectors in extended attribute record
 		unsigned int dirOffs;		/// Number of the first sector in the directory, as a double word
 		short parentDirIndex;		/// Index of the directory record's parent directory
-		// If nameLength is NOT even numbered, a padding byte will be present after the entry name.
+		// If nameLength is odd numbered, a padding byte will be present after the entry name.
 	};
 
 	struct ISO_DIR_ENTRY
@@ -115,7 +115,7 @@ namespace cd {
 		unsigned char interleaveGapSize;	// Interleave gap size (usually 0 even with Form 2 files such as STR/XA)
 		ISO_USHORT_PAIR volSeqNum;			// Volume sequence number (always 1)
 		unsigned char identifierLen;		// Identifier (file/directory name) length in bytes
-		// If identifierLen IS even numbered, a padding byte will be present after the identifier text.
+		// If identifierLen is even numbered, a padding byte will be present after the identifier text.
 	};
 
 	typedef struct {
