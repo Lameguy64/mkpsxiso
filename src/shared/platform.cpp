@@ -6,6 +6,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <chrono>
 #else
 #include <fcntl.h>
 #endif
