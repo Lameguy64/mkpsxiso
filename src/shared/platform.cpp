@@ -1,5 +1,4 @@
 #include "platform.h"
-#include "cd.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX

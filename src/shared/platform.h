@@ -2,6 +2,7 @@
 
 #include <optional>
 #include "fs.h"
+#include "cd.h"
 
 // PRFILESYSTEM_PATH printf format for fs::path::c_str()
 #ifdef _WIN32
@@ -19,11 +20,6 @@
 #define stat64 stat
 #endif
 #endif
-
-namespace cd
-{
-	struct ISO_DATESTAMP;
-}
 
 FILE* OpenFile(const fs::path& path, const char* mode);
 std::optional<struct stat64> Stat(const fs::path& path);

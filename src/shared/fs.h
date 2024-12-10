@@ -1,3 +1,4 @@
+#pragma once
 #ifdef __APPLE__
 #include <Availability.h> // for deployment target to support pre-catalina targets without std::fs
 #endif
@@ -11,7 +12,11 @@ using namespace std::filesystem;
 #endif
 #endif
 #ifndef GHC_USE_STD_FS
-#include <ghc/fs_fwd.hpp>
+#ifndef GHC_FILESYSTEM_IMPLEMENTATION_INCLUDED
+#define GHC_FILESYSTEM_IMPLEMENTATION_INCLUDED
+#define GHC_FILESYSTEM_IMPLEMENTATION
+#include <ghc/filesystem.hpp>
+#endif
 namespace fs {
 using namespace ghc::filesystem;
 }
