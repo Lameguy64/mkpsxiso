@@ -158,12 +158,10 @@ namespace iso
 		 *	have been written to the CD image.
 		 *
 		 *	*writer		   - Pointer to a cd::IsoWriter class that is ready for writing.
-		 *	LBA			   - Current directory LBA
-		 *  parentLBA	   - Parent directory LBA
-		 *  currentDirDate - Timestamp to use for . and .. directories.
+		 *	root		   - Root directory
 		 *  totalDirs	   - Total number of directories. Only usefull for games built with the latest sony mastering tool
 		 */
-		bool WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, unsigned short totalDirs);
+		bool WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& root, unsigned short totalDirs);
 
 		void SortDirectoryEntries(const bool byOrder, const bool byLBA = false);
 

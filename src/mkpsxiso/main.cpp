@@ -875,7 +875,7 @@ int Main(int argc, char* argv[])
 			}
 
 			// Write directory entries
-			dirTree->WriteDirectoryRecords( &writer, root, root, global::new_type.value_or(false) ? dirTree->GetDirCountTotal() : 0 );
+			dirTree->WriteDirectoryRecords( &writer, root, global::new_type.value_or(false) ? dirTree->GetDirCountTotal() : 0 );
 
 			// Write file system descriptors to finish the image
 	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLenLBA );

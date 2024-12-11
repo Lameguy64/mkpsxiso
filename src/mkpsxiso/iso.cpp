@@ -600,9 +600,9 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 	return true;
 }
 
-bool iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, unsigned short totalDirs)
+bool iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& root, unsigned short totalDirs)
 {
-	if(!WriteDirEntries( writer, dir, parentDir, totalDirs ))
+	if(!WriteDirEntries( writer, root, root, totalDirs ))
 	{
 		return false;
 	}
