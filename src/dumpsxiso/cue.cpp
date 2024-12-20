@@ -31,12 +31,16 @@ CueFile parseCueFile(fs::path& inputFile) {
 			size_t lastQuote = line.rfind("\"");
 			std::string fileName = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
 			filePath.replace_filename(fileName);
-			if (int64_t sectors = GetSize(filePath) / CD_SECTOR_SIZE; sectors < 1) {
+			if (int64_t fileSize = GetSize(filePath); fileSize < 0) {
 				printf("Error: Failed to get the file size for \"%s\"\n", fileName.c_str());
 				exit(EXIT_FAILURE);
 			}
 			else {
-				cueFile.totalSectors += sectors;
+				if (fileSize % CD_SECTOR_SIZE != 0) {
+					printf("Error: File size for \"%s\" is not a multiple of 2352\n", fileName.c_str());
+					exit(EXIT_FAILURE);
+				}
+				cueFile.totalSectors += fileSize / CD_SECTOR_SIZE;
 			}
 
 			if (line.find("BINARY") != std::string::npos) {

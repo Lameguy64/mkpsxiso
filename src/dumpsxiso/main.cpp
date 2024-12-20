@@ -568,16 +568,26 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			if (track.type != "AUDIO") {
 				continue;
 			}
+			// Skip referenced DA tracks
+			if (tracknum > 2) {
+				if (std::any_of(DAfiles.begin(), DAfiles.end(), [&track](const auto& entry) {
+								return entry->entry.entryOffs.lsb == track.startSector;
+								})) {
+					continue;
+				}
+			}
+
+			// Add the unreferenced DA track to the buffer
 			auto& entry = unrefDAbuff.emplace_back();
 			entry.entry.entryOffs.lsb = track.startSector;
-			entry.entry.entrySize.lsb = track.sizeInSectors * 2048; // We are using this size instead of 2352 because of how the code was written
+			entry.entry.entrySize.lsb = track.sizeInSectors * 2048;
 			entry.identifier = GetRealDAFilePath("TRACK-" + track.number).generic_u8string() + ";1";
 			entry.type = EntryType::EntryDA;
 
 			// Additional safety check in case the .cue file had a wrong pause size
-			// For ex, Mega Man X3 track 30 had 149 sectors pause, but redump.org says it was a 150 standard one
+			// For ex, Mega Man X3 track 30 had 149 sectors pause, but at redump.org says it was a 150 standard one
 			unsigned char sectorBuff[CD_SECTOR_SIZE];
-			unsigned char emptyBuff[CD_SECTOR_SIZE] = {0};
+			unsigned char emptyBuff[CD_SECTOR_SIZE] {};
 			while (true) {
 				if (!reader.SeekToSector(entry.entry.entryOffs.lsb - 1) && !multiBinSeeker(entry.entry.entryOffs.lsb - 1, entry, reader, global::cueFile)) {
 					break;
@@ -593,16 +603,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			}
 		}
 
-		// Checks for already referenced DA files and deletes them from the buffer
-		if (tracknum > 2) {
-			unrefDAbuff.erase(std::remove_if(unrefDAbuff.begin(), unrefDAbuff.end(), [&DAfiles](const cd::IsoDirEntries::Entry& entry) {
-								return std::any_of(DAfiles.begin(), DAfiles.end(), [&entry](const auto& daEntry) {
-											return daEntry->entry.entryOffs.lsb == entry.entry.entryOffs.lsb;
-										});
-							  }), unrefDAbuff.end());
-		}
-
-		// Add unreferenced DA files in entries for further extraction
+		// Add unreferenced DA tracks to entries for further extraction
 		for (auto& entry : unrefDAbuff) {
 			entries.emplace_back(std::move(entry));
 			DAfiles.push_back(std::prev(entries.end()));
@@ -614,9 +615,9 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 				return left->entry.entryOffs.lsb < right->entry.entryOffs.lsb;
 			});
 
-		// Only recalculate the trackid's if there were unreferenced tracks among the referenced ones
-		// This is just for a prettier XML view because unsorted trackid's have no impact at build time
-		if (tracknum > 2 && tracknum <= global::cueFile.tracks.size()) {
+		// Only recalculate the track id's if there were unreferenced tracks among the referenced ones
+		// This is just for a prettier XML sort, because unsorted track id's have no impact at build time
+		if (tracknum > 2) {
 			tracknum = 2;
 			for(const auto& entry : DAfiles) {
 				if(!entry->trackid.empty()) {
@@ -1013,8 +1014,15 @@ void ParseISO(cd::IsoReader& reader) {
 
 	printf("      Files Total: %zu\n", entries.size() - numEntries);
 	printf("      Directories: %zu\n", numEntries - 1);
-	if (!global::cueFile.tracks.empty()) {
-		printf("      Total file system size: %u bytes (%u sectors)\n", CD_SECTOR_SIZE*global::cueFile.tracks[0].endSector, global::cueFile.tracks[0].endSector);
+
+	unsigned int totalLenLBA = descriptor.volumeSize.lsb;
+	for (auto it = entries.rbegin(); it != entries.rend(); it++) {
+		if (it->type != EntryType::EntryDA) {
+			unsigned int endFS = it->entry.entryOffs.lsb + GetSizeInSectors(it->entry.entrySize.lsb);
+			endFS += totalLenLBA - endFS < 150 ? totalLenLBA - endFS : 150;
+			printf("      Total file system size: %u bytes (%u sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
+			break;
+		}
 	}
 
 	// Process DA tracks and add them to the entries list
@@ -1102,7 +1110,6 @@ void ParseISO(cd::IsoReader& reader) {
 			// Write the DATA track postgap
 			// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, postgap should be always >= 150 sectors for CD-DA discs and optionally for non CD-DA.
 			unsigned int postGap = 150;
-			unsigned int totalLenLBA = descriptor.volumeSize.lsb;
 			if (!global::cueFile.tracks.empty() && global::cueFile.tracks[0].endSector <= totalLenLBA) {
 				postGap = global::cueFile.tracks[0].endSector - currentLBA;
 			}
@@ -1116,7 +1123,7 @@ void ParseISO(cd::IsoReader& reader) {
 				postGap = 0;
 			}
 			// There are some CD-DA games that have a non-zero adrress ECC calculation in the last postgap sector. So, we are checking it.
-			// Idk if this behavior could happen in other sectors, but apparently it is only related to postgaps in CD-DA games.
+			// Idk if this behavior could happen in other sectors, but apparently it's only related to CD-DA games postgaps (maybe a bug).
 			if (postGap) {
 				cd::SECTOR_M2F1 sector;
 				reader.SeekToSector(currentLBA + postGap - 1);

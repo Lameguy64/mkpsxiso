@@ -38,10 +38,9 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ThreadPool/ThreadPool.h)
 	message(FATAL_ERROR "The ThreadPool directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
-# Build tinyxml2. I didn't bother with tinyxml2's actual CMake integration
-# because it's far easier do do this. It is a single-file library after all.
-add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
-target_include_directories(tinyxml2 PUBLIC tinyxml2)
+# Build tinyxml2
+set(tinyxml2_BUILD_TESTING OFF CACHE INTERNAL "")
+add_subdirectory(tinyxml2 EXCLUDE_FROM_ALL)
 
 # Build libFLAC, unless explicitly requested not too
 if(NOT MKPSXISO_NO_LIBFLAC)
@@ -61,6 +60,9 @@ if(NOT MKPSXISO_NO_LIBFLAC)
 	if(MINGW)
 		set(WITH_STACK_PROTECTOR, OFF CACHE INTERNAL "")
 	endif()
+	if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+		set(WITH_FORTIFY_SOURCE OFF CACHE INTERNAL "")
+	endif()
 	add_subdirectory(flac EXCLUDE_FROM_ALL)
 endif()
 
@@ -78,7 +80,7 @@ add_library(iso_shared OBJECT
 set_target_properties(iso_shared PROPERTIES CXX_STANDARD 20)
 target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
-target_link_libraries(iso_shared ghc_filesystem)
+target_link_libraries(iso_shared ghc_filesystem tinyxml2)
 
 find_package(Threads REQUIRED)
 
@@ -91,7 +93,7 @@ add_executable(mkpsxiso
 	${mkpsxiso_dir}/main.cpp
 )
 target_include_directories(mkpsxiso PUBLIC "miniaudio" "ThreadPool")
-target_link_libraries(mkpsxiso tinyxml2 iso_shared Threads::Threads)
+target_link_libraries(mkpsxiso iso_shared Threads::Threads)
 if(MINGW)
 	target_link_libraries(mkpsxiso "-municode")
 endif()
@@ -101,7 +103,7 @@ add_executable(dumpsxiso
 	${dumpsxiso_dir}/cue.cpp
 	${dumpsxiso_dir}/main.cpp
 )
-target_link_libraries(dumpsxiso tinyxml2 iso_shared)
+target_link_libraries(dumpsxiso iso_shared)
 if(NOT MKPSXISO_NO_LIBFLAC)
 	target_link_libraries(dumpsxiso FLAC)
 else()
