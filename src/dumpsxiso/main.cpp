@@ -486,10 +486,10 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
     for (int i = 1; i < pathTableList.size(); i++) {
         auto& e = pathTableList[i];
         if (e.entry.parentDirIndex - 1 == index) {
-			bool found = std::any_of(dirEntries->dirEntryList.GetView().begin(), dirEntries->dirEntryList.GetView().end(), [&e](const auto& entry) {
-										return e.name == entry.get().identifier;
-									});
-			if (!found) {
+			if (!std::any_of(dirEntries->dirEntryList.GetView().begin(), dirEntries->dirEntryList.GetView().end(), [&e](const auto& entry)
+					{
+						return entry.get().identifier == e.name;
+					})) {
 				dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
 			}
         }
@@ -570,9 +570,10 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			}
 			// Skip referenced DA tracks
 			if (tracknum > 2) {
-				if (std::any_of(DAfiles.begin(), DAfiles.end(), [&track](const auto& entry) {
-								return entry->entry.entryOffs.lsb == track.startSector;
-								})) {
+				if (std::any_of(DAfiles.begin(), DAfiles.end(), [&track](const auto& entry)
+						{
+							return entry->entry.entryOffs.lsb == track.startSector;
+						})) {
 					continue;
 				}
 			}
