@@ -7,6 +7,7 @@
 #include <forward_list>
 
 namespace cd {
+using namespace progschj;
 
 class IsoWriter
 {

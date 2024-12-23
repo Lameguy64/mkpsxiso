@@ -12,4 +12,4 @@
 	url = https://github.com/gulrak/filesystem
 [submodule "threadpool"]
 	path = threadpool
-	url = https://github.com/Qix-/ThreadPool
+	url = https://github.com/log4cplus/ThreadPool
