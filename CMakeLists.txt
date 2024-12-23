@@ -34,8 +34,8 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ghc/include/ghc/filesystem.hpp)
 	message(FATAL_ERROR "The ghc directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
-if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ThreadPool/ThreadPool.h)
-	message(FATAL_ERROR "The ThreadPool directory is empty. Run 'git submodule update --init --recursive' to populate it.")
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/threadpool/ThreadPool.h)
+	message(FATAL_ERROR "The threadpool directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
 # Build tinyxml2
@@ -92,7 +92,7 @@ add_executable(mkpsxiso
 	${mkpsxiso_dir}/iso.cpp
 	${mkpsxiso_dir}/main.cpp
 )
-target_include_directories(mkpsxiso PUBLIC "miniaudio" "ThreadPool")
+target_include_directories(mkpsxiso PUBLIC "miniaudio" "threadpool")
 target_link_libraries(mkpsxiso iso_shared Threads::Threads)
 if(MINGW)
 	target_link_libraries(mkpsxiso "-municode")
