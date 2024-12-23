@@ -1,25 +1,15 @@
 {
-	"version": 3,
+	"version": 6,
 	"cmakeMinimumRequired": {
 		"major": 3,
-		"minor": 19,
+		"minor": 21,
 		"patch": 0
 	},
 	"configurePresets": [
 		{
-			"name":        "release",
-			"displayName": "Release build",
-			"description": "Use this preset when building mkpsxiso for local installation.",
-			"binaryDir":   "${sourceDir}/build",
-			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release",
-				"CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE": "Release"
-			}
-		},
-		{
 			"name":        "debug",
-			"displayName": "Debug configuration",
-			"description": "Use this preset when debugging mkpsxiso.",
+			"displayName": "Debug Config",
+			"description": "Use this preset to debug mkpsxiso.",
 			"binaryDir":   "${sourceDir}/build",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug",
@@ -27,13 +17,47 @@
 			}
 		},
 		{
-			"name":        "ci",
-			"displayName": "CI build",
-			"description": "This preset is used by GitHub Actions to build mkpsxiso.",
-			"binaryDir":   "${sourceDir}/../build",
+			"name":        "release",
+			"displayName": "Release Config",
+			"description": "Use this preset to build mkpsxiso.",
+			"binaryDir":   "${sourceDir}/build",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release"
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE": "Release"
 			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name":            "release",
+			"configurePreset": "release",
+			"configuration":   "Release"
+		}
+	],
+	"packagePresets": [
+		{
+			"name":            "release",
+			"configurePreset": "release"
+		}
+	],
+	"workflowPresets": [
+		{
+			"name":        "ci",
+			"description": "This preset is used by GitHub Actions to build mkpsxiso.",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "release"
+				},
+				{
+					"type": "build",
+					"name": "release"
+				},
+				{
+					"type": "package",
+					"name": "release"
+				}
+			]
 		}
 	]
 }
