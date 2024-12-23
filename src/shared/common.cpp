@@ -98,7 +98,7 @@ std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src)
 	std::string result(srcStr, srcStr+16);
 
 	char GMTbuf[8];
-	sprintf(GMTbuf, "%+hhd", src.GMToffs);
+	snprintf(GMTbuf, sizeof(GMTbuf), "%+hhd", src.GMToffs);
 	result.append(GMTbuf);
 
 	return result;
