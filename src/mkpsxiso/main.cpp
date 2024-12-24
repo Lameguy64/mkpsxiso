@@ -171,7 +171,7 @@ int Main(int argc, char* argv[])
 		{
 			if ( global::XMLscript.empty() )
 			{
-				global::XMLscript = fs::u8path(*args);
+				global::XMLscript = fs::relative(fs::u8path(*args));
 			}
 		}
 
