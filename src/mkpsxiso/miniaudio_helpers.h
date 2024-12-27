@@ -35,7 +35,7 @@ ma_result ma_redbook_decoder_init_path_by_ext(const fs::path& filePath, ma_decod
 	isPCM = false;
 
 	DecoderAudioFormats tryorder[4] = {DAF_WAV, DAF_FLAC, DAF_MP3, DAF_PCM};
-	const auto& extension = filePath.extension().u8string();
+	const auto& extension = filePath.extension().string();
 
 	// determine which format to try first based on file extension
 	if(extension.size() >= 4)

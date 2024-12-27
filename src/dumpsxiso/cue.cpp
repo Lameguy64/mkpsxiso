@@ -12,7 +12,7 @@ bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &e
 CueFile parseCueFile(fs::path& inputFile) {
 	CueFile cueFile;
 	std::string line, fileType;
-	std::ifstream file(inputFile);
+	fs::ifstream file(inputFile);
 	fs::path filePath = inputFile;
 	unsigned int pauseStartSector = 1;
 	unsigned int previousStartSector = 0;

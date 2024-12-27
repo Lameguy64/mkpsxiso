@@ -120,7 +120,7 @@ int Main(int argc, char* argv[])
 			}
 			if (auto lbaHead = ParsePathArgument(args, "lbahead"); lbaHead.has_value())
 			{
-				if (CompareICase(lbaHead->extension().generic_u8string(), ".xml"))
+				if (CompareICase(lbaHead->extension().string(), ".xml"))
 				{
 					args--;
 					global::LBAheaderFile = lbaHead->stem() += "_LBA.h";
@@ -131,7 +131,7 @@ int Main(int argc, char* argv[])
 			}
 			if (auto lbaFile = ParsePathArgument(args, "lba"); lbaFile.has_value())
 			{
-				if (CompareICase(lbaFile->extension().generic_u8string(), ".xml"))
+				if (CompareICase(lbaFile->extension().string(), ".xml"))
 				{
 					args--;
 					global::LBAfile = lbaFile->stem() += "_LBA.txt";
@@ -171,7 +171,7 @@ int Main(int argc, char* argv[])
 		{
 			if ( global::XMLscript.empty() )
 			{
-				global::XMLscript = fs::relative(fs::u8path(*args));
+				global::XMLscript = fs::relative(*args);
 			}
 		}
 
@@ -366,7 +366,7 @@ int Main(int argc, char* argv[])
 		{
 			if ( const char* image_name = projectElement->Attribute(xml::attrib::IMAGE_NAME); image_name != nullptr )
 			{
-				global::ImageName = fs::u8path(image_name);
+				global::ImageName = image_name;
 			}
 			else
 			{
@@ -380,7 +380,7 @@ int Main(int argc, char* argv[])
 		{
 			if ( const char* cue_sheet = projectElement->Attribute(xml::attrib::CUE_SHEET); cue_sheet != nullptr )
 			{
-				global::cuefile = fs::u8path(cue_sheet);
+				global::cuefile = cue_sheet;
 			}
 		}
 
@@ -624,7 +624,7 @@ int Main(int argc, char* argv[])
 					}
 
 					const unsigned int audioSize = iso::DirTreeClass::GetAudioSize(trackSource);
-					audioTracks.emplace_back(totalLenLBA, audioSize, trackSource.generic_u8string());
+					audioTracks.emplace_back(totalLenLBA, audioSize, trackSource.string());
 
 					const char *trackid = trackElement->Attribute(xml::attrib::TRACK_ID);
 					if(trackid != nullptr)
@@ -637,7 +637,7 @@ int Main(int argc, char* argv[])
 					else
 					{
 						auto& entry = unrefTracks.emplace_back();
-						entry.id = trackSource.stem().generic_u8string() + ";1";
+						entry.id = trackSource.stem().string() + ";1";
 						entry.length = audioSize;
 						entry.lba = totalLenLBA;
 						entry.srcfile = trackSource;
@@ -814,7 +814,7 @@ int Main(int argc, char* argv[])
 						fflush(stdout);
 					}
 
-					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), fs::u8path(track.source) ) )
+					if ( PackFileAsCDDA( sectorView->GetRawBuffer(), track.source ) )
 					{
 						if ( !global::QuietMode )
 						{
@@ -839,7 +839,7 @@ int Main(int argc, char* argv[])
 			const tinyxml2::XMLElement* licenseElement = dataTrack->FirstChildElement(xml::elem::LICENSE);
 			if ( licenseElement != nullptr )
 			{
-				FILE* fp = OpenFile( global::XMLscript.parent_path() / fs::u8path(licenseElement->Attribute(xml::attrib::LICENSE_FILE)), "rb" );
+				FILE* fp = OpenFile( global::XMLscript.parent_path() / licenseElement->Attribute(xml::attrib::LICENSE_FILE), "rb" );
 				if (fp != nullptr)
 				{
 					auto license = std::make_unique<cd::ISO_LICENSE>();
@@ -1103,7 +1103,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	{
 		if ( const char* license_file_attrib = licenseElement->Attribute(xml::attrib::LICENSE_FILE); license_file_attrib != nullptr )
 		{
-			const fs::path license_file{xmlPath / fs::u8path(license_file_attrib)};
+			const fs::path license_file = xmlPath / license_file_attrib;
 			if ( license_file.empty() )
 			{
 				if ( !global::QuietMode )
@@ -1258,7 +1258,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	fs::path srcFile;
 	if ( sourceElement != nullptr )
 	{
-		srcFile = fs::u8path(sourceElement);
+		srcFile = sourceElement;
 	}
 
 	std::string name;
@@ -1268,7 +1268,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 	}
 	else
 	{
-		name = srcFile.filename().generic_u8string();
+		name = srcFile.filename().string();
 	}
 
 	if ( srcFile.empty() )
@@ -1374,7 +1374,7 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 				printf( "ERROR: <%s %s=\"audio\" %s=\"%s\"> must have source\n", xml::elem::TRACK, xml::attrib::TRACK_TYPE, xml::attrib::TRACK_ID, trackid);
 				return false;
 			}
-			srcFile = fs::u8path(sourceElement);
+			srcFile = sourceElement;
 			found_da = true;
 		}
 		else
@@ -1455,7 +1455,7 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 	fs::path srcDir;
 	if (const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE); sourceElement != nullptr)
 	{
-		srcDir = xmlPath / fs::u8path(sourceElement);
+		srcDir = xmlPath / sourceElement;
 	}
 
 	bool alreadyExists = false;

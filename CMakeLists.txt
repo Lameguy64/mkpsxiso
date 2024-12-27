@@ -13,7 +13,7 @@ project(
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_C_STANDARD           11)
-set(CMAKE_CXX_STANDARD         17)
+set(CMAKE_CXX_STANDARD         20)
 
 # Useful paths
 set(mkpsxiso_dir "src/mkpsxiso")
@@ -77,7 +77,6 @@ add_library(iso_shared OBJECT
 	${shared_dir}/mmappedfile.cpp
 	${shared_dir}/platform.cpp
 )
-set_target_properties(iso_shared PROPERTIES CXX_STANDARD 20)
 target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
 target_link_libraries(iso_shared ghc_filesystem tinyxml2)

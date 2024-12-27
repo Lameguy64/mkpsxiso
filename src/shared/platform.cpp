@@ -71,7 +71,7 @@ std::optional<struct stat64> Stat(const fs::path& path)
 	WIN32_FILE_ATTRIBUTE_DATA fad;
 	if (GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &fad))
 	{
-		fileAttrib.st_size = ((int64_t)fad.nFileSizeHigh << 32) | fad.nFileSizeLow;
+		fileAttrib.st_size = ULARGE_INTEGER{fad.nFileSizeLow, fad.nFileSizeHigh}.QuadPart;
 		fileAttrib.st_mtime = FileTimeToTimet(fad.ftLastWriteTime);
 	}
 	else

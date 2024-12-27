@@ -183,7 +183,7 @@ std::optional<fs::path> ParsePathArgument(char**& argv, std::string_view command
 		{
 			argv++;
 		}
-		return fs::path(*argv);
+		return *argv;
 	}
 	return std::nullopt;
 }

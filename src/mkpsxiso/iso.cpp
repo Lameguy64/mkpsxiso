@@ -562,7 +562,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 			else if (entry.type == EntryType::EntryXA)
 			{
 				attributes |= entry.attribs != 0xFFu ? (entry.attribs << 8) : 0x3800;
-				xa->filenum = std::max<const unsigned char>(1, std::ifstream(entry.srcfile, std::ios::binary).get());
+				xa->filenum = std::max<const unsigned char>(1, fs::ifstream(entry.srcfile, std::ios::binary).get());
 			}
 			else if (entry.type == EntryType::EntryDir)
 			{

@@ -582,7 +582,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			auto& entry = unrefDAbuff.emplace_back();
 			entry.entry.entryOffs.lsb = track.startSector;
 			entry.entry.entrySize.lsb = track.sizeInSectors * 2048;
-			entry.identifier = GetRealDAFilePath("TRACK-" + track.number).generic_u8string() + ";1";
+			entry.identifier = GetRealDAFilePath("TRACK-" + track.number).string() + ";1";
 			entry.type = EntryType::EntryDA;
 
 			// Additional safety check in case the .cue file had a wrong pause size
@@ -816,7 +816,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 		{
 			newelement = dirElement->InsertNewChildElement("dir");
 			newelement->SetAttribute(xml::attrib::ENTRY_NAME, entry.identifier.c_str());
-			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_u8string().c_str());
+			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_string().c_str());
 		}
 		else
 		{
@@ -836,7 +836,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 		newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(entry.identifier).c_str());
 		if(entry.type != EntryType::EntryDA)
 		{
-			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_u8string().c_str());
+			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_string().c_str());
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, entry.type == EntryType::EntryFile ? "data" : "mixed");	
 		}
 		else
@@ -917,7 +917,7 @@ void WriteXMLByLBA(std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElem
 
 			// "Enter" the directory
 			dirElement = dirElement->InsertNewChildElement("dir");
-			dirElement->SetAttribute(xml::attrib::ENTRY_NAME, part.generic_u8string().c_str());
+			dirElement->SetAttribute(xml::attrib::ENTRY_NAME, part.generic_string().c_str());
 
 			currentVirtualPath /= part;
 		}
@@ -1084,12 +1084,12 @@ void ParseISO(cd::IsoReader& reader) {
 				}
 			}
 
-			const fs::path xmlPath = fs::absolute(param::xmlFile).parent_path();
-			const fs::path sourcePath = fs::absolute(param::outPath).lexically_proximate(xmlPath);
+			const fs::path xmlPath = param::xmlFile.parent_path();
+			const fs::path sourcePath = xmlPath.is_absolute() ? fs::absolute(param::outPath) : param::outPath.lexically_proximate(xmlPath);
 
 			// Add license element to the xml
 			tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
-			newElement->SetAttribute(xml::attrib::LICENSE_FILE,	(sourcePath / "license_data.dat").generic_u8string().c_str());
+			newElement->SetAttribute(xml::attrib::LICENSE_FILE,	(sourcePath / "license_data.dat").generic_string().c_str());
 
 			// Create <default_attributes> now so it lands before the directory tree
 			tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
@@ -1159,7 +1159,7 @@ void ParseISO(cd::IsoReader& reader) {
 				if (!dafile->trackid.empty()) {
 					newtrack->SetAttribute(xml::attrib::TRACK_ID, dafile->trackid.c_str());
 				}
-				newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, dafile->virtualPath.generic_u8string().c_str());
+				newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, dafile->virtualPath.generic_string().c_str());
 				// only write the pregap element if it's non default
 				if(pregap_sectors != 150)
 				{
@@ -1293,7 +1293,7 @@ int Main(int argc, char *argv[])
 
 		if (param::isoFile.empty())
 		{
-			param::isoFile = fs::u8path(*args);
+			param::isoFile = *args;
 		}
 		else
 		{
@@ -1318,7 +1318,7 @@ int Main(int argc, char *argv[])
 		param::xmlFile = param::isoFile.stem() += ".xml";
 	}
 
-	if (CompareICase(param::isoFile.extension().generic_u8string(), ".cue"))
+	if (CompareICase(param::isoFile.extension().string(), ".cue"))
 	{
 		global::cueFile = parseCueFile(param::isoFile);
 	}
