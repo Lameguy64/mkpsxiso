@@ -45,6 +45,8 @@ namespace param {
     fs::path xmlFile;
 	bool force = false;
 	bool noxml = false;
+	bool noWarns = false;
+	bool QuietMode = false;
 	bool pathTable = false;
     bool outputSortedByDir = false;
 	EncoderAudioFormats encodingFormat = EAF_WAV;
@@ -62,18 +64,15 @@ fs::path GetRealDAFilePath(const fs::path& inputPath)
 	{
 		outputPath.replace_extension(".WAV");
 	}
+#ifndef MKPSXISO_NO_LIBFLAC
 	else if(param::encodingFormat == EAF_FLAC)
 	{
 		outputPath.replace_extension(".FLAC");
 	}
-	else if(param::encodingFormat == EAF_PCM)
-	{
-		outputPath.replace_extension(".PCM");
-	}
+#endif
 	else
 	{
-		printf("ERROR: support for encoding format is not implemented, not changing name.\n");
-		return inputPath;
+		outputPath.replace_extension(".PCM");
 	}
 	return outputPath;
 }
@@ -179,15 +178,17 @@ std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
 }
 
 void SaveLicense(const cd::ISO_LICENSE& license) {
-	printf("\n  Creating license data...");
+	if (!param::QuietMode) {
+		printf("\n  Creating license data...");
+	}
 
 	FILE* outFile = OpenFile(param::outPath / "license_data.dat", "wb");
 
     if (outFile == NULL) {
 		printf("\nERROR: Cannot create license file.\n");
-        return;
+        exit(EXIT_FAILURE);
     }
-	else {
+	else if (!param::QuietMode) {
 		printf(" Ok.\n");
 	}
 
@@ -234,7 +235,7 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
 	if((encoder = FLAC__stream_encoder_new()) == NULL)
 	{
 		fprintf(stderr, "\nERROR: allocating encoder.\n");
-		return;
+		exit(EXIT_FAILURE);
 	}
 	unsigned sample_rate = 44100;
 	unsigned channels = 2;
@@ -257,6 +258,7 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
 	if(init_status != FLAC__STREAM_ENCODER_INIT_STATUS_OK)
 	{
 		fprintf(stderr, "\nERROR: initializing encoder: %s.\n", FLAC__StreamEncoderInitStatusString[init_status]);
+		ok = false;
 		goto writeFLACFile_cleanup;
 	}
 
@@ -288,12 +290,15 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
 	ok &= FLAC__stream_encoder_finish(encoder); // closes outFile
 	if(!ok)
 	{
-		fprintf(stderr, "\nencoding: %s\n", ok? "succeeded" : "FAILED");
+		fprintf(stderr, "\nencoding: FAILED\n");
 		fprintf(stderr, "   state: %s\n", FLAC__StreamEncoderStateString[FLAC__stream_encoder_get_state(encoder)]);
 	}
 
 writeFLACFile_cleanup:
 	FLAC__stream_encoder_delete(encoder);
+	if(!ok) {
+		exit(EXIT_FAILURE);
+	}
 }
 #endif
 
@@ -646,7 +651,9 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			if (entry.type == EntryType::EntryXA)
 			{
 				// Extract XA or STR file.
-				printf("    Extracting XA \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
+				if (!param::QuietMode) {
+					printf("    Extracting XA \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
+				}
 				fflush(stdout);
 				// For both XA and STR files, we need to extract the data 2336 bytes per sector.
 				// When rebuilding the bin using mkpsxiso, either we mark the file with str or with xa
@@ -664,7 +671,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				if (outFile == NULL) {
 					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", outputPath.filename().c_str());
-					return;
+					exit(EXIT_FAILURE);
 				}
 
 				// Copy loop
@@ -690,7 +697,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			else if (entry.type == EntryType::EntryDA)
 			{
 				// Extract CDDA file
-				if (firstDA) {
+				if (firstDA && !param::QuietMode) {
 					printf("\n  Creating CDDA files...\n");
 					firstDA = false;
 				}
@@ -698,24 +705,27 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
                 auto daOutPath = GetRealDAFilePath(outputPath);
 				auto outFile = OpenScopedFile(daOutPath, "wb");
 
-				if (isInvalid) {
+				if (isInvalid && !param::noWarns) {
 					printf( "\nWARNING: The CDDA file \"%" PRFILESYSTEM_PATH "\" is out of the iso file bounds.\n"
 							"\t This usually means that the game has audio tracks, and they are on separate files.\n", daOutPath.filename().c_str() );
 					if (global::cueFile.tracks.empty()) {
-						printf("\t Try using a .cue file, instead of an image file, to be able to access those files.\n");
+						printf("\t Try using a .cue file, instead of an ISO image, to be able to access those files.\n");
 					}
 					printf( "\t DUMPSXISO will write the file as a dummy (silent) cdda file.\n"
 							"\t This is generally fine, when the real CDDA file is also a dummy file.\n"
 							"\t If it is not dummy, you WILL lose this audio data in the rebuilt iso... " );
+					if (param::QuietMode) {
+						printf("\n");
+					}
 				}
-				else {
+				else if (!param::QuietMode) {
 					printf("    Extracting audio \"%" PRFILESYSTEM_PATH "\"... ", daOutPath.lexically_normal().c_str());
 				}
 				fflush(stdout);
 
 				if (!outFile) {
 					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", daOutPath.filename().c_str());
-					return;
+					exit(EXIT_FAILURE);
 				}
 
 				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
@@ -732,14 +742,9 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					writeFLACFile(outFile.release(), reader, cddaSize, isInvalid);
 				}
 #endif
-				else if(param::encodingFormat == EAF_PCM)
-				{
-					writePCMFile(outFile.get(), reader, cddaSize, isInvalid);
-				}
 				else
 				{
-					printf("\nERROR: support for encoding format is not implemented.\n");
-					return;
+					writePCMFile(outFile.get(), reader, cddaSize, isInvalid);
 				}
 
 				if (global::cueFile.multiBIN) {
@@ -749,8 +754,10 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			else if (entry.type == EntryType::EntryFile)
 			{
 				// Extract regular file
-				printf("    Extracting \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
-				fflush(stdout);
+				if (!param::QuietMode) {
+					printf("    Extracting \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
+					fflush(stdout);
+				}
 
 				reader.SeekToSector(entry.entry.entryOffs.lsb);
 
@@ -758,7 +765,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				if (outFile == NULL) {
 					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", outputPath.filename().c_str());
-					return;
+					exit(EXIT_FAILURE);
 				}
 
 				size_t bytesLeft = entry.entry.entrySize.lsb;
@@ -781,10 +788,14 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			}
 			else
 			{
-				printf("ERROR: File %s is of invalid type.\n", entry.identifier.c_str());
+				if (!param::noWarns) {
+					printf("WARNING: File %s is of invalid type.\n", entry.identifier.c_str());
+				}
 				continue;
 			}
-			printf("Done.\n");
+			if (!param::QuietMode) {
+				printf("Done.\n");
+			}
         }
     }
 
@@ -960,27 +971,29 @@ void ParseISO(cd::IsoReader& reader) {
     reader.ReadBytes(&descriptor, 2048);
 
 
-	printf( "Scanning tracks...\n\n"
-			"  Track #1 data:\n"
-			"    Identifiers:\n" );
-	PrintId("      System ID         : ", descriptor.systemID);
-	PrintId("      Volume ID         : ", descriptor.volumeID);
-	PrintId("      Volume Set ID     : ", descriptor.volumeSetIdentifier);
-	PrintId("      Publisher ID      : ", descriptor.publisherIdentifier);
-	PrintId("      Data Preparer ID  : ", descriptor.dataPreparerIdentifier);
-	PrintId("      Application ID    : ", descriptor.applicationIdentifier);
-	PrintId("      Copyright ID      : ", descriptor.copyrightFileIdentifier);
+	if (!param::QuietMode) {
+		printf( "Scanning tracks...\n\n"
+				"  Track #1 data:\n"
+				"    Identifiers:\n" );
+		PrintId("      System ID         : ", descriptor.systemID);
+		PrintId("      Volume ID         : ", descriptor.volumeID);
+		PrintId("      Volume Set ID     : ", descriptor.volumeSetIdentifier);
+		PrintId("      Publisher ID      : ", descriptor.publisherIdentifier);
+		PrintId("      Data Preparer ID  : ", descriptor.dataPreparerIdentifier);
+		PrintId("      Application ID    : ", descriptor.applicationIdentifier);
+		PrintId("      Copyright ID      : ", descriptor.copyrightFileIdentifier);
 
-	PrintDate("      Creation Date     : ", descriptor.volumeCreateDate);
-	PrintDate("      Modification Date : ", descriptor.volumeModifyDate);
-	PrintDate("      Expiration Date   : ", descriptor.volumeExpiryDate);
+		PrintDate("      Creation Date     : ", descriptor.volumeCreateDate);
+		PrintDate("      Modification Date : ", descriptor.volumeModifyDate);
+		PrintDate("      Expiration Date   : ", descriptor.volumeExpiryDate);
+	}
 
     cd::IsoPathTable pathTable;
 
     size_t numEntries = pathTable.ReadPathTable(&reader, descriptor.pathTable1Offs);
 
     if (numEntries == 0) {
-		printf("\n    No files to find.\n");
+		printf("\nNo files to find.\n");
         return;
     }
 
@@ -997,10 +1010,12 @@ void ParseISO(cd::IsoReader& reader) {
 		}
 	}
 
-	if (!param::noxml) {
-		printf("\n    License file: \"%" PRFILESYSTEM_PATH "\"\n", (param::outPath.lexically_normal() / "license_data.dat").c_str());
+	if (!param::QuietMode) {
+		if (!param::noxml) {
+			printf("\n    License file: \"%" PRFILESYSTEM_PATH "\"\n", (param::outPath.lexically_normal() / "license_data.dat").c_str());
+		}
+		printf("\n    Parsing directory tree...\n");
 	}
-	printf("\n    Parsing directory tree...\n");
 
 	std::list<cd::IsoDirEntries::Entry> entries;
 	std::unique_ptr<cd::IsoDirEntries> rootDir = (param::pathTable
@@ -1013,15 +1028,19 @@ void ParseISO(cd::IsoReader& reader) {
 			return left.entry.entryOffs.lsb < right.entry.entryOffs.lsb;
 		});
 
-	printf("      Files Total: %zu\n", entries.size() - numEntries);
-	printf("      Directories: %zu\n", numEntries - 1);
+	if (!param::QuietMode) {
+		printf("      Files Total: %zu\n", entries.size() - numEntries);
+		printf("      Directories: %zu\n", numEntries - 1);
+	}
 
-	unsigned int totalLenLBA = descriptor.volumeSize.lsb;
+	unsigned totalLenLBA = descriptor.volumeSize.lsb;
 	for (auto it = entries.rbegin(); it != entries.rend(); it++) {
 		if (it->type != EntryType::EntryDA) {
-			unsigned int endFS = it->entry.entryOffs.lsb + GetSizeInSectors(it->entry.entrySize.lsb);
+			unsigned endFS = it->entry.entryOffs.lsb + GetSizeInSectors(it->entry.entrySize.lsb);
 			endFS += totalLenLBA - endFS < 150 ? totalLenLBA - endFS : 150;
-			printf("      Total file system size: %u bytes (%u sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
+			if (!param::QuietMode) {
+				printf("      Total file system size: %u bytes (%u sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
+			}
 			break;
 		}
 	}
@@ -1029,22 +1048,28 @@ void ParseISO(cd::IsoReader& reader) {
 	// Process DA tracks and add them to the entries list
 	auto DAfiles = processDAfiles(reader, entries);
 
-	for(size_t i = 0; i < DAfiles.size(); i++) {
-		printf("\n  Track #%zu audio:\n", i + 2);
-		printf("    DA File \"%s\"\n", CleanIdentifier(DAfiles[i]->identifier).c_str());
+	if (!param::QuietMode) {
+		for(size_t i = 0; i < DAfiles.size(); i++) {
+			printf("\n  Track #%zu audio:\n", i + 2);
+			printf("    DA File \"%s\"\n", CleanIdentifier(DAfiles[i]->identifier).c_str());
+		}
+		printf( "\nExtracting ISO...\n"
+				"  Creating files...\n" );
 	}
-	
-	printf( "\nExtracting ISO...\n"
-			"  Creating files...\n" );
+
 	ExtractFiles(reader, entries, param::outPath);
 
 	if (!param::noxml)
 	{
 		SaveLicense(*license);
-		printf("  Creating XML document...");
-		if (FILE* file = OpenFile(param::xmlFile, "w"); file != nullptr)
+		if (!param::QuietMode) {
+			printf("  Creating XML document...");
+		}
+		if (FILE* file = OpenFile(param::xmlFile, "wb"); file != nullptr)
 		{
-			printf(" Ok.\n");
+			if (!param::QuietMode) {
+				printf(" Ok.\n\n");
+			}
 			tinyxml2::XMLDocument xmldoc;
 
 			tinyxml2::XMLElement *baseElement = static_cast<tinyxml2::XMLElement*>(xmldoc.InsertFirstChild(xmldoc.NewElement(xml::elem::ISO_PROJECT)));
@@ -1110,14 +1135,14 @@ void ParseISO(cd::IsoReader& reader) {
 
 			// Write the DATA track postgap
 			// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, postgap should be always >= 150 sectors for CD-DA discs and optionally for non CD-DA.
-			unsigned int postGap = 150;
+			unsigned postGap = 150;
 			if (!global::cueFile.tracks.empty() && global::cueFile.tracks[0].endSector <= totalLenLBA) {
 				postGap = global::cueFile.tracks[0].endSector - currentLBA;
 			}
 			else if (totalLenLBA - currentLBA < postGap) {
 				postGap = totalLenLBA - currentLBA;
-				if (postGap) {
-					printf("WARNING: This %u sectors gap could mean that there are missing files or the image was previously modified.\n", postGap);
+				if (postGap && !param::noWarns) {
+					printf("WARNING: Size of DATA track postgap sector is %u instead of 150.\n", postGap);
 				}
 			}
 			else if (!DAfiles.empty() && DAfiles[0]->entry.entryOffs.lsb - postGap == currentLBA) {
@@ -1172,11 +1197,11 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 
 			// Check if there is still an EoF gap
-			if (currentLBA < totalLenLBA) {
+			if (currentLBA < totalLenLBA && !param::noWarns) {
 				printf( "WARNING: There is still a gap of %u sectors at the end.\n"
 						"\t This could mean that there are missing files or tracks.\n", totalLenLBA - currentLBA);
 				if (global::cueFile.tracks.empty()) {
-					printf("\t Try using a .cue file instead of an ISO image file.\n");
+					printf("\t Try using a .cue file instead of an ISO image.\n");
 				}
 				else {
 					printf("\t Try using the -pt command, it could help if the game has an obfuscated file system.\n");
@@ -1189,6 +1214,7 @@ void ParseISO(cd::IsoReader& reader) {
 		else
 		{
 			printf("\nERROR: Cannot create xml file \"%" PRFILESYSTEM_PATH "\"... %s\n", param::xmlFile.lexically_normal().c_str(), strerror(errno));
+			exit(EXIT_FAILURE);
 		}
 	}
 }
@@ -1200,6 +1226,8 @@ int Main(int argc, char *argv[])
 		"  <isofile>\t\tFile name of the bin/cue file (supports any 2352 byte/sector images)\n\n"
 		"Options:\n"
 		"  -h|--help\t\tShows this help text\n"
+		"  -q|--quiet\t\tQuiet mode (suppress all but warnings and errors)\n"
+		"  -w|--warns\t\tSuppress all warnings (can be used along with -q)\n"
 		"  -x <path>\t\tOptional destination directory for extracted files (defaults to working dir)\n"
 		"  -s <file>\t\tOptional XML name/destination for MKPSXISO script (defaults to working dir)\n"
 		"  -pt|--path-table\tGo through every known directory in order; helps to deobfuscate some games (like DMW3)\n"
@@ -1209,14 +1237,16 @@ int Main(int argc, char *argv[])
 		"  -S|--sort-by-dir\tOutputs a \"pretty\" XML script where entries are grouped in directories\n"
 		"\t\t\t(instead of strictly following their original order on the disc)\n";
 
-    printf( "DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
-			"Get the latest version at https://github.com/Lameguy64/mkpsxiso\n"
-			"Original work: Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
-			"Maintained by: Silent (CookiePLMonster) and spicyjpeg\n"
-			"Contributions: marco-calautti, G4Vi, Nagtan and all the ones from github\n\n" );
+	static constexpr const char* VERSION_TEXT =
+		"DUMPSXISO " VERSION " - PlayStation ISO dumping tool\n"
+		"Get the latest version at https://github.com/Lameguy64/mkpsxiso\n"
+		"Original work: Meido-Tek Productions (John \"Lameguy\" Wilbert Villamor/Lameguy64)\n"
+		"Maintained by: Silent (CookiePLMonster) and spicyjpeg\n"
+		"Contributions: marco-calautti, G4Vi, Nagtan and all the ones from github\n\n";
 
 	if (argc == 1)
 	{
+		printf(VERSION_TEXT);
 		printf(HELP_TEXT);
 		return EXIT_SUCCESS;
 	}
@@ -1228,6 +1258,7 @@ int Main(int argc, char *argv[])
 		{
 			if (ParseArgument(args, "h", "help"))
 			{
+				printf(VERSION_TEXT);
 				printf(HELP_TEXT);
 				return EXIT_SUCCESS;
 			}
@@ -1244,6 +1275,16 @@ int Main(int argc, char *argv[])
 			if (ParseArgument(args, "pt", "path-table"))
 			{
 				param::pathTable = true;
+				continue;
+			}
+			if (ParseArgument(args, "q", "quiet"))
+			{
+				param::QuietMode = true;
+				continue;
+			}
+			if (ParseArgument(args, "w", "warns"))
+			{
+				param::noWarns = true;
 				continue;
 			}
 			if (ParseArgument(args, "S", "sort-by-dir"))
@@ -1308,6 +1349,11 @@ int Main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	if (!param::QuietMode)
+	{
+		printf(VERSION_TEXT);
+	}
+
 	if (param::outPath.empty())
 	{
 		param::outPath = param::isoFile.stem();
@@ -1345,10 +1391,14 @@ int Main(int argc, char *argv[])
 		}
 	}
 
-	printf("Output directory : \"%" PRFILESYSTEM_PATH "\"\n\n", param::outPath.lexically_normal().c_str());
+	if (!param::QuietMode) {
+		printf("Output directory : \"%" PRFILESYSTEM_PATH "\"\n\n", param::outPath.lexically_normal().c_str());
+	}
 
 	tzset(); // Initializes the time-related environment variables
     ParseISO(reader);
-	printf("ISO image dumped successfully.\n");
+	if (!param::QuietMode) {
+		printf("ISO image dumped successfully.\n");
+	}
 	return EXIT_SUCCESS;
 }

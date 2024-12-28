@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Fetch repo contents
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
@@ -19,7 +19,7 @@ jobs:
       run:  cmake --workflow ci
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v4
       with:
         name: mkpsxiso-windows
         path: |
@@ -32,7 +32,7 @@ jobs:
 
     steps:
     - name: Fetch repo contents
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
@@ -40,7 +40,7 @@ jobs:
       run:  cmake --workflow ci
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v4
       with:
         name: mkpsxiso-linux
         path: |
@@ -53,7 +53,7 @@ jobs:
 
     steps:
     - name: Fetch repo contents
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
@@ -61,7 +61,7 @@ jobs:
       run:  cmake --workflow ci
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v4
       with:
         name: mkpsxiso-macos
         path: |
@@ -78,7 +78,7 @@ jobs:
     steps:
     - name: Fetch build artifacts
       if:   ${{ github.ref_type == 'tag' }}
-      uses: actions/download-artifact@main
+      uses: actions/download-artifact@v4
 
     - name: Publish release
       if:   ${{ github.ref_type == 'tag' }}

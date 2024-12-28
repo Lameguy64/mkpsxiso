@@ -51,7 +51,7 @@ public:
 
 // Shared by mkpsxiso and dumpsxiso
 namespace global {
-    extern std::optional<bool> new_type;
+	extern std::optional<bool> new_type;
 }
 
 // Helper functions for datestamp manipulation

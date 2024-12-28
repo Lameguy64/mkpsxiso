@@ -7,6 +7,7 @@ namespace global {
 
 	extern time_t	BuildTime;
 	extern bool		xa_edc;
+	extern bool		noWarns;
 	extern bool		QuietMode;
 	extern bool		noXA;
 	extern int		trackNum;

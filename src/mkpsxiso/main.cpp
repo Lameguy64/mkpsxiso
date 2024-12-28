@@ -11,6 +11,7 @@ namespace global
 	time_t	BuildTime;
 	bool	xa_edc		= true;
 	bool	ps2			= false;
+	bool	noWarns		= false;
 	bool	QuietMode	= false;
 	bool	Overwrite	= false;
 	bool	NoIsoGen 	= false;
@@ -66,6 +67,7 @@ int Main(int argc, char* argv[])
 		"Options:\n"
 		"  -h|--help\t\tShows this help text\n"
 		"  -q|--quiet\t\tQuiet mode (suppress all but warnings and errors)\n"
+		"  -w|--warns\t\tSuppress all warnings (can be used along with -q)\n"
 		"  -l|--label\t\tSpecify volume ID (overrides volume element)\n"
 		"  -o|--output <file>\tSpecify output file (overrides image_name attribute)\n"
 		"  -c|--cuefile <file>\tSpecify cue sheet file (overrides cue_sheet attribute)\n"
@@ -84,8 +86,14 @@ int Main(int argc, char* argv[])
 		"Maintained by: Silent (CookiePLMonster) and spicyjpeg\n"
 		"Contributions: marco-calautti, G4Vi, Nagtan and all the ones from github\n\n";
 
-	bool OutputOverride = false;
+	if ( argc == 1 )
+	{
+		printf(VERSION_TEXT);
+		printf(HELP_TEXT);
+		return EXIT_SUCCESS;
+	}
 
+	bool OutputOverride = false;
 	// Parse arguments
 	for (char** args = argv+1; *args != nullptr; args++)
 	{
@@ -106,6 +114,11 @@ int Main(int argc, char* argv[])
 			if (ParseArgument(args, "q", "quiet"))
 			{
 				global::QuietMode = true;
+				continue;
+			}
+			if (ParseArgument(args, "w", "warns"))
+			{
+				global::noWarns = true;
 				continue;
 			}
 			if (ParseArgument(args, "y"))
@@ -167,31 +180,28 @@ int Main(int argc, char* argv[])
 			printf("Unknown parameter: %s\n", *args);
 			return EXIT_FAILURE;
 		}
+
+		if ( global::XMLscript.empty() )
+		{
+			global::XMLscript = *args;
+		}
 		else
 		{
-			if ( global::XMLscript.empty() )
-			{
-				global::XMLscript = fs::relative(*args);
-			}
+			printf("Only one XML script is supported. (use an XML with multiple <iso_project> elements instead)\n");
+			return EXIT_FAILURE;
 		}
 
-	}
-
-	if ( (!global::QuietMode) || (argc == 1) )
-	{
-		printf(VERSION_TEXT);
-	}
-
-	if ( argc == 1 )
-	{
-		printf(HELP_TEXT);
-		return EXIT_SUCCESS;
 	}
 
 	if ( global::XMLscript.empty() )
 	{
 		printf( "No XML script specified.\n" );
 		return EXIT_FAILURE;
+	}
+
+	if ( !global::QuietMode )
+	{
+		printf(VERSION_TEXT);
 	}
 
 	if ( global::LBAfile == "-lba" )
@@ -214,6 +224,7 @@ int Main(int argc, char* argv[])
 		tinyxml2::XMLError error;
 		if (FILE* file = OpenFile(global::XMLscript, "rb"); file != nullptr)
 		{
+			global::XMLscript = fs::relative(global::XMLscript);
 			error = xmlFile.LoadFile(file);
 			fclose(file);
 		}
@@ -398,7 +409,7 @@ int Main(int argc, char* argv[])
 
 		global::noXA = projectElement->BoolAttribute( xml::attrib::NO_XA );
 
-		if ( ( !global::Overwrite ) && ( !global::NoIsoGen ) )
+		if ( !global::Overwrite && !global::NoIsoGen && !global::noWarns)
 		{
 			if ( GetSize( global::ImageName ) >= 0 )
 			{
@@ -414,15 +425,11 @@ int Main(int argc, char* argv[])
 						return EXIT_FAILURE;
 					}
 				} while( tolower( key ) != 'y' );
-
-				printf( "\n" );
-
 			}
-			else
-			{
-				printf( "\n" );
-			}
-
+		}
+		if ( !global::QuietMode )
+		{
+			printf( "\n" );
 		}
 
 		// Check if there is a track element specified
@@ -601,9 +608,9 @@ int Main(int argc, char* argv[])
 								return EXIT_FAILURE;
 							}
 
-							if(pregapSectors > (80 * 60 * 75))
+							if(pregapSectors > (80 * 60 * 75) && !global::noWarns)
 							{
-								printf( "WARNING: duration > 80 minutes\n");
+								printf( "WARNING: Duration > 80 minutes\n");
 							}
 						}
 					}
@@ -882,7 +889,7 @@ int Main(int argc, char* argv[])
 
 			if ( !global::QuietMode )
 			{
-				printf( "Ok.\n" );
+				printf( "Ok.\n\n" );
 			}
 
 			// Close both ISO writer and CUE sheet
@@ -1137,7 +1144,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 				return false;
 
             }
-			else if ( licenseSize != 28032 )
+			else if ( licenseSize != 28032 && !global::noWarns )
 			{
             	if ( !global::QuietMode )
 				{
@@ -1298,9 +1305,13 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 				"characters long.\n", name.c_str(), dirElement->GetLineNum() );
 			return false;
 		}
-		else if ( !global::QuietMode )
+		if ( !global::noWarns )
 		{
-			printf( "      Warning: File name '%s' on line %d is more than 12 "
+			if ( !global::QuietMode )
+			{
+				printf("      ");
+			}
+			printf( "WARNING: File name '%s' on line %d is more than 12 "
 				"characters long.\n", name.c_str(), dirElement->GetLineNum() );
 		}
 	}
@@ -1445,9 +1456,13 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 				"characters long.\n", nameElement, dirElement->GetLineNum() );
 			return false;
 		}
-		else if ( !global::QuietMode )
+		if ( !global::noWarns )
 		{
-			printf( "      Warning: Directory name '%s' on line %d is more than 12 "
+			if ( !global::QuietMode )
+			{
+				printf("      ");
+			}
+			printf( "WARNING: Directory name '%s' on line %d is more than 12 "
 				"characters long.\n", nameElement, dirElement->GetLineNum() );
 		}
 	}
@@ -1526,9 +1541,9 @@ bool PackFileAsCDDA(void* buffer, const fs::path& audioFile)
 		ma_decoder_uninit(&decoder);
 		return false;
 	}
-	else if (isPCM && !global::QuietMode)
+	else if (isPCM && !global::QuietMode && !global::noWarns)
 	{
-		printf("\n      WARN: Guessing it's signed 16 bit stereo @ 44100 kHz pcm audio... ");
+		printf("\n      WARNING: Guessing it's signed 16 bit stereo @ 44100 kHz pcm audio... ");
 	}
 
 	// note if there's some data converting going on
@@ -1541,9 +1556,9 @@ bool PackFileAsCDDA(void* buffer, const fs::path& audioFile)
 		ma_decoder_uninit(&decoder);
 		return false;
 	}
-	if((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100) || isLossy)
+	if(((internalFormat != ma_format_s16) || (internalChannels != 2) || (internalSampleRate != 44100) || isLossy) && !global::QuietMode && !global::noWarns)
 	{
-		printf("\n      WARN: This is not Redbook audio, converting... ");
+		printf("\n      WARNING: This is not Redbook audio, converting... ");
 	}
 
 	// get expected pcm frame count (if your file isn't redbook this can vary from the input file's amount)

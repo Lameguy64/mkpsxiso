@@ -289,7 +289,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 	{
 		fileAttrib.emplace().st_mtime = global::BuildTime;
 	
-		if ( id != nullptr )
+		if ( id != nullptr && !global::noWarns )
 		{
 			if ( !global::QuietMode )
 			{
@@ -505,7 +505,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
-			if(entry.lba == iso::DA_FILE_PLACEHOLDER_LBA)
+			if(entry.lba == iso::DA_FILE_PLACEHOLDER_LBA && !global::noWarns)
 			{
 				printf("\nWARNING: DA file still has placeholder value 0x%X... ", iso::DA_FILE_PLACEHOLDER_LBA);
 			}
