@@ -5,7 +5,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
-#include <chrono>
+#include <vector>
 #else
 #include <fcntl.h>
 #endif
@@ -39,7 +39,7 @@ static FILETIME TimetToFileTime(time_t t)
 {
 	FILETIME ft;
 	LARGE_INTEGER ll;
-	ll.QuadPart = t * 10000000ll + 116444736000000000ll;
+	ll.QuadPart = (t * 10000000LL) + 116444736000000000LL;
 	ft.dwLowDateTime = ll.LowPart;
 	ft.dwHighDateTime = ll.HighPart;
 	return ft;
@@ -50,7 +50,7 @@ static time_t FileTimeToTimet(const FILETIME& ft)
 	LARGE_INTEGER ll;
 	ll.LowPart = ft.dwLowDateTime;
 	ll.HighPart = ft.dwHighDateTime;
-	return (ll.QuadPart / 10000000LL) - 11644473600LL;
+	return (ll.QuadPart - 116444736000000000LL) / 10000000LL;
 }
 #endif
 
@@ -93,29 +93,19 @@ int64_t GetSize(const fs::path& path)
 
 // Returns local UTC `struct tm` from UTC+0 `time_t`
 struct tm CustomLocalTime(const time_t* timeSec)
-{
+{ // Windows localtime() can't handle timestamps prior to 1970
 #ifdef _WIN32
-	using namespace std::chrono;
 	tm timeBuf {};
+	SYSTEMTIME localST {};
+	FILETIME localFT = TimetToFileTime(*timeSec - SYSTEM_TIMEZONE);
+	FileTimeToSystemTime(&localFT, &localST);
 
-	// Convert time_t to sys_time (compatible with std::chrono)
-	auto tp = system_clock::from_time_t(*timeSec - SYSTEM_TIMEZONE);
-
-	// Break down the time into year/month/day/hour/minute/second
-	auto num_of_days = floor<days>(tp);
-	auto time_of_day = tp - num_of_days; // Time within the day
-	auto ymd = year_month_day{num_of_days};
-	auto h = duration_cast<hours>(time_of_day);
-	auto m = duration_cast<minutes>(time_of_day - h);
-	auto s = duration_cast<seconds>(time_of_day - h - m);
-
-	// Populate the struct tm fields
-	timeBuf.tm_year = (int)ymd.year() - 1900;
-	timeBuf.tm_mon = (unsigned int)ymd.month() - 1;
-	timeBuf.tm_mday = (unsigned int)ymd.day();
-	timeBuf.tm_hour = h.count();
-	timeBuf.tm_min = m.count();
-	timeBuf.tm_sec = s.count();
+	timeBuf.tm_year = localST.wYear - 1900;
+	timeBuf.tm_mon  = localST.wMonth - 1;
+	timeBuf.tm_mday = localST.wDay;
+	timeBuf.tm_hour = localST.wHour;
+	timeBuf.tm_min  = localST.wMinute;
+	timeBuf.tm_sec  = localST.wSecond;
 
 	return timeBuf;
 #else
@@ -125,19 +115,22 @@ struct tm CustomLocalTime(const time_t* timeSec)
 
 // Returns UTC+0 `time_t` from local UTC `struct tm`
 time_t CustomMkTime(struct tm* timeBuf)
-{
+{ // Windows mktime() can't handle timestamps prior to 1970
 #ifdef _WIN32
-	using namespace std::chrono;
+	FILETIME localFT;
+	SYSTEMTIME localST
+		{
+			(WORD)(timeBuf->tm_year + 1900),
+			(WORD)(timeBuf->tm_mon + 1), 0,
+			(WORD)timeBuf->tm_mday,
+			(WORD)timeBuf->tm_hour,
+			(WORD)timeBuf->tm_min,
+			(WORD)timeBuf->tm_sec
+		};
 
-	// Create sys_days for date and add time components
-	auto chronoTime = sys_days{year{timeBuf->tm_year + 1900} /
-								   (timeBuf->tm_mon + 1) /
-									timeBuf->tm_mday} +
-							  hours{timeBuf->tm_hour} +
-							minutes{timeBuf->tm_min} +
-							seconds{timeBuf->tm_sec};
+	SystemTimeToFileTime(&localST, &localFT);
 
-	return system_clock::to_time_t(chronoTime) + SYSTEM_TIMEZONE;
+	return FileTimeToTimet(localFT) + SYSTEM_TIMEZONE;
 #else
 	return mktime(timeBuf);
 #endif
