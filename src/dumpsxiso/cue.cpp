@@ -14,8 +14,9 @@ CueFile parseCueFile(fs::path& inputFile) {
 	std::string line, fileType;
 	fs::ifstream file(inputFile);
 	fs::path filePath = inputFile;
-	unsigned int pauseStartSector = 1;
-	unsigned int previousStartSector = 0;
+	int lineNumber = 1;
+	int pauseStartSector = 1;
+	int previousStartSector = 0;
 
 	while (std::getline(file, line)) {
 		if (line.find("FILE") != std::string::npos) {
@@ -75,7 +76,12 @@ CueFile parseCueFile(fs::path& inputFile) {
 		}
 		else if (line.find("INDEX 00") != std::string::npos) {
 			size_t timeStart = line.find("INDEX 00") + 9;
-			pauseStartSector = TimecodeToSectors(line.substr(timeStart, 8));
+			std::string startTime = line.substr(timeStart, line.find("\r") - timeStart);
+			pauseStartSector = TimecodeToSectors(startTime);
+			if (pauseStartSector < 0) {
+				printf("Error: Invalid cue file timecode \"%s\" on line %d\n", startTime.c_str(), lineNumber);
+				exit(EXIT_FAILURE);
+			}
 
 			if (pauseStartSector) {
 				cueFile.tracks[cueFile.tracks.size() - 2].sizeInSectors = pauseStartSector - previousStartSector;
@@ -84,8 +90,12 @@ CueFile parseCueFile(fs::path& inputFile) {
 		}
 		else if (line.find("INDEX 01") != std::string::npos) {
 			size_t timeStart = line.find("INDEX 01") + 9;
-			std::string startTime = line.substr(timeStart, 8);
-			unsigned int startSector = TimecodeToSectors(startTime);
+			std::string startTime = line.substr(timeStart, line.find("\r") - timeStart);
+			int startSector = TimecodeToSectors(startTime);
+			if (startSector < 0) {
+				printf("Error: Invalid cue file timecode \"%s\" on line %d\n", startTime.c_str(), lineNumber);
+				exit(EXIT_FAILURE);
+			}
 
 			if (!pauseStartSector) {
 				startSector = cueFile.tracks[cueFile.tracks.size() - 2].endSector + startSector;
@@ -96,6 +106,12 @@ CueFile parseCueFile(fs::path& inputFile) {
 			cueFile.tracks.back().startSector = startSector;
 			previousStartSector = startSector;
 		}
+		else {
+			printf("Error: Unsupported cue file syntax on line %d\n", lineNumber);
+			exit(EXIT_FAILURE);
+		}
+
+		lineNumber++;
 	}
 
 	if (!cueFile.tracks.empty()) {

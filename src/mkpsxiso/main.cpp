@@ -601,10 +601,11 @@ int Main(int argc, char* argv[])
 						const char *duration = pregapElement->Attribute(xml::attrib::PREGAP_DURATION);
 						if(duration != nullptr)
 						{
-							if((pregapSectors = TimecodeToSectors(duration)) == EXIT_FAILURE)
+							pregapSectors = TimecodeToSectors(duration);
+							if(pregapSectors < 0)
 							{
-								printf( "ERROR: %s duration is invalid MM:SS:FF"
-									"for track on line %d.\n", xml::attrib::TRACK_SOURCE, pregapElement->GetLineNum() );
+								printf( "ERROR: %s duration has invalid MM:SS:FF "
+									"for track on line %d.\n", xml::elem::TRACK_PREGAP, pregapElement->GetLineNum() );
 								return EXIT_FAILURE;
 							}
 
@@ -1184,7 +1185,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	if ( !gotDateFromXML )
 	{
 		// Use local time
-		const tm imageTime = *gmtime( &global::BuildTime );
+		const tm imageTime = *localtime( &global::BuildTime );
 
 		volumeDate.year = imageTime.tm_year;
 		volumeDate.month = imageTime.tm_mon + 1;
@@ -1192,7 +1193,15 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		volumeDate.hour = imageTime.tm_hour;
 		volumeDate.minute = imageTime.tm_min;
 		volumeDate.second = imageTime.tm_sec;
-		volumeDate.GMToffs = static_cast<signed char>(-SYSTEM_TIMEZONE / 60.0 / 15.0); // Seconds to 15-minute units
+		volumeDate.GMToffs = static_cast<signed char>(-SYSTEM_TIMEZONE / 60 / 15); // Seconds to 15-minute units
+
+		// Convert volumeDate to const char*
+		static char dateBuffer[20] {};
+		snprintf(dateBuffer, sizeof(dateBuffer), "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu00%hhd",
+				volumeDate.year + 1900, volumeDate.month, volumeDate.day,
+				volumeDate.hour, volumeDate.minute, volumeDate.second, volumeDate.GMToffs);
+
+		isoIdentifiers.CreationDate = dateBuffer;
 	}
 
 	// Parse directory entries in the directory_tree element

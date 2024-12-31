@@ -16,7 +16,8 @@ jobs:
         submodules: recursive
 
     - name: Build and package mkpsxiso
-      run:  cmake --workflow ci
+      run: |
+        cmake --workflow ci
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -37,7 +38,8 @@ jobs:
         submodules: recursive
 
     - name: Build and package mkpsxiso
-      run:  cmake --workflow ci
+      run: |
+        cmake --workflow ci
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -58,7 +60,8 @@ jobs:
         submodules: recursive
 
     - name: Build and package mkpsxiso
-      run:  cmake --workflow ci
+      run: |
+        cmake --workflow ci
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

@@ -62,8 +62,8 @@ std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src);
 
 // Helper functions for sector conversion
 uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize = 2048);
+int32_t TimecodeToSectors(const std::string timecode);
 std::string SectorsToTimecode(const unsigned sectors);
-const unsigned int TimecodeToSectors(const std::string timecode);
 
 // Endianness swap
 unsigned short SwapBytes16(unsigned short val);

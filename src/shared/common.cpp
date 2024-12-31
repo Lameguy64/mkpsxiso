@@ -13,13 +13,13 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 
 	ISO_DATESTAMP result {};
 
-	short int year;
-	const int argsRead = sscanf( str, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%*02u%hhd",
+	unsigned short year;
+	const int argsRead = sscanf( str, "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu%*02hhu%hhd",
 		&year, &result.month, &result.day,
 		&result.hour, &result.minute, &result.second, &result.GMToffs );
 	if (argsRead >= 6)
 	{
-		result.year = year != 0 ? year - 1900 : 0;
+		result.year = year >= 1900 ? year - 1900 : 0;
 		if (argsRead < 7)
 		{
 			// Consider GMToffs optional
@@ -109,20 +109,20 @@ uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize)
 	return size > 0 ? static_cast<uint32_t>((size + (sectorSize - 1)) / sectorSize) : 1;
 }
 
+int32_t TimecodeToSectors(const std::string timecode)
+{
+	unsigned int minutes, seconds, frames;
+	if (sscanf(timecode.c_str(), "%u:%u:%u", &minutes, &seconds, &frames) != 3 || (minutes > INT_MAX) || (seconds > 59) || (frames > 74)) {
+		return -1;
+	}
+	return (minutes * 60 + seconds) * 75 + frames;
+}
+
 std::string SectorsToTimecode(const unsigned sectors)
 {
 	char timecode[16];
 	snprintf( timecode, sizeof(timecode), "%02u:%02u:%02u", (sectors/75)/60, (sectors/75)%60, sectors%75);
 	return std::string(timecode);
-}
-
-const unsigned int TimecodeToSectors(const std::string timecode)
-{
-	unsigned int minutes, seconds, frames;
-	if (sscanf(timecode.c_str(), "%u:%u:%u", &minutes, &seconds, &frames) != 3 || (seconds > 59) || (frames > 74)) {
-		return EXIT_FAILURE;
-	}
-	return (minutes * 60 + seconds) * 75 + frames;
 }
 
 unsigned short SwapBytes16(unsigned short val)
