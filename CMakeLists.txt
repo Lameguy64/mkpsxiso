@@ -115,7 +115,7 @@ endif()
 ## Installation
 
 include(GNUInstallDirs)
-if (WIN32)
+if (WIN32 AND CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
 	set(CMAKE_INSTALL_BINDIR $<IF:$<CONFIG:Release>,.,${CMAKE_INSTALL_BINDIR}>)
 	set(CMAKE_INSTALL_DATADIR $<IF:$<CONFIG:Release>,doc,${CMAKE_INSTALL_DOCDIR}>)
 else()
