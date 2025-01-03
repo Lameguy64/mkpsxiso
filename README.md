@@ -38,18 +38,12 @@
 2. Git clone the repository and then cd into the mkpsxiso directory:
 
    ```bash
-   git clone https://github.com/Lameguy64/mkpsxiso.git
+   git clone --recurse-submodules https://github.com/Lameguy64/mkpsxiso.git
    cd mkpsxiso
    ```
+   Note: submodules folders will be empty if you downloaded the repository .zip instead of cloning it.
 
-3. Run the following command from the mkpsxiso directory to download and updated the submodules:
-
-   ```bash
-   git submodule update --init --recursive
-   ```
-   Note: This step will not work if you downloaded the repository .zip instead of cloning it.
-
-4. Run the following commands to configure and build the project:
+3. Run the following commands to configure and build the project:
 
    ```bash
    cmake --preset release
@@ -61,9 +55,9 @@
    ```bash
    cmake --install ./build
    ```
-   Add `sudo` to the install command if necessary.
+   Note: you need administrative privileges to install to the default folders.
 
-   The default installation path is `C:\Program Files (x86)\mkpsxiso` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
+   Default installation path is `C:\Program Files (x86)\mkpsxiso` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 
 ## Issues
 
