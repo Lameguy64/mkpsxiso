@@ -13,8 +13,8 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 
 	ISO_DATESTAMP result {};
 
-	unsigned short year;
-	const int argsRead = sscanf( str, "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu%*2u%hhd",
+	unsigned int year;
+	const int argsRead = sscanf( str, "%4u%2hhu%2hhu%2hhu%2hhu%2hhu%*2u%hhd",
 		&year, &result.month, &result.day,
 		&result.hour, &result.minute, &result.second, &result.GMToffs );
 	if (argsRead >= 6)
@@ -40,10 +40,9 @@ ISO_LONG_DATESTAMP GetLongDateFromString(const char* str)
 	ISO_LONG_DATESTAMP result {};
 
 	if (str) {
-		unsigned short year;
-		unsigned char month, day, hour, minute, second, hsecond;
+		unsigned int year, month, day, hour, minute, second, hsecond {};
 
-		const unsigned char argsRead = sscanf( str, "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu%02hhu%hhd",
+		const int argsRead = sscanf( str, "%4u%2u%2u%2u%2u%2u%2u%hhd",
 			&year, &month, &day, &hour, &minute, &second, &hsecond, &result.GMToffs );
 
 		if (argsRead >= 6) {
@@ -52,10 +51,10 @@ ISO_LONG_DATESTAMP GetLongDateFromString(const char* str)
 				result.GMToffs = 36;
 			}
 
-			auto intToChars = [](unsigned short value, char* buf, unsigned char size) {
-				for (signed char i = size - 1; i >= 0; --i) {
-					buf[i] = '0' + (value % 10);
-					value /= 10;
+			auto intToChars = [](unsigned int src, char* dest, unsigned int size) {
+				for (int i = size - 1; i >= 0; --i) {
+					dest[i] = '0' + (src % 10);
+					src /= 10;
 				}
 			};
 
@@ -78,13 +77,7 @@ ISO_LONG_DATESTAMP GetUnspecifiedLongDate()
 {
 	ISO_LONG_DATESTAMP result;
 
-	strncpy(result.year, "0000", std::size(result.year));
-	strncpy(result.month, "00", std::size(result.month));
-	strncpy(result.day, "00", std::size(result.day));
-	strncpy(result.hour, "00", std::size(result.hour));
-	strncpy(result.minute, "00", std::size(result.minute));
-	strncpy(result.second, "00", std::size(result.second));
-	strncpy(result.hsecond, "00", std::size(result.hsecond));
+	memset(&result, '0', sizeof(result));
 	result.GMToffs = 0;
 
 	return result;
@@ -97,7 +90,7 @@ std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src)
 
 	std::string result(srcStr, srcStr+16);
 
-	char GMTbuf[8];
+	char GMTbuf[4];
 	snprintf(GMTbuf, sizeof(GMTbuf), "%+hhd", src.GMToffs);
 	result.append(GMTbuf);
 

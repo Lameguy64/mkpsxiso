@@ -1028,20 +1028,17 @@ void ParseISO(cd::IsoReader& reader) {
 			return left.entry.entryOffs.lsb < right.entry.entryOffs.lsb;
 		});
 
+	unsigned totalLenLBA = descriptor.volumeSize.lsb;
 	if (!param::QuietMode) {
 		printf("      Files Total: %zu\n", entries.size() - numEntries);
 		printf("      Directories: %zu\n", numEntries - 1);
-	}
-
-	unsigned totalLenLBA = descriptor.volumeSize.lsb;
-	for (auto it = entries.rbegin(); it != entries.rend(); it++) {
-		if (it->type != EntryType::EntryDA) {
-			unsigned endFS = it->entry.entryOffs.lsb + GetSizeInSectors(it->entry.entrySize.lsb);
-			endFS += totalLenLBA - endFS < 150 ? totalLenLBA - endFS : 150;
-			if (!param::QuietMode) {
+		for (auto it = entries.rbegin(); it != entries.rend(); it++) {
+			if (it->type != EntryType::EntryDA) {
+				unsigned endFS = it->entry.entryOffs.lsb + GetSizeInSectors(it->entry.entrySize.lsb);
+				endFS += totalLenLBA - endFS < 150 ? totalLenLBA - endFS : 150;
 				printf("      Total file system size: %u bytes (%u sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
+				break;
 			}
-			break;
 		}
 	}
 
@@ -1142,7 +1139,7 @@ void ParseISO(cd::IsoReader& reader) {
 			else if (totalLenLBA - currentLBA < postGap) {
 				postGap = totalLenLBA - currentLBA;
 				if (postGap && !param::noWarns) {
-					printf("WARNING: Size of DATA track postgap sector is %u instead of 150.\n", postGap);
+					printf("WARNING: Size of DATA track postgap is of %u sectors instead of 150.\n", postGap);
 				}
 			}
 			else if (!DAfiles.empty() && DAfiles[0]->entry.entryOffs.lsb - postGap == currentLBA) {

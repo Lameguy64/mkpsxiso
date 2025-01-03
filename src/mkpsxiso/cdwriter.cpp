@@ -108,7 +108,7 @@ void IsoWriter::SectorView::CalculateForm2()
 			EDC_ECC_GEN.ComputeEdcBlock(sector->data, sizeof(sector->data) - 4, &sector->data[2332]);
 		}
 		else {
-			std::memset(&sector->data[2332], 0, 4);
+			memset(&sector->data[2332], 0, 4);
 		}
 	}, sector));
 }

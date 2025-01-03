@@ -811,6 +811,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 	// Print first the files in the directory
 	for (const auto& e : entriesInDir) {
 		const DIRENTRY& entry = e.get();
+		// Skip directories and postgap dummy
 		if (entry.type == EntryType::EntryDir || (entry.type == EntryType::EntryDummy && level == 0 && entry.lba > maxlba)) {
 			continue;
 		}

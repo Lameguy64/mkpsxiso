@@ -1195,9 +1195,9 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		volumeDate.second = imageTime.tm_sec;
 		volumeDate.GMToffs = static_cast<signed char>(-SYSTEM_TIMEZONE / 60 / 15); // Seconds to 15-minute units
 
-		// Convert volumeDate to const char*
-		static char dateBuffer[20] {};
-		snprintf(dateBuffer, sizeof(dateBuffer), "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu00%hhd",
+		// Convert ISO_DATESTAMP to ISO_LONG_DATESTAMP char*
+		static char dateBuffer[20];
+		snprintf(dateBuffer, sizeof(dateBuffer), "%04u%02hhu%02hhu%02hhu%02hhu%02hhu00%+hhd",
 				volumeDate.year + 1900, volumeDate.month, volumeDate.day,
 				volumeDate.hour, volumeDate.minute, volumeDate.second, volumeDate.GMToffs);
 
