@@ -6,23 +6,6 @@
 #include <cstring>
 #include <fstream>
 
-static bool icompare_func(unsigned char a, unsigned char b)
-{
-	return std::tolower( a ) == std::tolower( b );
-}
-
-static bool icompare(const std::string& a, const std::string& b)
-{
-	if ( a.length() == b.length() )
-	{
-		return std::equal( b.begin(), b.end(), a.begin(), icompare_func );
-	}
-	else
-	{
-		return false;
-	}
-}
-
 static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 {
 	tm timestamp;
@@ -195,7 +178,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 		if ( !entry.id.empty() )
 		{
             if ( ( entry.type == EntryType::EntryFile )
-				&& ( icompare( entry.id, temp_name ) ) )
+				&& ( CompareICase( entry.id, temp_name ) ) )
 			{
 				if (!global::QuietMode)
 				{
