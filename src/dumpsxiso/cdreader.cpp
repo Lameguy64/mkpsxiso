@@ -304,7 +304,7 @@ cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
 {
 }
 
-void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors, bool skipFolders)
+void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors)
 {
 	size_t numEntries = 0; // Used to skip the first two entries, . and ..
 	unsigned short order = 0;
@@ -320,7 +320,7 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 				break;
 			}
 
-			if (numEntries++ >= 2 && !(skipFolders && entry.value().entry.flags & 0x2))
+			if (numEntries++ >= 2)
 			{
 				if (*global::new_type) {
 					entry->order = order++;
@@ -336,20 +336,16 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 			return left.get().entry.entryOffs.lsb < right.get().entry.entryOffs.lsb;
 		});
 
-	// Delete correct orders so as to not populate the xml with unnecessary strings
+	// Delete orders if all are correct to avoid populate the xml with unnecessary strings
 	if (*global::new_type) {
 		auto& entriesInDir = dirEntryList.GetView();
-		bool diffOrder = false;
-		for (unsigned short index = 0; index < entriesInDir.size(); index++) {
+		for (int index = 0; index < entriesInDir.size(); index++) {
 			if (*entriesInDir[index].get().order != index) {
-				diffOrder = true;
-				break;
+				return;
 			}
 		}
-		if (!diffOrder) {
-			for (auto& entry : entriesInDir) {
-				entry.get().order.reset();
-			}
+		for (auto& entry : entriesInDir) {
+			entry.get().order.reset();
 		}
 	}
 }

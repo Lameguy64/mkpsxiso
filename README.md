@@ -55,7 +55,7 @@
    ```bash
    cmake --install ./build
    ```
-   Note: you need administrative privileges to install to the default folders.
+   Note: you need administrative privileges to install to the default paths.
 
    Default installation path is `C:\Program Files (x86)\mkpsxiso` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 

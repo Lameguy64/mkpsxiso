@@ -102,7 +102,7 @@
 								'da': is for CD-DA audio files. More details below.
 							  If no value for type is specified, the default is 'data'.
 					order	- Optional, custom directory record order for games with the 'new_type' string on 'true'. Values between 0-65535 only.
-							  This setting is per directory, so you can have multiple order="0", order="11", etc but in different directories.
+							  This setting doesn't modify the LBA and is per directory, so you can repeat order values but in different directories.
 							  If order is not specified, defaults to '10'. So, files/folders with order < 10 will be before the unspecified ones
 							  and after them the ones with order > 10. To set more than 9 files before the unspecified ones, you will need to set
 							  ALL files/folders in the current directory, otherwise unexpected results will happen.
