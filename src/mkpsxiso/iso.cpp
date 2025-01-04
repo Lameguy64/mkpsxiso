@@ -6,6 +6,16 @@
 #include <cstring>
 #include <fstream>
 
+static const int MinimumOne(const int val)
+{
+	return val ? val : 1;
+}
+
+static const int RoundToEven(const int val)
+{
+	return (val + 1) & -2;
+}
+
 static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 {
 	tm timestamp;
@@ -29,11 +39,6 @@ static cd::ISO_DATESTAMP GetISODateStamp(time_t time, signed char GMToffs)
 	result.GMToffs	= GMToffs;
 
 	return result;
-}
-
-static const unsigned char RoundToEven(const unsigned char val)
-{
-	return (val + 1) & -2;
 }
 
 int iso::DirTreeClass::GetAudioSize(const fs::path& audioFile)
@@ -448,7 +453,7 @@ void iso::DirTreeClass::SortDirectoryEntries(const bool byOrder, const bool byLB
 		});
 }
 
-bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, const unsigned short totalDirs) const
+bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, const int totalDirs) const
 {
 	//char	dataBuff[2048] {};
 	//char*	dataBuffPtr=dataBuff;
@@ -545,7 +550,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 			else if (entry.type == EntryType::EntryXA)
 			{
 				attributes |= entry.attribs != 0xFFu ? (entry.attribs << 8) : 0x3800;
-				xa->filenum = std::max<const unsigned char>(1, fs::ifstream(entry.srcfile, std::ios::binary).get());
+				xa->filenum = MinimumOne(fs::ifstream(entry.srcfile, std::ios::binary).get());
 			}
 			else if (entry.type == EntryType::EntryDir)
 			{
@@ -583,7 +588,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 	return true;
 }
 
-bool iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& root, unsigned short totalDirs)
+bool iso::DirTreeClass::WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& root, int totalDirs)
 {
 	if(!WriteDirEntries( writer, root, root, totalDirs ))
 	{
@@ -852,7 +857,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 int iso::DirTreeClass::CalculatePathTableLen(const DIRENTRY& dirEntry) const
 {
 	// Put identifier (empty if first entry)
-	int len = 8 + RoundToEven(std::max<const unsigned char>(1, dirEntry.id.length()));
+	int len = sizeof(cd::ISO_PATHTABLE_ENTRY) + RoundToEven(MinimumOne(dirEntry.id.length()));
 
 	for ( const auto& e : entriesInDir )
 	{
@@ -1071,7 +1076,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 
 	// Write the descriptor
 	unsigned int currentHeaderLBA = 16;
-	const unsigned char ISOver = global::new_type.value_or(false) ? 1 : 0;
+	const int ISOver = global::new_type.value_or(false) ? 1 : 0;
 
 	auto isoDescriptorSectors = writer->GetSectorViewM2F1(currentHeaderLBA, 2 + ISOver, cd::IsoWriter::EdcEccForm::Form1);
 	isoDescriptorSectors->SetSubheader(global::new_type.value_or(false) ? cd::IsoWriter::SubData : cd::IsoWriter::SubEOL);
@@ -1114,7 +1119,7 @@ unsigned char* iso::PathTableClass::GenTableData(unsigned char* buff, bool msb)
 {
 	for ( const PathEntryClass& entry : entries )
 	{
-		const unsigned char idLength = std::max<const unsigned char>(1, entry.dir_id.length());
+		const int idLength = MinimumOne(entry.dir_id.length());
 		*buff++ = idLength;	// Directory identifier length
 		*buff++ = 0;		// Extended attribute record length (unused)
 
