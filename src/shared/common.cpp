@@ -51,10 +51,10 @@ ISO_LONG_DATESTAMP GetLongDateFromString(const char* str)
 				result.GMToffs = 36;
 			}
 
-			auto intToChars = [](unsigned int src, char* dest, unsigned int size) {
+			auto intToChars = [](unsigned int value, char* dest, unsigned int size) {
 				for (int i = size - 1; i >= 0; --i) {
-					dest[i] = '0' + (src % 10);
-					src /= 10;
+					dest[i] = '0' + (value % 10);
+					value /= 10;
 				}
 			};
 

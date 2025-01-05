@@ -49,19 +49,20 @@
    cmake --preset release
    cmake --build --preset release
    ```
+
    If you wish to build dumpsxiso without libFLAC support (libFLAC is required for encoding CDDA/DA audio as FLAC), add `-DMKPSXISO_NO_LIBFLAC=1` to the end of the first command.
 
    Optionally you can install the build files with the following command:
    ```bash
    cmake --install ./build
    ```
-   Note: you need administrative privileges to install to the default paths.
+   Note: installation to default paths needs administrative privileges.
 
    Default installation path is `C:\Program Files (x86)\mkpsxiso` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 
 ## Issues
 
-On `ext4` and `xfs` filesystems, the minimum timestamp you can set is 1901/12/13, which makes games that has files/folders with dates older than that (like Crash Bash, Spyro3, Vagrant Story, etc) impossible to make a 1:1 copy. A workaround to this is to work on a fs that has better date support, like `f2fs` `ntfs` `btrfs`.
+On `ext4` and `xfs` filesystems, the minimum timestamp you can set is 1901/12/13, which makes games that has files/folders with dates older than that (like Crash Bash, Spyro3, Vagrant Story, etc) impossible to be rebuilt 1:1. A workaround to this is to work on a fs that has better date support, like `f2fs` `ntfs` `btrfs`.
 
 The other known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
 

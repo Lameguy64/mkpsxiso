@@ -124,7 +124,7 @@
 					name	- Specifies the name of the subdirectory.
 					srcdir	- Specifies the directory path to the source files if no source attribute is
 							  specified to the <file> elements (optional, can be a relative or absolute path).
-					order	- Same as above, optionally specifies a custom order.
+					order	- Optional, custom directory record order (see above for description).
 						  
 			-->
 			<dir name="mydir">
@@ -171,9 +171,8 @@
 					type	- The dummy's submode value. Values between 0-255 only.
 								 '0': for a Form 1 dummy (0x00).
 								'32': for a Form 2 dummy (0x20).
-					ecc_addr- Boolean switch that gives the ability to calculate the ECC with the real address instead of a zeroed one.
+					ecc_addr- Optional, calculates the ECC with the real address instead of a zeroed one. Values 'true' or 'false' only.
 							  This is only usefull for some CD-DA games last DATA postgap sector that has a non-standart ECC calculation.
-							  Normally this should be set to 'false' or not set at all. If ecc_addr is not specified, defaults to 'false'.
 			-->
 			<dummy sectors="1024" type="0"/>
 			

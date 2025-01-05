@@ -43,6 +43,7 @@
 	"workflowPresets": [
 		{
 			"name":        "ci",
+			"displayName": "CI build",
 			"description": "This preset is used by GitHub Actions to build mkpsxiso.",
 			"steps": [
 				{
