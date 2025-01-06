@@ -706,7 +706,7 @@ int Main(int argc, char* argv[])
 
 				dirTree->OutputLBAlisting( fp, 0 );
 
-				dirTree->SortDirectoryEntries(global::new_type.has_value() && *global::new_type);
+				dirTree->SortDirectoryEntries(global::new_type.value_or(false));
 				if (!unrefTracks.empty())
 				{
 					iso::DirTreeClass dirTree(unrefTracks, nullptr, "UNREFERENCED TRACKS");
@@ -743,7 +743,7 @@ int Main(int argc, char* argv[])
 
 				dirTree->OutputHeaderListing( fp, 0 );
 
-				dirTree->SortDirectoryEntries(global::new_type.has_value() && *global::new_type);
+				dirTree->SortDirectoryEntries(global::new_type.value_or(false));
 				if (!unrefTracks.empty())
 				{
 					iso::DirTreeClass dirTree(unrefTracks, nullptr, "UNREFERENCED TRACKS");
@@ -1225,7 +1225,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	bool found_da = false;
 	const EntryAttributes defaultAttributes = ReadEntryAttributes(EntryAttributes{}, trackElement->FirstChildElement(xml::elem::DEFAULT_ATTRIBUTES));
 
-	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate, ReadEntryAttributes(defaultAttributes, directoryTree).HFLAG);
+	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate, ReadEntryAttributes(EntryAttributes{}, directoryTree));
 	iso::DirTreeClass* dirTree = root.subdir.get();
 
 	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, defaultAttributes, found_da) )
@@ -1239,7 +1239,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
 
 	// Sort directory entries, calculate tree LBAs and retrieve size of image
-	dirTree->SortDirectoryEntries(global::new_type.has_value() && *global::new_type);
+	dirTree->SortDirectoryEntries(global::new_type.value_or(false));
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);
 
 	if ( !global::QuietMode )

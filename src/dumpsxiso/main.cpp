@@ -364,7 +364,7 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_GID, defaultAttributes.GID);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_UID, defaultAttributes.UID);
 	if (defaultAttributes.HFLAG) { // Set only if not zero
-		defaultAttributesElement->SetAttribute(xml::attrib::HIDDEN_FLAG, 0x01);
+		defaultAttributesElement->SetAttribute(xml::attrib::HIDDEN_FLAG, defaultAttributes.HFLAG);
 	}
 
 	return defaultAttributes;
@@ -490,13 +490,12 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 	// Only add the missing directories to the list
     for (int i = 1; i < pathTableList.size(); i++) {
         auto& e = pathTableList[i];
-        if (e.entry.parentDirIndex - 1 == index) {
-			if (!std::any_of(dirEntries->dirEntryList.GetView().begin(), dirEntries->dirEntryList.GetView().end(), [&e](const auto& entry)
-					{
-						return entry.get().identifier == e.name;
-					})) {
-				dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
-			}
+        if (e.entry.parentDirIndex - 1 == index &&
+			!std::any_of(dirEntries->dirEntryList.GetView().begin(), dirEntries->dirEntryList.GetView().end(), [&e](const auto& entry)
+				{
+					return entry.get().identifier == e.name;
+				})) {
+            dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
         }
     } 
 
@@ -574,13 +573,11 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 				continue;
 			}
 			// Skip referenced DA tracks
-			if (tracknum > 2) {
-				if (std::any_of(DAfiles.begin(), DAfiles.end(), [&track](const auto& entry)
-						{
-							return entry->entry.entryOffs.lsb == track.startSector;
-						})) {
-					continue;
-				}
+			if (tracknum > 2 && std::any_of(DAfiles.begin(), DAfiles.end(), [&track](const auto& entry)
+									{
+										return entry->entry.entryOffs.lsb == track.startSector;
+									})) {
+				continue;
 			}
 
 			// Add the unreferenced DA track to the buffer
@@ -599,7 +596,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 					break;
 				}
 				reader.ReadBytesDA(sectorBuff, CD_SECTOR_SIZE, true);
-				if (std::memcmp(sectorBuff, emptyBuff, CD_SECTOR_SIZE)) {
+				if (memcmp(sectorBuff, emptyBuff, CD_SECTOR_SIZE)) {
 					entry.entry.entryOffs.lsb--;
 					entry.entry.entrySize.lsb += 2048;
 				}
@@ -701,7 +698,9 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					printf("\n  Creating CDDA files...\n");
 					firstDA = false;
 				}
-				bool isInvalid = !global::cueFile.multiBIN ? !reader.SeekToSector(entry.entry.entryOffs.lsb) : !multiBinSeeker(entry.entry.entryOffs.lsb, entry, reader, global::cueFile);
+				bool isInvalid = !global::cueFile.multiBIN
+					? !reader.SeekToSector(entry.entry.entryOffs.lsb)
+					: !multiBinSeeker(entry.entry.entryOffs.lsb, entry, reader, global::cueFile);
                 auto daOutPath = GetRealDAFilePath(outputPath);
 				auto outFile = OpenScopedFile(daOutPath, "wb");
 
@@ -887,12 +886,12 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	}
 }
 
-void WriteXMLByLBA(std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
+void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
 	EntryAttributeCounters& attributeCounters, cd::IsoReader &reader)
 {
 	fs::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
 
-	for (auto& entry : files)
+	for (const auto& entry : files)
 	{
 		// if this is a DA file we are at the end of filesystem
 		if (entry.type != EntryType::EntryDA)
@@ -942,7 +941,7 @@ void WriteXMLByDirectories(const cd::IsoDirEntries* directory, tinyxml2::XMLElem
 {
 	for (const auto& e : directory->dirEntryList.GetView())
 	{
-		auto& entry = e.get();
+		const auto& entry = e.get();
 
 		if (entry.type != EntryType::EntryDA)
 		{

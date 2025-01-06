@@ -74,7 +74,7 @@ iso::DirTreeClass::~DirTreeClass()
 {
 }
 
-iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate, const bool hiddenFlag)
+iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate, const EntryAttributes& attributes)
 {
 	DIRENTRY entry {};
 
@@ -85,9 +85,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 		entry.date.year = volumeDate.year % 0x64; // Root overflows dates past 1999 for games built with old(<2003) mastering tool
 	}
 	entry.length	= 0; // Length is meaningless for directories
-	entry.HF		= hiddenFlag;
-
-	const EntryAttributes attributes; // Leave defaults
+	entry.HF		= attributes.HFLAG;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -204,7 +202,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 	entry.id		= std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
-	entry.HF		= (bool)attributes.HFLAG;
+	entry.HF		= attributes.HFLAG;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -301,7 +299,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries, this);
-	entry.HF		= (bool)attributes.HFLAG;
+	entry.HF		= attributes.HFLAG;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -473,11 +471,11 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 
 		if ( entry.type == EntryType::EntryDir )
 		{
-			dirEntry->flags = 0x02 | entry.HF;
+			dirEntry->flags = 0x02 | (int)entry.HF;
 		}
 		else
 		{
-			dirEntry->flags = 0x00 | entry.HF;
+			dirEntry->flags = 0x00 | (int)entry.HF;
 		}
 
 		// File length correction for certain file types
@@ -1052,11 +1050,9 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	// Setup the root directory record
 	isoDescriptor.rootDirRecord.entryLength = 34;
 	isoDescriptor.rootDirRecord.extLength	= 0;
-	isoDescriptor.rootDirRecord.entryOffs = cd::SetPair32(
-		18+(pathTableSectors*4) );
-	isoDescriptor.rootDirRecord.entrySize = cd::SetPair32(
-		dirTree->CalculateDirEntryLen() );
-	isoDescriptor.rootDirRecord.flags = 0x02 | root.HF;
+	isoDescriptor.rootDirRecord.entryOffs = cd::SetPair32( 18+(pathTableSectors*4) );
+	isoDescriptor.rootDirRecord.entrySize = cd::SetPair32( dirTree->CalculateDirEntryLen() );
+	isoDescriptor.rootDirRecord.flags = 0x02 | (int)root.HF;
 	isoDescriptor.rootDirRecord.volSeqNum = cd::SetPair16( 1 );
 	isoDescriptor.rootDirRecord.identifierLen = 1;
 	isoDescriptor.rootDirRecord.identifier = 0x0;
@@ -1064,11 +1060,9 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	isoDescriptor.rootDirRecord.entryDate = root.date;
 
 	isoDescriptor.pathTable1Offs = 18;
-	isoDescriptor.pathTable2Offs = isoDescriptor.pathTable1Offs+
-		pathTableSectors;
+	isoDescriptor.pathTable2Offs = isoDescriptor.pathTable1Offs + pathTableSectors;
 	isoDescriptor.pathTable1MSBoffs = isoDescriptor.pathTable2Offs+1;
-	isoDescriptor.pathTable2MSBoffs =
-		isoDescriptor.pathTable1MSBoffs+pathTableSectors;
+	isoDescriptor.pathTable2MSBoffs = isoDescriptor.pathTable1MSBoffs + pathTableSectors;
 	isoDescriptor.pathTable1MSBoffs = SwapBytes32( isoDescriptor.pathTable1MSBoffs );
 	isoDescriptor.pathTable2MSBoffs = SwapBytes32( isoDescriptor.pathTable2MSBoffs );
 
@@ -1076,7 +1070,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 
 	// Write the descriptor
 	unsigned int currentHeaderLBA = 16;
-	const int ISOver = global::new_type.value_or(false) ? 1 : 0;
+	const int ISOver = global::new_type.value_or(false);
 
 	auto isoDescriptorSectors = writer->GetSectorViewM2F1(currentHeaderLBA, 2 + ISOver, cd::IsoWriter::EdcEccForm::Form1);
 	isoDescriptorSectors->SetSubheader(global::new_type.value_or(false) ? cd::IsoWriter::SubData : cd::IsoWriter::SubEOL);
