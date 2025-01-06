@@ -4,6 +4,11 @@
 // Sector size in bytes (do not change)
 #define CD_SECTOR_SIZE		2352
 
+// Sector data size in bytes (do not change)
+#define F1_DATA_SIZE		2048 // Mode 2 Form 1
+#define F2_DATA_SIZE		2324 // Mode 2 Form 2
+#define XA_DATA_SIZE		2336 // XA Mode 2 Form 2
+
 // CD and ISO 9660 reader namespace
 namespace cd {
 
@@ -42,7 +47,9 @@ namespace cd {
 		unsigned char	sync[12];	/// Sync pattern (usually 00 FF FF FF FF FF FF FF FF FF FF 00)
 		unsigned char	addr[3];	/// Sector address (a 24-bit big-endian integer. starts at 200, 201 an onwards)
 		unsigned char	mode;		/// Mode (usually 2 for Mode 2 Form 1/2 sectors)
-		unsigned char	data[2336];	/// 8 bytes Subheader, 2324 bytes Data (form 2), and 4 bytes ECC
+		unsigned char	subHead[8];	/// Sub-header (values vary for Form 2 data sectors)
+		unsigned char	data[2324];	/// Data (form 2)
+		unsigned char	edc[4];		/// Error-detection code (CRC32 of data area)
 	} SECTOR_M2F2;
 
 	// Set struct alignment to 1 because the ISO file system is not very memory alignment friendly which will
@@ -65,7 +72,8 @@ namespace cd {
 	typedef struct {
 		unsigned char	type;		/// Volume descriptor type (1 is descriptor, 255 is descriptor terminator)
 		char			id[5];		/// Volume descriptor ID (always CD001)
-		unsigned short	version;	/// Volume descriptor version (always 0x01)
+		unsigned char	version;	/// Volume descriptor version (always 0x01)
+		unsigned char	flags;		/// Volume descriptor flags (always 0x00)
 	} ISO_DESCRIPTOR_HEADER;
 
 	/// Structure of a date stamp for ISO_DIR_ENTRY structure
@@ -142,11 +150,11 @@ namespace cd {
 		// Volume ID (or label, can be blank or anything)
 		char volumeID[32];
 		// Unused null bytes
-		unsigned char pad2[8];
+		unsigned char pad[8];
 		// Size of volume in sector units
 		ISO_UINT_PAIR volumeSize;
 		// Unused null bytes
-		unsigned char pad3[32];
+		unsigned char escapeSequences[32];
 		// Number of discs in this volume set (always 1 for single volume)
 		ISO_USHORT_PAIR volumeSetSize;
 		// Number of this disc in volume set (always 1 for single volume)
@@ -190,11 +198,11 @@ namespace cd {
 		// File structure version (always 1)
 		unsigned char	fileStructVersion;
 		// Padding
-		unsigned char	dummy0;
+		unsigned char	pad2;
 		// Application specific data (says CD-XA001 at [141], the rest are null bytes)
 		unsigned char	appData[512];
 		// Padding
-		unsigned char	pad4[653];
+		unsigned char	pad3[653];
 
 	} ISO_DESCRIPTOR;
 

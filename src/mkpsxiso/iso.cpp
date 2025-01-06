@@ -142,9 +142,9 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 		}
 
 		// Check if size is a multiple of 2336 bytes
-		if ( ( fileAttrib->st_size % 2336 ) != 0 )
+		if ( ( fileAttrib->st_size % XA_DATA_SIZE ) != 0 )
 		{
-			if ( ( fileAttrib->st_size % 2048) == 0 )
+			if ( ( fileAttrib->st_size % F1_DATA_SIZE) == 0 )
 			{
 				type = EntryType::EntryXA_DO;
 			}
@@ -246,7 +246,7 @@ void iso::DirTreeClass::AddDummyEntry(const unsigned int sectors, const unsigned
 	// TODO: HUGE HACK, will be removed once EntryDummy is unified with EntryFile again
 	entry.attribs	= submode;
 	entry.type		= EntryType::EntryDummy;
-	entry.length	= 2048*sectors;
+	entry.length	= F1_DATA_SIZE * sectors;
 	entry.flba		= flba;
 	entry.HF		= eccAddr;
 
@@ -357,19 +357,19 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			{	
 				if (entry.flba > maxFlba) {
 					maxFlba = entry.flba;
-					sizeMax = GetSizeInSectors(entry.length, 2048);
+					sizeMax = GetSizeInSectors(entry.length, F1_DATA_SIZE);
 				}
 
-				lba += GetSizeInSectors(entry.length, 2048);
+				lba += GetSizeInSectors(entry.length, F1_DATA_SIZE);
 			}
 			else if ( entry.type == EntryType::EntryXA )
 			{
 				if (entry.flba > maxFlba) {
 					maxFlba = entry.flba;
-					sizeMax = GetSizeInSectors(entry.length, 2336);
+					sizeMax = GetSizeInSectors(entry.length, XA_DATA_SIZE);
 				}
 
-				lba += GetSizeInSectors(entry.length, 2336);
+				lba += GetSizeInSectors(entry.length, XA_DATA_SIZE);
 			}
 			else if ( entry.type == EntryType::EntryDA )
 			{
@@ -411,16 +411,16 @@ int iso::DirTreeClass::CalculateDirEntryLen() const
 			dataLen += sizeof( cdxa::ISO_XA_ATTRIB );
 		}
 
-		if ( ((dirEntryLen%2048)+dataLen) > 2048 )
+		if ( ((dirEntryLen % F1_DATA_SIZE) + dataLen) > F1_DATA_SIZE )
 		{
 			// Round dirEntryLen to the nearest multiple of 2048 as the rest of that sector is "unusable"
-			dirEntryLen = ((dirEntryLen + 2047) / 2048) * 2048;
+			dirEntryLen = ((dirEntryLen + 2047) / F1_DATA_SIZE) * F1_DATA_SIZE;
 		}
 
 		dirEntryLen += dataLen;
 	}
 
-	return 2048 * GetSizeInSectors(dirEntryLen);
+	return F1_DATA_SIZE * GetSizeInSectors(dirEntryLen);
 }
 
 void iso::DirTreeClass::SortDirectoryEntries(const bool byOrder, const bool byLBA)
@@ -483,11 +483,11 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 
 		if ( entry.type == EntryType::EntryXA )
 		{
-			length = 2048* GetSizeInSectors(entry.length, 2336);
+			length = F1_DATA_SIZE * GetSizeInSectors(entry.length, XA_DATA_SIZE);
 		}
 		else if ( entry.type == EntryType::EntryXA_DO )
 		{
-			length = 2048 * GetSizeInSectors(entry.length, 2048);
+			length = F1_DATA_SIZE * GetSizeInSectors(entry.length, F1_DATA_SIZE);
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
@@ -495,7 +495,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 			{
 				printf("\nWARNING: DA file still has placeholder value 0x%X... ", iso::DA_FILE_PLACEHOLDER_LBA);
 			}
-			length = 2048 * GetSizeInSectors(entry.length, 2352);
+			length = F1_DATA_SIZE * GetSizeInSectors(entry.length, CD_SECTOR_SIZE);
 		}
 		else if (entry.type == EntryType::EntryDir)
 		{
@@ -655,7 +655,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			FILE *fp = OpenFile( entry.srcfile, "rb" );
 			if (fp != nullptr)
 			{
-				auto sectorView = writer->GetSectorViewM2F2(entry.lba, GetSizeInSectors(entry.length, 2336), cd::IsoWriter::EdcEccForm::Autodetect);
+				auto sectorView = writer->GetSectorViewM2F2(entry.lba, GetSizeInSectors(entry.length, XA_DATA_SIZE), cd::IsoWriter::EdcEccForm::Autodetect);
 				sectorView->WriteFile(fp);
 
 				fclose( fp );
@@ -819,7 +819,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 				break;
 			case EntryType::EntryXA:
 				typeStr = "   XA";
-				sectors = GetSizeInSectors(entry.length, 2336);
+				sectors = GetSizeInSectors(entry.length, XA_DATA_SIZE);
 				break;
 			case EntryType::EntryDA:
 				typeStr = " CDDA";
@@ -963,7 +963,7 @@ int iso::DirTreeClass::GetDirCountTotal() const
 void iso::WriteLicenseData(cd::IsoWriter* writer, void* data, const bool& ps2)
 {
 	auto licenseSectors = writer->GetSectorViewM2F2(0, 12, cd::IsoWriter::EdcEccForm::Form1);
-	licenseSectors->WriteMemory(data, 2336 * 12);
+	licenseSectors->WriteMemory(data, XA_DATA_SIZE * 12);
 
 	if (!ps2) {
 		auto licenseBlankSectors = writer->GetSectorViewM2F1(12, 4, cd::IsoWriter::EdcEccForm::Form2);
@@ -1044,7 +1044,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 
 	isoDescriptor.volumeSetSize = cd::SetPair16( 1 );
 	isoDescriptor.volumeSeqNumber = cd::SetPair16( 1 );
-	isoDescriptor.sectorSize = cd::SetPair16( 2048 );
+	isoDescriptor.sectorSize = cd::SetPair16( F1_DATA_SIZE );
 	isoDescriptor.pathTableSize = cd::SetPair32( pathTableLen );
 
 	// Setup the root directory record
@@ -1087,7 +1087,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	currentHeaderLBA += 2;
 
 	// Generate and write L-path table
-	const size_t pathTableSize = static_cast<size_t>(2048)*pathTableSectors;
+	const size_t pathTableSize = static_cast<size_t>(F1_DATA_SIZE)*pathTableSectors;
 	auto sectorBuff = std::make_unique<unsigned char[]>(pathTableSize);
 
 	dirTree->GeneratePathTable( root, sectorBuff.get(), false );

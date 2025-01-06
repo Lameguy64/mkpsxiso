@@ -141,9 +141,9 @@ void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
 // don't have EDC Form2 data (this can be checked at redump.org) and some games rely on this to do anti-piracy checks like DDR.
 const bool CheckEDCXA(cd::IsoReader &reader) {
 	cd::SECTOR_M2F2 sector;
-	while (reader.ReadBytesXA(sector.data, 2336, true)) {
-		if (sector.data[2] & 0x20) {
-			if (sector.data[2332] == 0 && sector.data[2333] == 0 && sector.data[2334] == 0 && sector.data[2335] == 0) {
+	while (reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE, true)) {
+		if (sector.subHead[2] & 0x20) {
+			if (sector.edc[0] == 0 && sector.edc[1] == 0 && sector.edc[2] == 0 && sector.edc[3] == 0) {
 				return false;
 			}
 			return true;
@@ -157,12 +157,12 @@ const bool CheckEDCXA(cd::IsoReader &reader) {
 const bool CheckISOver(cd::IsoReader &reader, bool& ps2) {
 	cd::SECTOR_M2F2 sector;
 	reader.SeekToSector(15);
-	reader.ReadBytesXA(sector.data, 2336);
-	if (sector.data[2] & 0x08) {
+	reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
+	if (sector.subHead[2] & 0x08) {
 		ps2 = true;
 	}
-	reader.ReadBytesXA(sector.data, 2336, true);
-	if (sector.data[2] & 0x01) {
+	reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE, true);
+	if (sector.subHead[2] & 0x01) {
 		return false;
 	}
 	return true;
@@ -201,12 +201,12 @@ void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, c
 	int bytesLeft = cddaSize;
 	while (bytesLeft > 0) {
 
-		unsigned char copyBuff[2352]{};
+		unsigned char copyBuff[CD_SECTOR_SIZE]{};
 
     	int bytesToRead = bytesLeft;
 
-    	if (bytesToRead > 2352)
-    		bytesToRead = 2352;
+    	if (bytesToRead > CD_SECTOR_SIZE)
+    		bytesToRead = CD_SECTOR_SIZE;
 
     	if (!isInvalid)
     		reader.ReadBytesDA(copyBuff, bytesToRead);
@@ -264,12 +264,12 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
 
     {
     size_t left = (size_t)total_samples;
-	size_t max_pcmframe_read = 2352 / (channels * (bps/8));
+	size_t max_pcmframe_read = CD_SECTOR_SIZE / (channels * (bps/8));
 
     std::unique_ptr<int32_t[]> pcm(new int32_t[channels * max_pcmframe_read]);
 	while (left && ok) {
 
-		unsigned char copyBuff[2352]{};
+		unsigned char copyBuff[CD_SECTOR_SIZE]{};
 
 		size_t need = (left > max_pcmframe_read ? max_pcmframe_read : left);
 		size_t needBytes = need * (channels * (bps/8));
@@ -476,9 +476,9 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 	else {
 		reader.SeekToSector(pathTableList[index].entry.dirOffs);
 		while (true) {
-			cd::SECTOR_M2F1 sector;
+			cd::SECTOR_M2F2 sector;
 			dirRecordSectors++;
-			reader.ReadBytesXA(sector.subHead, 2336);
+			reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
 			if (sector.subHead[2] == 0x89) { // Directory records always ends with submode 0x89
 				break;
 			}
@@ -583,7 +583,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			// Add the unreferenced DA track to the buffer
 			auto& entry = unrefDAbuff.emplace_back();
 			entry.entry.entryOffs.lsb = track.startSector;
-			entry.entry.entrySize.lsb = track.sizeInSectors * 2048;
+			entry.entry.entrySize.lsb = track.sizeInSectors * F1_DATA_SIZE;
 			entry.identifier = GetRealDAFilePath("TRACK-" + track.number).string() + ";1";
 			entry.type = EntryType::EntryDA;
 
@@ -598,7 +598,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 				reader.ReadBytesDA(sectorBuff, CD_SECTOR_SIZE, true);
 				if (memcmp(sectorBuff, emptyBuff, CD_SECTOR_SIZE)) {
 					entry.entry.entryOffs.lsb--;
-					entry.entry.entrySize.lsb += 2048;
+					entry.entry.entrySize.lsb += F1_DATA_SIZE;
 				}
 				else {
 					break;
@@ -660,7 +660,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				// because the STR contains audio.
 				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
 
-				int bytesLeft = 2336*sectorsToRead;
+				int bytesLeft = XA_DATA_SIZE * sectorsToRead;
 
 				reader.SeekToSector(entry.entry.entryOffs.lsb);
 
@@ -674,12 +674,12 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				// Copy loop
 				while(bytesLeft > 0) {
 
-					unsigned char copyBuff[2336];
+					unsigned char copyBuff[XA_DATA_SIZE];
 
 					int bytesToRead = bytesLeft;
 
-					if (bytesToRead > 2336)
-						bytesToRead = 2336;
+					if (bytesToRead > XA_DATA_SIZE)
+						bytesToRead = XA_DATA_SIZE;
 
 					reader.ReadBytesXA(copyBuff, bytesToRead);
 
@@ -728,7 +728,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				}
 
 				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
-				size_t cddaSize = 2352 * sectorsToRead;
+				size_t cddaSize = CD_SECTOR_SIZE * sectorsToRead;
 
 				if(param::encodingFormat == EAF_WAV)
 				{
@@ -770,11 +770,11 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				size_t bytesLeft = entry.entry.entrySize.lsb;
 				while(bytesLeft > 0) {
 
-					unsigned char copyBuff[2048];
+					unsigned char copyBuff[F1_DATA_SIZE];
 					size_t bytesToRead = bytesLeft;
 
-					if (bytesToRead > 2048)
-						bytesToRead = 2048;
+					if (bytesToRead > F1_DATA_SIZE)
+						bytesToRead = F1_DATA_SIZE;
 
 					reader.ReadBytes(copyBuff, bytesToRead);
 					fwrite(copyBuff, 1, bytesToRead, outFile);
@@ -875,9 +875,9 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	if (numSectors < 1) {
 		return;
 	}
-	cd::SECTOR_M2F1 sector;
+	cd::SECTOR_M2F2 sector;
 	reader.SeekToSector(startSector);
-	reader.ReadBytesXA(sector.subHead, 2336);
+	reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 	newelement->SetAttribute(xml::attrib::ENTRY_TYPE, sector.subHead[2]);
@@ -967,7 +967,7 @@ void ParseISO(cd::IsoReader& reader) {
 	global::new_type = CheckISOver(reader, ps2);
 
     reader.SeekToSector(16);
-    reader.ReadBytes(&descriptor, 2048);
+    reader.ReadBytes(&descriptor, F1_DATA_SIZE);
 
 
 	if (!param::QuietMode) {
@@ -1149,7 +1149,7 @@ void ParseISO(cd::IsoReader& reader) {
 			if (postGap) {
 				cd::SECTOR_M2F1 sector;
 				reader.SeekToSector(currentLBA + postGap - 1);
-				reader.ReadBytesXA(sector.subHead, 2336);
+				reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
 				if (sector.ecc[0] != 0 || sector.ecc[1] != 0 || sector.ecc[2] != 0 || sector.ecc[3] != 0) {
 					WriteXMLGap(postGap - 1, dirtree, currentLBA, reader);
 					WriteXMLGap(1, dirtree, currentLBA + postGap - 1, reader);
@@ -1376,10 +1376,10 @@ int Main(int argc, char *argv[])
 	
 	// Check if file has a valid ISO9660 header
 	{
-		char sectbuff[2048];
+		char sectbuff[F1_DATA_SIZE];
 		//char descid[] = { 0x01, 0x43, 0x44, 0x30, 0x30, 0x31, 0x01 };
 		reader.SeekToSector(16);
-		reader.ReadBytes(&sectbuff, 2048);
+		reader.ReadBytes(&sectbuff, F1_DATA_SIZE);
 		if( memcmp(sectbuff, "\1CD001\1", 7) )
 		{
 			printf("ERROR: File does not contain a valid ISO9660 file system.\n");

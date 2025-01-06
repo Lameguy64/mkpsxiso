@@ -51,11 +51,10 @@ size_t cd::IsoReader::ReadBytes(void* ptr, size_t bytes, bool singleSector)
 
 	size_t bytesRead = 0;
     char* const dataPtr = (char*)ptr;
-	constexpr size_t DATA_SIZE = sizeof(sectorM2F1->data);
 
     while(bytes > 0)
 	{
-		const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
+		const size_t toRead = std::min(F1_DATA_SIZE - currentByte, bytes);
 
         memcpy(dataPtr+bytesRead, &sectorM2F1->data[currentByte], toRead);
 
@@ -63,7 +62,7 @@ size_t cd::IsoReader::ReadBytes(void* ptr, size_t bytes, bool singleSector)
 		bytesRead += toRead;
 		bytes -= toRead;
 
-		if (currentByte >= DATA_SIZE)
+		if (currentByte >= F1_DATA_SIZE)
 		{
 			if (singleSector || !PrepareNextSector())
 			{
@@ -84,19 +83,18 @@ size_t cd::IsoReader::ReadBytesXA(void* ptr, size_t bytes, bool singleSector)
 
 	size_t bytesRead = 0;
     char* const dataPtr = (char*)ptr;
-	constexpr size_t DATA_SIZE = sizeof(sectorM2F2->data);
 
     while(bytes > 0)
 	{
-		const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
+		const size_t toRead = std::min(XA_DATA_SIZE - currentByte, bytes);
 
-        memcpy(dataPtr+bytesRead, &sectorM2F2->data[currentByte], toRead);
+        memcpy(dataPtr+bytesRead, &sectorM2F2->subHead[currentByte], toRead);
 
 		currentByte += toRead;
 		bytesRead += toRead;
 		bytes -= toRead;
 
-		if (currentByte >= DATA_SIZE)
+		if (currentByte >= XA_DATA_SIZE)
 		{
 			if (singleSector || !PrepareNextSector())
 			{
@@ -117,11 +115,10 @@ size_t cd::IsoReader::ReadBytesDA(void* ptr, size_t bytes, bool singleSector)
 
 	size_t bytesRead = 0;
     char* const dataPtr = (char*)ptr;
-	constexpr size_t DATA_SIZE = sizeof(sectorBuff);
 
     while(bytes > 0)
 	{
-		const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
+		const size_t toRead = std::min(CD_SECTOR_SIZE - currentByte, bytes);
 
         memcpy(dataPtr+bytesRead, &sectorBuff[currentByte], toRead);
 
@@ -129,7 +126,7 @@ size_t cd::IsoReader::ReadBytesDA(void* ptr, size_t bytes, bool singleSector)
 		bytesRead += toRead;
 		bytes -= toRead;
 
-		if (currentByte >= DATA_SIZE)
+		if (currentByte >= CD_SECTOR_SIZE)
 		{
 			if (singleSector || !PrepareNextSector())
 			{
@@ -148,16 +145,14 @@ void cd::IsoReader::SkipBytes(size_t bytes, bool singleSector) {
 		return;
 	}
 
-	constexpr size_t DATA_SIZE = sizeof(sectorM2F1->data);
-
     while(bytes > 0) {
 
-        const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
+        const size_t toRead = std::min(F1_DATA_SIZE - currentByte, bytes);
 
 		currentByte += toRead;
 		bytes -= toRead;
 
-		if (currentByte >= DATA_SIZE) {
+		if (currentByte >= F1_DATA_SIZE) {
 
             if (singleSector || !PrepareNextSector())
 			{

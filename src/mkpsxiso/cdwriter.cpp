@@ -90,7 +90,7 @@ void IsoWriter::SectorView::CalculateForm1(const bool eccAddr)
 	m_checksumJobs.emplace_front(m_threadPool->enqueue([eccAddr](SECTOR_M2F1* sector)
 		{
 			// Encode EDC data
-			EDC_ECC_GEN.ComputeEdcBlock(sector->subHead, sizeof(sector->subHead) + sizeof(sector->data), sector->edc);
+			EDC_ECC_GEN.ComputeEdcBlock(sector->subHead, sizeof(sector->subHead) + F1_DATA_SIZE, sector->edc);
 
 			// Compute ECC P code
 			static const unsigned char zeroaddress[4] = { 0, 0, 0, 0 };
@@ -105,10 +105,10 @@ void IsoWriter::SectorView::CalculateForm2()
 	SECTOR_M2F2* sector = static_cast<SECTOR_M2F2*>(m_currentSector);
 	m_checksumJobs.emplace_front(m_threadPool->enqueue([](SECTOR_M2F2* sector) {
 		if (global::xa_edc) {
-			EDC_ECC_GEN.ComputeEdcBlock(sector->data, sizeof(sector->data) - 4, &sector->data[2332]);
+			EDC_ECC_GEN.ComputeEdcBlock(sector->subHead, sizeof(sector->subHead) + F2_DATA_SIZE, sector->edc);
 		}
 		else {
-			memset(&sector->data[2332], 0, 4);
+			memset(sector->edc, 0, 4);
 		}
 	}, sector));
 }
@@ -150,7 +150,7 @@ public:
 			PrepareSectorHeader();
 			SetSubHeader(sector->subHead, m_currentLBA != lastLBA ? m_subHeader : IsoWriter::SubEOF);
 
-			const size_t bytesRead = fread(sector->data, 1, sizeof(sector->data), file);
+			const size_t bytesRead = fread(sector->data, 1, F1_DATA_SIZE, file);
 			// Fill the remainder of the sector with zeroes if applicable
 			std::fill(std::begin(sector->data) + bytesRead, std::end(sector->data), 0);
 		
@@ -190,7 +190,7 @@ public:
 			buf += memToCopy;
 			m_offsetInSector += memToCopy;
 
-			if (m_offsetInSector >= sizeof(sector->data))
+			if (m_offsetInSector >= F1_DATA_SIZE)
 			{
 				NextSector();
 			}
@@ -224,7 +224,7 @@ public:
 
 	size_t GetSpaceInCurrentSector() const override
 	{
-		return sizeof(SectorType::data) - m_offsetInSector;
+		return F1_DATA_SIZE - m_offsetInSector;
 	}
 
 	void NextSector() override
@@ -292,9 +292,9 @@ public:
 		{
 			PrepareSectorHeader();
 
-			const size_t bytesRead = fread(sector->data, 1, sizeof(sector->data), file);
+			const size_t bytesRead = fread(sector->subHead, 1, XA_DATA_SIZE, file);
 			// Fill the remainder of the sector with zeroes if applicable
-			std::fill(std::begin(sector->data) + bytesRead, std::end(sector->data), 0);
+			std::fill(std::begin(sector->subHead) + bytesRead, std::end(sector->edc), 0);
 		
 			if (m_edcEccForm != IsoWriter::EdcEccForm::Autodetect)
 			{
@@ -310,7 +310,7 @@ public:
 			else
 			{
 				// Check submode if sector is mode 2 form 2
-				if ( sector->data[2] & 0x20 )
+				if ( sector->subHead[2] & 0x20 )
 				{
 					// If so, write it as an XA sector
 					CalculateForm2();
@@ -341,13 +341,13 @@ public:
 			SectorType* sector = static_cast<SectorType*>(m_currentSector);
 
 			const size_t memToCopy = std::min(GetSpaceInCurrentSector(), size);
-			std::copy_n(buf, memToCopy, sector->data + m_offsetInSector);
+			std::copy_n(buf, memToCopy, sector->subHead + m_offsetInSector);
 			
 			size -= memToCopy;
 			buf += memToCopy;
 			m_offsetInSector += memToCopy;
 
-			if (m_offsetInSector >= sizeof(sector->data))
+			if (m_offsetInSector >= XA_DATA_SIZE)
 			{
 				NextSector();
 			}
@@ -362,7 +362,7 @@ public:
 		{
 			PrepareSectorHeader();
 
-			std::fill(std::begin(sector->data), std::end(sector->data), 0);
+			std::fill(std::begin(sector->subHead), std::end(sector->edc), 0);
 			if (m_edcEccForm == IsoWriter::EdcEccForm::Form1)
 			{
 				CalculateForm1(eccAddr);
@@ -380,14 +380,14 @@ public:
 
 	size_t GetSpaceInCurrentSector() const override
 	{
-		return sizeof(SectorType::data) - m_offsetInSector;
+		return XA_DATA_SIZE - m_offsetInSector;
 	}
 
 	void NextSector() override
 	{
 		// Fill the remainder of the sector with zeroes if applicable
 		SectorType* sector = static_cast<SectorType*>(m_currentSector);
-		std::fill(std::begin(sector->data) + m_offsetInSector, std::end(sector->data), 0);
+		std::fill(std::begin(sector->subHead) + m_offsetInSector, std::end(sector->edc), 0);
 		
 		if (m_edcEccForm != IsoWriter::EdcEccForm::Autodetect)
 		{
@@ -403,7 +403,7 @@ public:
 		else
 		{
 			// Check submode if sector is mode 2 form 2
-			if ( sector->data[2] & 0x20 )
+			if ( sector->subHead[2] & 0x20 )
 			{
 				// If so, write it as an XA sector
 				CalculateForm2();
