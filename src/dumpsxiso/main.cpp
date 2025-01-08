@@ -43,7 +43,7 @@ namespace param {
     fs::path isoFile;
     fs::path outPath;
     fs::path xmlFile;
-	bool force = false;
+	bool lba = false;
 	bool noxml = false;
 	bool noWarns = false;
 	bool QuietMode = false;
@@ -336,6 +336,15 @@ static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::Iso
 
 	element->SetAttribute(xml::attrib::HIDDEN_FLAG, entry.entry.flags & 0x01);
 	++attributeCounters.HFLAG[entry.entry.flags & 0x01];
+
+	if (entry.order.has_value())
+	{
+		element->SetAttribute(xml::attrib::ORDER, *entry.order);
+	}
+	if (param::lba)
+	{
+		element->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
+	}
 }
 
 static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defaultAttributesElement, const EntryAttributeCounters& attributeCounters)
@@ -864,17 +873,6 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, "da");
 		}
 	}
-	if (!entry.identifier.empty())
-	{
-		if (param::force)
-		{
-			newelement->SetAttribute(xml::attrib::OFFSET, entry.entry.entryOffs.lsb);
-		}
-		if (entry.order.has_value())
-		{
-			newelement->SetAttribute(xml::attrib::ORDER, *entry.order);
-		}
-	}
 	WriteOptionalXMLAttribs(newelement, entry, entry.type, attributeCounters);
 	return dirElement;
 }
@@ -890,7 +888,8 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
 	newelement->SetAttribute(xml::attrib::NUM_DUMMY_SECTORS, numSectors);
 	newelement->SetAttribute(xml::attrib::ENTRY_TYPE, sector.subHead[2]);
-	if (param::force) {
+	if (param::lba)
+	{
 		newelement->SetAttribute(xml::attrib::OFFSET, startSector);
 	}
 }
@@ -1244,7 +1243,7 @@ int Main(int argc, char *argv[])
 		"  -s <file>\t\tOptional XML name/destination for MKPSXISO script (defaults to working dir)\n"
 		"  -pt|--path-table\tGo through every known directory in order; helps to deobfuscate some games (like DMW3)\n"
 		"  -e|--encode <codec>\tCodec to encode CDDA/DA audio; supports " SUPPORTED_CODEC_TEXT " (defaults to wave)\n"
-		"  -f|--force\t\tWrites all lba offsets in the xml to force them at build\n"
+		"  -l|--lba\t\tWrites all lba offsets in the xml to force them at build time\n"
 		"  -n|--noxml\t\tDo not generate an XML file and license file\n"
 		"  -S|--sort-by-dir\tOutputs a \"pretty\" XML script where entries are grouped in directories\n"
 		"\t\t\t(instead of strictly following their original order on the disc)\n";
@@ -1274,9 +1273,9 @@ int Main(int argc, char *argv[])
 				printf(HELP_TEXT);
 				return EXIT_SUCCESS;
 			}
-			if (ParseArgument(args, "f", "force"))
+			if (ParseArgument(args, "l", "lba"))
 			{
-				param::force = true;
+				param::lba = true;
 				continue;
 			}
 			if (ParseArgument(args, "n", "noxml"))
