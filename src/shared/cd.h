@@ -104,40 +104,40 @@ namespace cd {
 	/// Structure of an ISO path table entry
 	struct ISO_PATHTABLE_ENTRY
 	{
-		unsigned char nameLength;	/// Name length (or 1 for the root directory)
-		unsigned char extLength;	/// Number of sectors in extended attribute record
-		unsigned int dirOffs;		/// Number of the first sector in the directory, as a double word
-		short parentDirIndex;		/// Index of the directory record's parent directory
-		// If nameLength is odd numbered, a padding byte will be present after the entry name.
+		unsigned char	identifierLen;	/// Length of Directory Identifier(LEN_DI) (or 1 for the root directory)
+		unsigned char	extLength;		/// Number of sectors in Extended Attribute Record
+		unsigned int	dirOffs;		/// Number of the first sector in the directory, as a double word
+		short			parentDirIndex;	/// Index of the directory record's parent directory
+		// If identifierLen is odd numbered, a padding byte will be present after the identifier text.
 	};
 
 	struct ISO_DIR_ENTRY
 	{
-		unsigned char entryLength;			// Directory entry length (variable, use for parsing through entries)
-		unsigned char extLength;			// Extended entry data length (always 0)
-		ISO_UINT_PAIR entryOffs;			// Points to the LBA of the file/directory entry
-		ISO_UINT_PAIR entrySize;			// Size of the file/directory entry
-		ISO_DATESTAMP entryDate;			// Date & time stamp of entry
-		unsigned char flags;				// File flags (0x02 for directories, 0x00 for files)
-		unsigned char fileUnitSize;			// Unit size (usually 0 even with Form 2 files such as STR/XA)
-		unsigned char interleaveGapSize;	// Interleave gap size (usually 0 even with Form 2 files such as STR/XA)
-		ISO_USHORT_PAIR volSeqNum;			// Volume sequence number (always 1)
-		unsigned char identifierLen;		// Identifier (file/directory name) length in bytes
+		unsigned char	entryLength;		// Directory Record Length(LEN_DR) (variable, use for parsing through entries)
+		unsigned char	extLength;			// Extended Attribute Record Length (always 0)
+		ISO_UINT_PAIR	entryOffs;			// Points to the LBA of the file/directory entry
+		ISO_UINT_PAIR	entrySize;			// Size of the file/directory entry
+		ISO_DATESTAMP	entryDate;			// Date & time stamp of entry
+		unsigned char	flags;				// File flags (0x02 for directories, 0x00 for files)
+		unsigned char	fileUnitSize;		// Unit size (usually 0 even with Form 2 files such as STR/XA)
+		unsigned char	interleaveGapSize;	// Interleave gap size (usually 0 even with Form 2 files such as STR/XA)
+		ISO_USHORT_PAIR	volSeqNum;			// Volume sequence number (always 1)
+		unsigned char	identifierLen;		// Length of File/Dir Identifier(LEN_FI) in bytes
 		// If identifierLen is even numbered, a padding byte will be present after the identifier text.
 	};
 
 	typedef struct {
-		unsigned char entryLength;		// Always 34 bytes
-		unsigned char extLength;		// Always 0
-		ISO_UINT_PAIR entryOffs;	// Should point to LBA 22
-		ISO_UINT_PAIR entrySize;	// Size of entry extent
-		ISO_DATESTAMP entryDate;	// Record date and time
-		unsigned char flags;				// File flags
-		unsigned char fileUnitSize;
-		unsigned char interleaveGapSize;
-		ISO_USHORT_PAIR volSeqNum;
-		unsigned char identifierLen;		// 0x01
-		unsigned char identifier;			// 0x00
+		unsigned char	entryLength;		// Always 34 bytes
+		unsigned char	extLength;			// Always 0
+		ISO_UINT_PAIR	entryOffs;			// Should point to LBA 22
+		ISO_UINT_PAIR	entrySize;			// Size of entry extent
+		ISO_DATESTAMP	entryDate;			// Record date and time
+		unsigned char	flags;				// File flags
+		unsigned char	fileUnitSize;		//
+		unsigned char	interleaveGapSize;	//
+		ISO_USHORT_PAIR	volSeqNum;			//
+		unsigned char	identifierLen;		// 0x01
+		unsigned char	identifier;			// 0x00
 	} ISO_ROOTDIR_HEADER;
 
 	// ISO descriptor structure

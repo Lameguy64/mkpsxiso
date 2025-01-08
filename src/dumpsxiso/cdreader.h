@@ -44,7 +44,7 @@ namespace cd {
         size_t ReadBytesDA(void* ptr, size_t bytes, bool singleSector = false);
 
         // Skip bytes in data sectors (supports sequential skipping)
-        void SkipBytes(size_t bytes, bool singleSector = false);
+        size_t SkipBytes(size_t bytes, bool singleSector = false);
 
         // Seek to a sector in the ISO image in sector units (returns true if success)
         bool SeekToSector(int sector);
@@ -75,7 +75,7 @@ namespace cd {
         std::vector<Entry> pathTableList;
 
         void FreePathTable();
-        size_t ReadPathTable(cd::IsoReader* reader, int lba);
+        size_t ReadPathTable(cd::IsoReader* reader, int lba, unsigned int size);
 
         fs::path GetFullDirPath(int dirEntry) const;
     };

@@ -531,6 +531,11 @@ std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd:
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
     dirEntries->ReadRootDir(&reader, offs);
 
+	if (dirEntries->dirEntryList.GetView().empty())
+	{
+		printf("\nERROR: Root directory is empty or invalid.\n");
+		exit(EXIT_FAILURE);
+	}
 	auto& entry = dirEntries->dirEntryList.GetView().front().get();
     entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb),
 		CleanIdentifier(entry.identifier));
@@ -543,8 +548,12 @@ std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, Lis
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
     dirEntries->ReadRootDir(&reader, pathTableList[0].entry.dirOffs);
 
+	if (dirEntries->dirEntryList.GetView().empty())
+	{
+		printf("\nERROR: Root directory is empty or invalid.\n");
+		exit(EXIT_FAILURE);
+	}
   	auto& entry = dirEntries->dirEntryList.GetView().front().get();
-
 	entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, 0, CleanIdentifier(entry.identifier));
 
   	return dirEntries;
@@ -667,7 +676,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", outputPath.filename().c_str());
+					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"\n", outputPath.filename().c_str());
 					exit(EXIT_FAILURE);
 				}
 
@@ -723,7 +732,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				fflush(stdout);
 
 				if (!outFile) {
-					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", daOutPath.filename().c_str());
+					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"\n", daOutPath.filename().c_str());
 					exit(EXIT_FAILURE);
 				}
 
@@ -763,7 +772,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"...\n", outputPath.filename().c_str());
+					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"\n", outputPath.filename().c_str());
 					exit(EXIT_FAILURE);
 				}
 
@@ -989,7 +998,7 @@ void ParseISO(cd::IsoReader& reader) {
 
     cd::IsoPathTable pathTable;
 
-    size_t numEntries = pathTable.ReadPathTable(&reader, descriptor.pathTable1Offs);
+	size_t numEntries = pathTable.ReadPathTable(&reader, descriptor.pathTable1Offs, descriptor.pathTableSize.lsb);
 
     if (numEntries == 0) {
 		printf("\nNo files to find.\n");
@@ -1004,7 +1013,7 @@ void ParseISO(cd::IsoReader& reader) {
 		std::error_code ec;
 		fs::create_directories(dirPath, ec);
 		if (ec) {
-			printf("\nERROR: Cannot create directory \"%" PRFILESYSTEM_PATH "\"... %s\n", dirPath.parent_path().lexically_normal().c_str(), ec.message().c_str());
+			printf("\nERROR: Cannot create directory \"%" PRFILESYSTEM_PATH "\". %s\n", dirPath.parent_path().lexically_normal().c_str(), ec.message().c_str());
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -1109,8 +1118,10 @@ void ParseISO(cd::IsoReader& reader) {
 			const fs::path sourcePath = xmlPath.is_absolute() ? fs::absolute(param::outPath) : param::outPath.lexically_proximate(xmlPath);
 
 			// Add license element to the xml
-			tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
-			newElement->SetAttribute(xml::attrib::LICENSE_FILE,	(sourcePath / "license_data.dat").generic_string().c_str());
+			{
+				tinyxml2::XMLElement *newElement = trackElement->InsertNewChildElement(xml::elem::LICENSE);
+				newElement->SetAttribute(xml::attrib::LICENSE_FILE,	(sourcePath / "license_data.dat").generic_string().c_str());
+			}
 
 			// Create <default_attributes> now so it lands before the directory tree
 			tinyxml2::XMLElement* defaultAttributesElement = trackElement->InsertNewChildElement(xml::elem::DEFAULT_ATTRIBUTES);
@@ -1209,9 +1220,14 @@ void ParseISO(cd::IsoReader& reader) {
 		}
 		else
 		{
-			printf("\nERROR: Cannot create xml file \"%" PRFILESYSTEM_PATH "\"... %s\n", param::xmlFile.lexically_normal().c_str(), strerror(errno));
+			printf("\nERROR: Cannot create xml file \"%" PRFILESYSTEM_PATH "\". %s\n", param::xmlFile.lexically_normal().c_str(), strerror(errno));
 			exit(EXIT_FAILURE);
 		}
+	}
+
+	if (!param::QuietMode)
+	{
+		printf("ISO image dumped successfully.\n");
 	}
 }
 
@@ -1369,18 +1385,15 @@ int Main(int argc, char *argv[])
 
 	if (!reader.Open(param::isoFile)) {
 
-		printf("ERROR: Cannot open file \"%" PRFILESYSTEM_PATH "\"...\n", param::isoFile.lexically_normal().c_str());
+		printf("ERROR: Cannot open file \"%" PRFILESYSTEM_PATH "\"\n", param::isoFile.lexically_normal().c_str());
 		return EXIT_FAILURE;
 
 	}
 	
 	// Check if file has a valid ISO9660 header
 	{
-		char sectbuff[F1_DATA_SIZE];
-		//char descid[] = { 0x01, 0x43, 0x44, 0x30, 0x30, 0x31, 0x01 };
-		reader.SeekToSector(16);
-		reader.ReadBytes(&sectbuff, F1_DATA_SIZE);
-		if( memcmp(sectbuff, "\1CD001\1", 7) )
+		cd::ISO_DESCRIPTOR descriptor;
+		if (!reader.SeekToSector(16) || !reader.ReadBytes(&descriptor, F1_DATA_SIZE, true) || memcmp(&descriptor.header, "\1CD001\1", 7))
 		{
 			printf("ERROR: File does not contain a valid ISO9660 file system.\n");
 			return EXIT_FAILURE;
@@ -1393,8 +1406,5 @@ int Main(int argc, char *argv[])
 
 	tzset(); // Initializes the time-related environment variables
     ParseISO(reader);
-	if (!param::QuietMode) {
-		printf("ISO image dumped successfully.\n");
-	}
 	return EXIT_SUCCESS;
 }

@@ -139,27 +139,31 @@ size_t cd::IsoReader::ReadBytesDA(void* ptr, size_t bytes, bool singleSector)
 
 }
 
-void cd::IsoReader::SkipBytes(size_t bytes, bool singleSector) {
+size_t cd::IsoReader::SkipBytes(size_t bytes, bool singleSector) {
 
 	if (currentSector >= totalSectors) {
-		return;
+		return 0;
 	}
 
+	size_t bytesRead = 0;
     while(bytes > 0) {
 
         const size_t toRead = std::min(F1_DATA_SIZE - currentByte, bytes);
 
 		currentByte += toRead;
+		bytesRead += toRead;
 		bytes -= toRead;
 
 		if (currentByte >= F1_DATA_SIZE) {
 
             if (singleSector || !PrepareNextSector())
 			{
-				return;
+				return bytesRead;
 			}
 		}
     }
+
+	return bytesRead;
 }
 
 bool cd::IsoReader::SeekToSector(int sector) {
@@ -236,33 +240,35 @@ void cd::IsoPathTable::FreePathTable()
 	pathTableList.clear();
 }
 
-size_t cd::IsoPathTable::ReadPathTable(cd::IsoReader* reader, int lba)
+size_t cd::IsoPathTable::ReadPathTable(cd::IsoReader* reader, int lba, unsigned int size)
 {
-	if (lba >= 0)
-		reader->SeekToSector(lba);
+	if (lba < 0 || !reader->SeekToSector(lba) || size < sizeof(ISO_PATHTABLE_ENTRY) + sizeof(""))
+		return 0;
 
 	FreePathTable();
 
-	while (true)
+	size_t bytesRead = 0;
+	while (bytesRead < size)
 	{
 		Entry pathTableEntry;
-		reader->ReadBytes(&pathTableEntry.entry, sizeof(pathTableEntry.entry));
+		bytesRead += reader->ReadBytes(&pathTableEntry.entry, sizeof(pathTableEntry.entry));
 
 		// Its the end of the path table when its nothing but zeros
-		if (pathTableEntry.entry.nameLength == 0)
+		// ECMA-119 7.6.3 - The length of a Directory Identifier shall not exceed 31
+		if (pathTableEntry.entry.identifierLen == 0 || pathTableEntry.entry.identifierLen > 31)
 			break;
 
 
 		// Read entry name
 		{
-			const size_t length = pathTableEntry.entry.nameLength;
+			const size_t length = pathTableEntry.entry.identifierLen;
 			pathTableEntry.name.resize(length);
-			reader->ReadBytes(pathTableEntry.name.data(), length);
+			bytesRead += reader->ReadBytes(pathTableEntry.name.data(), length);
 
 			// ECMA-119 9.4.6 - 00 field present only if entry length is an odd number
 			if ((length % 2) != 0)
 			{
-				reader->SkipBytes(1);
+				bytesRead += reader->SkipBytes(1);
 			}
 
 			// Strip trailing zeroes, if any
@@ -353,7 +359,8 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	size_t bytesRead = reader->ReadBytes(&entry.entry, sizeof(entry.entry), true);
 
 	// The file entry table usually ends with null bytes so break if we reached that area
-	if (bytesRead != sizeof(entry.entry) || entry.entry.entryLength == 0)
+	// ECMA-119 7.5.1 - The length of a File Identifier shall not exceed 31 + ';1'
+	if (bytesRead != sizeof(entry.entry) || entry.entry.entryLength == 0 || entry.entry.identifierLen > 33)
 		return std::nullopt;
 
 	// Read identifier string
@@ -366,8 +373,7 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	// ECMA-119 9.1.12 - 00 field present only if file identifier length is an even number
 	if ((entry.entry.identifierLen % 2) == 0)
     {
-        reader->SkipBytes(1);
-		bytesRead += 1;
+		bytesRead += reader->SkipBytes(1);
     }
 
 	// Read XA attribute data
@@ -380,8 +386,15 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 		entry.extData.attributes = SwapBytes16(entry.extData.attributes);
 	}
 
-	// Check to detect corrupted directory records
-	if (bytesRead != entry.entry.entryLength) {
+	// Skip unsupported System Use extensions
+	if (bytesRead < entry.entry.entryLength)
+	{
+		bytesRead += reader->SkipBytes(entry.entry.entryLength - bytesRead, true);
+	}
+
+	// If there is still a difference, then it's either an invalid entry or a corrupted sector
+	if (bytesRead != entry.entry.entryLength)
+	{
 		return std::nullopt;
 	}
 
