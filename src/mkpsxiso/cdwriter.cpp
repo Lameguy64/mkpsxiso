@@ -108,7 +108,7 @@ void IsoWriter::SectorView::CalculateForm2()
 			EDC_ECC_GEN.ComputeEdcBlock(sector->subHead, sizeof(sector->subHead) + F2_DATA_SIZE, sector->edc);
 		}
 		else {
-			memset(sector->edc, 0, 4);
+			memset(sector->edc, 0, sizeof(sector->edc));
 		}
 	}, sector));
 }

@@ -143,7 +143,7 @@ const bool CheckEDCXA(cd::IsoReader &reader) {
 	cd::SECTOR_M2F2 sector;
 	while (reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE, true)) {
 		if (sector.subHead[2] & 0x20) {
-			if (sector.edc[0] == 0 && sector.edc[1] == 0 && sector.edc[2] == 0 && sector.edc[3] == 0) {
+			if (!memcmp(sector.edc, "\0\0\0\0", sizeof(sector.edc))) {
 				return false;
 			}
 			return true;
@@ -198,18 +198,20 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
 
 void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const bool isInvalid)
 {
-	int bytesLeft = cddaSize;
+	constexpr size_t bufferSize = 64 * 1024; // Use a 64KiB buffer for better I/O performance
+	unsigned char copyBuff[bufferSize];
+	size_t bytesLeft = cddaSize;
 	while (bytesLeft > 0) {
 
-		unsigned char copyBuff[CD_SECTOR_SIZE]{};
+    	size_t bytesToRead = bytesLeft;
 
-    	int bytesToRead = bytesLeft;
-
-    	if (bytesToRead > CD_SECTOR_SIZE)
-    		bytesToRead = CD_SECTOR_SIZE;
+    	if (bytesToRead > bufferSize)
+    		bytesToRead = bufferSize;
 
     	if (!isInvalid)
     		reader.ReadBytesDA(copyBuff, bytesToRead);
+		else
+			memset(copyBuff, 0, bytesToRead);
 
     	fwrite(copyBuff, 1, bytesToRead, outFile);
 
@@ -666,38 +668,37 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			if (entry.type == EntryType::EntryXA)
 			{
 				// Extract XA or STR file.
+				// For both XA and STR files, we need to extract the data 2336 bytes per sector.
+				// When rebuilding the bin using mkpsxiso, we mark the file with mixed.
+				// The source file will anyway be stored on our hard drive in raw form.
 				if (!param::QuietMode) {
 					printf("    Extracting XA \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
 				}
 				fflush(stdout);
-				// For both XA and STR files, we need to extract the data 2336 bytes per sector.
-				// When rebuilding the bin using mkpsxiso, either we mark the file with str or with xa
-				// the source file will anyway be stored on our hard drive in raw form.
+
+				FILE* outFile = OpenFile(outputPath, "wb");
+
+				if (outFile == NULL || !reader.SeekToSector(entry.entry.entryOffs.lsb))
+				{
+					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"\n", outputPath.filename().c_str());
+					exit(EXIT_FAILURE);
+				}
 
 				// this is the data to be read 2336 bytes per sector, both if the file is an STR or XA,
 				// because the STR contains audio.
 				size_t sectorsToRead = GetSizeInSectors(entry.entry.entrySize.lsb);
 
-				int bytesLeft = XA_DATA_SIZE * sectorsToRead;
-
-				reader.SeekToSector(entry.entry.entryOffs.lsb);
-
-				FILE* outFile = OpenFile(outputPath, "wb");
-
-				if (outFile == NULL) {
-					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"\n", outputPath.filename().c_str());
-					exit(EXIT_FAILURE);
-				}
-
 				// Copy loop
+				{
+				constexpr size_t bufferSize = 64 * 1024; // Use a 64KiB buffer for better I/O performance
+				unsigned char copyBuff[bufferSize];
+				size_t bytesLeft = XA_DATA_SIZE * sectorsToRead;
 				while(bytesLeft > 0) {
 
-					unsigned char copyBuff[XA_DATA_SIZE];
+					size_t bytesToRead = bytesLeft;
 
-					int bytesToRead = bytesLeft;
-
-					if (bytesToRead > XA_DATA_SIZE)
-						bytesToRead = XA_DATA_SIZE;
+					if (bytesToRead > bufferSize)
+						bytesToRead = bufferSize;
 
 					reader.ReadBytesXA(copyBuff, bytesToRead);
 
@@ -705,6 +706,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 					bytesLeft -= bytesToRead;
 
+				}
 				}
 
 				fclose(outFile);
@@ -785,20 +787,23 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					exit(EXIT_FAILURE);
 				}
 
+				{
+				constexpr size_t bufferSize = 64 * 1024; // Use a 64KiB buffer for better I/O performance
+				unsigned char copyBuff[bufferSize];
 				size_t bytesLeft = entry.entry.entrySize.lsb;
 				while(bytesLeft > 0) {
 
-					unsigned char copyBuff[F1_DATA_SIZE];
 					size_t bytesToRead = bytesLeft;
 
-					if (bytesToRead > F1_DATA_SIZE)
-						bytesToRead = F1_DATA_SIZE;
+					if (bytesToRead > bufferSize)
+						bytesToRead = bufferSize;
 
 					reader.ReadBytes(copyBuff, bytesToRead);
 					fwrite(copyBuff, 1, bytesToRead, outFile);
 
 					bytesLeft -= bytesToRead;
 
+				}
 				}
 
 				fclose(outFile);
@@ -1156,16 +1161,19 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 			// There are some CD-DA games that have a non-zero adrress ECC calculation in the last postgap sector. So, we are checking it.
 			// Idk if this behavior could happen in other sectors, but apparently it's only related to CD-DA games postgaps (maybe a bug).
-			if (postGap) {
+			if (postGap)
+			{
 				cd::SECTOR_M2F1 sector;
 				reader.SeekToSector(currentLBA + postGap - 1);
 				reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
-				if (sector.ecc[0] != 0 || sector.ecc[1] != 0 || sector.ecc[2] != 0 || sector.ecc[3] != 0) {
+				if (memcmp(sector.ecc, "\0\0\0\0", sizeof(sector.edc)))
+				{
 					WriteXMLGap(postGap - 1, dirtree, currentLBA, reader);
 					WriteXMLGap(1, dirtree, currentLBA + postGap - 1, reader);
 					dirtree->LastChildElement("dummy")->SetAttribute(xml::attrib::ECC_ADDRES, true);
 				}
-				else {
+				else
+				{
 					WriteXMLGap(postGap, dirtree, currentLBA, reader);
 				}
 			}
