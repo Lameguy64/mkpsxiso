@@ -169,6 +169,7 @@ namespace iso
 
 		int GetFileCountTotal() const;
 		int GetDirCountTotal() const;
+		int GetPathDepth(size_t* pathLength = nullptr) const;
 
 		void OutputLBAlisting(FILE* fp, int level) const;
 	};

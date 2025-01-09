@@ -1325,6 +1325,16 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 		}
 	}
 
+	{ // ECMA-119 6.8.2.1 - The path length of any file shall not exceed 255.
+		size_t pathLength = (name + ";1").length();
+		int depth = dirTree->GetPathDepth(&pathLength);
+		if (pathLength + depth > 255)
+		{
+			printf("ERROR: File path length exceeds 255 characters on line %d.\n", dirElement->GetLineNum());
+			return false;
+		}
+	}
+
 	EntryType entry = EntryType::EntryFile;
 	const char *trackid = nullptr;
 
@@ -1480,6 +1490,15 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 	if (const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE); sourceElement != nullptr)
 	{
 		srcDir = xmlPath / sourceElement;
+	}
+
+	{ // ECMA-119 6.8.2.1 - The number of levels in the hierarchy shall not exceed eight.
+		int level = dirTree->GetPathDepth() + 2; // +1 for root, +1 for this dir
+		if (level > 8)
+		{
+			printf("ERROR: Directory hierarchy depth exceeds 8 levels on line %d.\n", dirElement->GetLineNum());
+			return false;
+		}
 	}
 
 	bool alreadyExists = false;

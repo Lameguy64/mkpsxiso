@@ -960,6 +960,18 @@ int iso::DirTreeClass::GetDirCountTotal() const
     return numdirs;
 }
 
+int iso::DirTreeClass::GetPathDepth(size_t* pathLength) const
+{
+	int depth = 0;
+	for (auto current = this; current->parent != nullptr; current = current->parent)
+	{
+		depth++;
+		if (pathLength != nullptr)
+			*pathLength += current->entry->id.length();
+	}
+	return depth;
+}
+
 void iso::WriteLicenseData(cd::IsoWriter* writer, void* data, const bool& ps2)
 {
 	auto licenseSectors = writer->GetSectorViewM2F2(0, 12, cd::IsoWriter::EdcEccForm::Form1);
