@@ -103,11 +103,14 @@ void IsoWriter::SectorView::CalculateForm1(const bool eccAddr)
 void IsoWriter::SectorView::CalculateForm2()
 {
 	SECTOR_M2F2* sector = static_cast<SECTOR_M2F2*>(m_currentSector);
-	m_checksumJobs.emplace_front(m_threadPool->enqueue([](SECTOR_M2F2* sector) {
-		if (global::xa_edc) {
+	m_checksumJobs.emplace_front(m_threadPool->enqueue([](SECTOR_M2F2* sector)
+	{
+		if (global::xa_edc)
+		{
 			EDC_ECC_GEN.ComputeEdcBlock(sector->subHead, sizeof(sector->subHead) + F2_DATA_SIZE, sector->edc);
 		}
-		else {
+		else
+		{
 			memset(sector->edc, 0, sizeof(sector->edc));
 		}
 	}, sector));

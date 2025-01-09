@@ -81,7 +81,8 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries);
 	entry.date		= volumeDate;
-	if (!global::new_type.value_or(false)) {
+	if (!global::new_type.value_or(false))
+	{
 		entry.date.year = volumeDate.year % 0x64; // Root overflows dates past 1999 for games built with old(<2003) mastering tool
 	}
 	entry.length	= 0; // Length is meaningless for directories
@@ -441,10 +442,12 @@ void iso::DirTreeClass::SortDirectoryEntries(const bool byOrder, const bool byLB
 
 	std::stable_sort(entriesInDir.begin(), entriesInDir.end(), [&](const auto& left, const auto& right)
 		{
-			if (byOrder) {
+			if (byOrder)
+			{
 				return left.get().order < right.get().order;
 			}
-			if (byLBA) {
+			if (byLBA)
+			{
 				return left.get().lba < right.get().lba;
 			}
 			return CleanIdentifier(left.get().id) < CleanIdentifier(right.get().id);
@@ -767,7 +770,8 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 {
 	// Helper lambda to print common details
-	auto printEntryDetails = [&](const char* type, const char* name, const char* sectors, const DIRENTRY& entry) {
+	auto printEntryDetails = [&](const char* type, const char* name, const char* sectors, const DIRENTRY& entry)
+	{
 		// Write entry type with 4 spaces at start
 		fprintf(fp, "%*s%-6s|", level + 4, "", type);
 		// Write entry name
@@ -785,28 +789,32 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 	};
 
 	int maxlba = 0;
-	if (level == 0) {
-		for (const auto& e : entriesInDir) {
+	if (level == 0)
+	{
+		for (const auto& e : entriesInDir)
+		{
 			const DIRENTRY& entry = e.get();
-			if (entry.type != EntryType::EntryDummy && entry.type != EntryType::EntryDA) {
+			if (entry.type != EntryType::EntryDummy && entry.type != EntryType::EntryDA)
+			{
 				maxlba = std::max<int>(entry.lba, maxlba);
 			}
 		}
 	}
 
 	// Print first the files in the directory
-	for (const auto& e : entriesInDir) {
+	for (const auto& e : entriesInDir)
+	{
 		const DIRENTRY& entry = e.get();
 		// Skip directories and postgap dummy
-		if (entry.type == EntryType::EntryDir || (entry.type == EntryType::EntryDummy && level == 0 && entry.lba > maxlba)) {
+		if (entry.type == EntryType::EntryDir || (entry.type == EntryType::EntryDummy && level == 0 && entry.lba > maxlba))
 			continue;
-		}
 
 		const char* typeStr;
 		std::string nameStr = CleanIdentifier(entry.id);
 		uint32_t sectors = GetSizeInSectors(entry.length);
 
-		switch (entry.type) {
+		switch (entry.type)
+		{
 			case EntryType::EntryFile:
 				typeStr = " File";
 				break;
@@ -834,13 +842,16 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 	}
 
 	// Print directories and postgap dummy
-	for (const auto& e : entriesInDir) {
+	for (const auto& e : entriesInDir)
+	{
 		const DIRENTRY& entry = e.get();
-		if (entry.type == EntryType::EntryDir) {
+		if (entry.type == EntryType::EntryDir)
+		{
 			printEntryDetails(" Dir", CleanIdentifier(entry.id).c_str(), "", entry);
 			entry.subdir->OutputLBAlisting( fp, level+1 );
 		}
-		else if (entry.type == EntryType::EntryDummy && level == 0 && entry.lba > maxlba) {
+		else if (entry.type == EntryType::EntryDummy && level == 0 && entry.lba > maxlba)
+		{
 			printEntryDetails("Dummy", "<DUMMY>", std::to_string(GetSizeInSectors(entry.length)).c_str(), entry);
 		}
 	}
@@ -977,11 +988,13 @@ void iso::WriteLicenseData(cd::IsoWriter* writer, void* data, const bool& ps2)
 	auto licenseSectors = writer->GetSectorViewM2F2(0, 12, cd::IsoWriter::EdcEccForm::Form1);
 	licenseSectors->WriteMemory(data, XA_DATA_SIZE * 12);
 
-	if (!ps2) {
+	if (!ps2)
+	{
 		auto licenseBlankSectors = writer->GetSectorViewM2F1(12, 4, cd::IsoWriter::EdcEccForm::Form2);
 		licenseBlankSectors->WriteBlankSectors(4);
 	}
-	else {
+	else
+	{
 		auto licenseBlankSectors = writer->GetSectorViewM2F1(12, 4, cd::IsoWriter::EdcEccForm::Form1);
 		licenseBlankSectors->WriteBlankSectors(4, 0x08);
 	}

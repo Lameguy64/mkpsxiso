@@ -2,7 +2,8 @@
 
 #include "cdreader.h"
 
-struct TrackInfo {
+struct TrackInfo
+{
 	fs::path filePath;
 	std::string fileType;
 	std::string number;
@@ -13,7 +14,8 @@ struct TrackInfo {
 	unsigned int endSector;
 };
 
-struct CueFile {
+struct CueFile
+{
 	bool multiBIN = false;
 	unsigned int totalSectors = 0;
 	std::vector<TrackInfo> tracks;

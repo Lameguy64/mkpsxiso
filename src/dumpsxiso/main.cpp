@@ -52,7 +52,8 @@ namespace param {
 	EncoderAudioFormats encodingFormat = EAF_WAV;
 }
 
-namespace global {
+namespace global
+{
 	CueFile cueFile;
 	std::optional<bool> new_type;
 }
@@ -141,9 +142,11 @@ void prepareRIFFHeader(cd::RIFF_HEADER* header, int dataSize) {
 // don't have EDC Form2 data (this can be checked at redump.org) and some games rely on this to do anti-piracy checks like DDR.
 const bool CheckEDCXA(cd::IsoReader &reader) {
 	cd::SECTOR_M2F2 sector;
-	while (reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE, true)) {
+	while (reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE, true))
+	{
 		if (sector.subHead[2] & 0x20) {
-			if (!memcmp(sector.edc, "\0\0\0\0", sizeof(sector.edc))) {
+			if (!memcmp(sector.edc, "\0\0\0\0", sizeof(sector.edc)))
+			{
 				return false;
 			}
 			return true;
@@ -154,15 +157,18 @@ const bool CheckEDCXA(cd::IsoReader &reader) {
 
 // Games from 2003 and onwards apparenly has built with a newer Sony's mastering tool.
 // These has different submode in the descriptor sectors, a correct root year value and files are sorted by LBA instead by name.
-const bool CheckISOver(cd::IsoReader &reader, bool& ps2) {
+const bool CheckISOver(cd::IsoReader &reader, bool& ps2)
+{
 	cd::SECTOR_M2F2 sector;
 	reader.SeekToSector(15);
 	reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
-	if (sector.subHead[2] & 0x08) {
+	if (sector.subHead[2] & 0x08)
+	{
 		ps2 = true;
 	}
 	reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE, true);
-	if (sector.subHead[2] & 0x01) {
+	if (sector.subHead[2] & 0x01)
+	{
 		return false;
 	}
 	return true;
@@ -178,7 +184,8 @@ std::unique_ptr<cd::ISO_LICENSE> ReadLicense(cd::IsoReader& reader) {
 }
 
 void SaveLicense(const cd::ISO_LICENSE& license) {
-	if (!param::QuietMode) {
+	if (!param::QuietMode)
+	{
 		printf("\n  Creating license data...");
 	}
 
@@ -298,7 +305,8 @@ void writeFLACFile(FILE *outFile, cd::IsoReader& reader, const int cddaSize, con
 
 writeFLACFile_cleanup:
 	FLAC__stream_encoder_delete(encoder);
-	if(!ok) {
+	if(!ok)
+	{
 		exit(EXIT_FAILURE);
 	}
 }
@@ -374,7 +382,8 @@ static EntryAttributes EstablishXMLAttributeDefaults(tinyxml2::XMLElement* defau
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_PERMISSIONS, defaultAttributes.XAPerm);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_GID, defaultAttributes.GID);
 	defaultAttributesElement->SetAttribute(xml::attrib::XA_UID, defaultAttributes.UID);
-	if (defaultAttributes.HFLAG) { // Set only if not zero
+	if (defaultAttributes.HFLAG) // Set only if not zero
+	{
 		defaultAttributesElement->SetAttribute(xml::attrib::HIDDEN_FLAG, defaultAttributes.HFLAG);
 	}
 
@@ -481,18 +490,20 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 
 	// Calculate Directory Record sector size
 	int dirRecordSectors = 0;
-	if (*global::new_type && pathTableList.size() != index + 1) {
+	if (*global::new_type && pathTableList.size() != index + 1)
+	{
 		dirRecordSectors = pathTableList[index + 1].entry.dirOffs - pathTableList[index].entry.dirOffs;
 	}
-	else {
+	else
+	{
 		reader.SeekToSector(pathTableList[index].entry.dirOffs);
-		while (true) {
+		while (true)
+		{
 			cd::SECTOR_M2F2 sector;
 			dirRecordSectors++;
 			reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
-			if (sector.subHead[2] == 0x89) { // Directory records always ends with submode 0x89
+			if (sector.subHead[2] == 0x89) // Directory records always ends with submode 0x89
 				break;
-			}
 		}
 	}
 
@@ -505,7 +516,8 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 			!std::any_of(dirEntries->dirEntryList.GetView().begin(), dirEntries->dirEntryList.GetView().end(), [&e](const auto& entry)
 				{
 					return entry.get().identifier == e.name;
-				})) {
+				}))
+		{
             dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
         }
     } 
@@ -530,7 +542,7 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 						if (index < 0) continue;
 						entry.identifier = s;
 				
-						entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, index, path / s);				
+						entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, index, path / s);
 				}
     }
   
@@ -576,27 +588,31 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 	unsigned tracknum = 2;
 
 	// Get referenced DA files and assign them an ID number
-	for(auto it = entries.begin(); it != entries.end(); it++) {
-		if(it->type == EntryType::EntryDA) {
+	for(auto it = entries.begin(); it != entries.end(); it++)
+	{
+		if(it->type == EntryType::EntryDA)
+		{
 			it->trackid = (tracknum < 10 ? "0" : "") + std::to_string(tracknum);
 			tracknum++;
 			DAfiles.push_back(it);
 		}
 	}
 
-	if (tracknum <= global::cueFile.tracks.size()) {
+	if (tracknum <= global::cueFile.tracks.size())
+	{
 		std::vector<cd::IsoDirEntries::Entry> unrefDAbuff;
 		// Create a buffer of unreferenced DA tracks
-		for(const auto& track : global::cueFile.tracks) {
+		for(const auto& track : global::cueFile.tracks)
+		{
 			// Skip non audio tracks
-			if (track.type != "AUDIO") {
+			if (track.type != "AUDIO")
 				continue;
-			}
 			// Skip referenced DA tracks
 			if (tracknum > 2 && std::any_of(DAfiles.begin(), DAfiles.end(), [&track](const auto& entry)
 									{
 										return entry->entry.entryOffs.lsb == track.startSector;
-									})) {
+									}))
+			{
 				continue;
 			}
 
@@ -611,23 +627,27 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			// For ex, Mega Man X3 track 30 had 149 sectors pause, but at redump.org says it was a 150 standard one
 			unsigned char sectorBuff[CD_SECTOR_SIZE];
 			unsigned char emptyBuff[CD_SECTOR_SIZE] {};
-			while (true) {
-				if (!reader.SeekToSector(entry.entry.entryOffs.lsb - 1) && !multiBinSeeker(entry.entry.entryOffs.lsb - 1, entry, reader, global::cueFile)) {
+			while (true)
+			{
+				if (!reader.SeekToSector(entry.entry.entryOffs.lsb - 1) && !multiBinSeeker(entry.entry.entryOffs.lsb - 1, entry, reader, global::cueFile))
 					break;
-				}
+
 				reader.ReadBytesDA(sectorBuff, CD_SECTOR_SIZE, true);
-				if (memcmp(sectorBuff, emptyBuff, CD_SECTOR_SIZE)) {
+				if (memcmp(sectorBuff, emptyBuff, CD_SECTOR_SIZE))
+				{
 					entry.entry.entryOffs.lsb--;
 					entry.entry.entrySize.lsb += F1_DATA_SIZE;
 				}
-				else {
+				else
+				{
 					break;
 				}
 			}
 		}
 
 		// Add unreferenced DA tracks to entries for further extraction
-		for (auto& entry : unrefDAbuff) {
+		for (auto& entry : unrefDAbuff)
+		{
 			entries.emplace_back(std::move(entry));
 			DAfiles.push_back(std::prev(entries.end()));
 		}
@@ -640,10 +660,13 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 
 		// Only recalculate the track id's if there were unreferenced tracks among the referenced ones
 		// This is just for a prettier XML sort, because unsorted track id's have no impact at build time
-		if (tracknum > 2) {
+		if (tracknum > 2)
+		{
 			tracknum = 2;
-			for(const auto& entry : DAfiles) {
-				if(!entry->trackid.empty()) {
+			for(const auto& entry : DAfiles)
+			{
+				if(!entry->trackid.empty())
+				{
 					entry->trackid = (tracknum < 10 ? "0" : "") + std::to_string(tracknum);
 				}
 				tracknum++;
@@ -671,7 +694,8 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				// For both XA and STR files, we need to extract the data 2336 bytes per sector.
 				// When rebuilding the bin using mkpsxiso, we mark the file with mixed.
 				// The source file will anyway be stored on our hard drive in raw form.
-				if (!param::QuietMode) {
+				if (!param::QuietMode)
+				{
 					printf("    Extracting XA \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
 				}
 				fflush(stdout);
@@ -714,7 +738,8 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			else if (entry.type == EntryType::EntryDA)
 			{
 				// Extract CDDA file
-				if (firstDA && !param::QuietMode) {
+				if (firstDA && !param::QuietMode)
+				{
 					printf("\n  Creating CDDA files...\n");
 					firstDA = false;
 				}
@@ -724,20 +749,24 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
                 auto daOutPath = GetRealDAFilePath(outputPath);
 				auto outFile = OpenScopedFile(daOutPath, "wb");
 
-				if (isInvalid && !param::noWarns) {
+				if (isInvalid && !param::noWarns)
+				{
 					printf( "\nWARNING: The CDDA file \"%" PRFILESYSTEM_PATH "\" is out of the iso file bounds.\n"
 							"\t This usually means that the game has audio tracks, and they are on separate files.\n", daOutPath.filename().c_str() );
-					if (global::cueFile.tracks.empty()) {
+					if (global::cueFile.tracks.empty())
+					{
 						printf("\t Try using a .cue file, instead of an ISO image, to be able to access those files.\n");
 					}
 					printf( "\t DUMPSXISO will write the file as a dummy (silent) cdda file.\n"
 							"\t This is generally fine, when the real CDDA file is also a dummy file.\n"
 							"\t If it is not dummy, you WILL lose this audio data in the rebuilt iso... " );
-					if (param::QuietMode) {
+					if (param::QuietMode)
+					{
 						printf("\n");
 					}
 				}
-				else if (!param::QuietMode) {
+				else if (!param::QuietMode)
+				{
 					printf("    Extracting audio \"%" PRFILESYSTEM_PATH "\"... ", daOutPath.lexically_normal().c_str());
 				}
 				fflush(stdout);
@@ -766,14 +795,16 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					writePCMFile(outFile.get(), reader, cddaSize, isInvalid);
 				}
 
-				if (global::cueFile.multiBIN) {
+				if (global::cueFile.multiBIN)
+				{
 					reader.Open(global::cueFile.tracks[0].filePath);
 				}
 			}
 			else if (entry.type == EntryType::EntryFile)
 			{
 				// Extract regular file
-				if (!param::QuietMode) {
+				if (!param::QuietMode)
+				{
 					printf("    Extracting \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
 					fflush(stdout);
 				}
@@ -810,12 +841,14 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			}
 			else
 			{
-				if (!param::noWarns) {
+				if (!param::noWarns)
+				{
 					printf("WARNING: File %s is of invalid type.\n", entry.identifier.c_str());
 				}
 				continue;
 			}
-			if (!param::QuietMode) {
+			if (!param::QuietMode)
+			{
 				printf("Done.\n");
 			}
         }
@@ -828,9 +861,9 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 		fs::path toChange(rootPath / entry.virtualPath / CleanIdentifier(entry.identifier));
 		if(entry.type == EntryType::EntryDA)
 		{
-			if (entry.trackid.empty()) {
+			if (entry.trackid.empty())
 				continue; // Skip if it's an unreferenced DA file
-			}
+
 			toChange = GetRealDAFilePath(toChange);
 		}
 		UpdateTimestamps(toChange, entry.entry.entryDate);
@@ -983,7 +1016,8 @@ void ParseISO(cd::IsoReader& reader) {
     reader.ReadBytes(&descriptor, F1_DATA_SIZE);
 
 
-	if (!param::QuietMode) {
+	if (!param::QuietMode)
+	{
 		printf( "Scanning tracks...\n\n"
 				"  Track #1 data:\n"
 				"    Identifiers:\n" );
@@ -1016,14 +1050,17 @@ void ParseISO(cd::IsoReader& reader) {
 
 		std::error_code ec;
 		fs::create_directories(dirPath, ec);
-		if (ec) {
+		if (ec)
+		{
 			printf("\nERROR: Cannot create directory \"%" PRFILESYSTEM_PATH "\". %s\n", dirPath.parent_path().lexically_normal().c_str(), ec.message().c_str());
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	if (!param::QuietMode) {
-		if (!param::noxml) {
+	if (!param::QuietMode)
+	{
+		if (!param::noxml)
+		{
 			printf("\n    License file: \"%" PRFILESYSTEM_PATH "\"\n", (param::outPath.lexically_normal() / "license_data.dat").c_str());
 		}
 		printf("\n    Parsing directory tree...\n");
@@ -1041,11 +1078,14 @@ void ParseISO(cd::IsoReader& reader) {
 		});
 
 	unsigned totalLenLBA = descriptor.volumeSize.lsb;
-	if (!param::QuietMode) {
+	if (!param::QuietMode)
+	{
 		printf("      Files Total: %zu\n", entries.size() - numEntries);
 		printf("      Directories: %zu\n", numEntries - 1);
-		for (auto it = entries.rbegin(); it != entries.rend(); it++) {
-			if (it->type != EntryType::EntryDA) {
+		for (auto it = entries.rbegin(); it != entries.rend(); it++)
+		{
+			if (it->type != EntryType::EntryDA)
+			{
 				unsigned endFS = it->entry.entryOffs.lsb + GetSizeInSectors(it->entry.entrySize.lsb);
 				endFS += totalLenLBA - endFS < 150 ? totalLenLBA - endFS : 150;
 				printf("      Total file system size: %u bytes (%u sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
@@ -1057,8 +1097,10 @@ void ParseISO(cd::IsoReader& reader) {
 	// Process DA tracks and add them to the entries list
 	auto DAfiles = processDAfiles(reader, entries);
 
-	if (!param::QuietMode) {
-		for(size_t i = 0; i < DAfiles.size(); i++) {
+	if (!param::QuietMode)
+	{
+		for(size_t i = 0; i < DAfiles.size(); i++)
+		{
 			printf("\n  Track #%zu audio:\n", i + 2);
 			printf("    DA File \"%s\"\n", CleanIdentifier(DAfiles[i]->identifier).c_str());
 		}
@@ -1071,12 +1113,14 @@ void ParseISO(cd::IsoReader& reader) {
 	if (!param::noxml)
 	{
 		SaveLicense(*license);
-		if (!param::QuietMode) {
+		if (!param::QuietMode)
+		{
 			printf("  Creating XML document...");
 		}
 		if (FILE* file = OpenFile(param::xmlFile, "wb"); file != nullptr)
 		{
-			if (!param::QuietMode) {
+			if (!param::QuietMode)
+			{
 				printf(" Ok.\n\n");
 			}
 			tinyxml2::XMLDocument xmldoc;
@@ -1089,7 +1133,8 @@ void ParseISO(cd::IsoReader& reader) {
 			trackElement->SetAttribute(xml::attrib::TRACK_TYPE, "data");
 			trackElement->SetAttribute(xml::attrib::XA_EDC, xa_edc);
 			trackElement->SetAttribute(xml::attrib::NEW_TYPE, *global::new_type);
-			if (ps2) {
+			if (ps2)
+			{
 				trackElement->SetAttribute(xml::attrib::PS2, ps2);
 			}
 
@@ -1147,16 +1192,20 @@ void ParseISO(cd::IsoReader& reader) {
 			// Write the DATA track postgap
 			// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, postgap should be always >= 150 sectors for CD-DA discs and optionally for non CD-DA.
 			unsigned postGap = 150;
-			if (!global::cueFile.tracks.empty() && global::cueFile.tracks[0].endSector <= totalLenLBA) {
+			if (!global::cueFile.tracks.empty() && global::cueFile.tracks[0].endSector <= totalLenLBA)
+			{
 				postGap = global::cueFile.tracks[0].endSector - currentLBA;
 			}
-			else if (totalLenLBA - currentLBA < postGap) {
+			else if (totalLenLBA - currentLBA < postGap)
+			{
 				postGap = totalLenLBA - currentLBA;
-				if (postGap && !param::noWarns) {
+				if (postGap && !param::noWarns)
+				{
 					printf("WARNING: Size of DATA track postgap is of %u sectors instead of 150.\n", postGap);
 				}
 			}
-			else if (!DAfiles.empty() && DAfiles[0]->entry.entryOffs.lsb - postGap == currentLBA) {
+			else if (!DAfiles.empty() && DAfiles[0]->entry.entryOffs.lsb - postGap == currentLBA)
+			{
 				postGap = 0;
 			}
 			// There are some CD-DA games that have a non-zero adrress ECC calculation in the last postgap sector. So, we are checking it.
@@ -1195,7 +1244,8 @@ void ParseISO(cd::IsoReader& reader) {
 				currentLBA += GetSizeInSectors(dafile->entry.entrySize.lsb);
 				tinyxml2::XMLElement *newtrack = xmldoc.NewElement(xml::elem::TRACK);
 				newtrack->SetAttribute(xml::attrib::TRACK_TYPE, "audio");
-				if (!dafile->trackid.empty()) {
+				if (!dafile->trackid.empty())
+				{
 					newtrack->SetAttribute(xml::attrib::TRACK_ID, dafile->trackid.c_str());
 				}
 				newtrack->SetAttribute(xml::attrib::TRACK_SOURCE, dafile->virtualPath.generic_string().c_str());
@@ -1211,13 +1261,16 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 
 			// Check if there is still an EoF gap
-			if (currentLBA < totalLenLBA && !param::noWarns) {
+			if (currentLBA < totalLenLBA && !param::noWarns)
+			{
 				printf( "WARNING: There is still a gap of %u sectors at the end.\n"
 						"\t This could mean that there are missing files or tracks.\n", totalLenLBA - currentLBA);
-				if (global::cueFile.tracks.empty()) {
+				if (global::cueFile.tracks.empty())
+				{
 					printf("\t Try using a .cue file instead of an ISO image.\n");
 				}
-				else {
+				else
+				{
 					printf("\t Try using the -pt command, it could help if the game has an obfuscated file system.\n");
 				}
 			}
@@ -1407,7 +1460,8 @@ int Main(int argc, char *argv[])
 		}
 	}
 
-	if (!param::QuietMode) {
+	if (!param::QuietMode)
+	{
 		printf("Output directory : \"%" PRFILESYSTEM_PATH "\"\n\n", param::outPath.lexically_normal().c_str());
 	}
 

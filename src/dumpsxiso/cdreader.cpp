@@ -323,7 +323,8 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 
 			if (numEntries++ >= 2)
 			{
-				if (*global::new_type) {
+				if (*global::new_type)
+				{
 					entry->order = order++;
 				}
 				dirEntryList.emplace(std::move(entry.value()));
@@ -338,14 +339,16 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 		});
 
 	// Delete orders if all are correct to avoid populate the xml with unnecessary strings
-	if (*global::new_type) {
+	if (*global::new_type)
+	{
 		auto& entriesInDir = dirEntryList.GetView();
-		for (int index = 0; index < entriesInDir.size(); index++) {
-			if (*entriesInDir[index].get().order != index) {
+		for (int index = 0; index < entriesInDir.size(); index++)
+		{
+			if (*entriesInDir[index].get().order != index)
 				return;
-			}
 		}
-		for (auto& entry : entriesInDir) {
+		for (auto& entry : entriesInDir)
+		{
 			entry.get().order.reset();
 		}
 	}
@@ -382,7 +385,8 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	// XA attributes are big endian, swap them
 	entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
 	entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
-	if ((entry.extData.attributes & 0x0FFF) != 0x0800) { // HACK for conflictive images that has the attributes written as little endian
+	if ((entry.extData.attributes & 0x0FFF) != 0x0800) // HACK for conflictive images that has the attributes written as little endian
+	{
 		entry.extData.attributes = SwapBytes16(entry.extData.attributes);
 	}
 
@@ -394,9 +398,7 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 
 	// If there is still a difference, then it's either an invalid entry or a corrupted sector
 	if (bytesRead != entry.entry.entryLength)
-	{
 		return std::nullopt;
-	}
 
 	// Add the EntryType here so as to not keep calculating it everytime later
 	// Check for file number first to determine if it's a STR/XA file, because some games (Mega Man X3) have flagged them as DATA but currently they are not

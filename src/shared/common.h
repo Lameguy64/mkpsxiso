@@ -50,7 +50,8 @@ public:
 };
 
 // Shared by mkpsxiso and dumpsxiso
-namespace global {
+namespace global
+{
 	extern std::optional<bool> new_type;
 }
 

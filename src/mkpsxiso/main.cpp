@@ -522,10 +522,12 @@ int Main(int argc, char* argv[])
 				global::xa_edc = trackElement->BoolAttribute(xml::attrib::XA_EDC, true);
 
 				// This check is necessary so as to leave an empty value for compatibility with <=v2.04 dumped files timestamps
-				if ( trackElement->Attribute(xml::attrib::NEW_TYPE) != nullptr ) {
+				if ( trackElement->Attribute(xml::attrib::NEW_TYPE) != nullptr )
+				{
 					global::new_type = trackElement->BoolAttribute(xml::attrib::NEW_TYPE);
 				}
-				if ( (global::ps2 = trackElement->BoolAttribute(xml::attrib::PS2)) ) {
+				if ( (global::ps2 = trackElement->BoolAttribute(xml::attrib::PS2)) )
+				{
 					global::new_type = true; // Force true if it's an PS2 disc
 				}
 
@@ -710,7 +712,8 @@ int Main(int argc, char* argv[])
 				if (!unrefTracks.empty())
 				{
 					iso::DirTreeClass dirTree(unrefTracks, nullptr, "UNREFERENCED TRACKS");
-					for (auto& entry : unrefTracks) {
+					for (auto& entry : unrefTracks)
+					{
 						dirTree.entriesInDir.push_back(entry);
 					}
 					dirTree.OutputLBAlisting( fp, 0 );
@@ -747,7 +750,8 @@ int Main(int argc, char* argv[])
 				if (!unrefTracks.empty())
 				{
 					iso::DirTreeClass dirTree(unrefTracks, nullptr, "UNREFERENCED TRACKS");
-					for (auto& entry : unrefTracks) {
+					for (auto& entry : unrefTracks)
+					{
 						dirTree.entriesInDir.push_back(entry);
 					}
 					fprintf( fp, "\n" );

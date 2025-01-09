@@ -105,7 +105,8 @@ uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize)
 int32_t TimecodeToSectors(const std::string timecode)
 {
 	unsigned int minutes, seconds, frames;
-	if (sscanf(timecode.c_str(), "%u:%u:%u", &minutes, &seconds, &frames) != 3 || (minutes > INT_MAX) || (seconds > 59) || (frames > 74)) {
+	if (sscanf(timecode.c_str(), "%u:%u:%u", &minutes, &seconds, &frames) != 3 || (minutes > INT_MAX) || (seconds > 59) || (frames > 74))
+	{
 		return -1;
 	}
 	return (minutes * 60 + seconds) * 75 + frames;
