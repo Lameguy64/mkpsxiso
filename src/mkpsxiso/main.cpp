@@ -1149,7 +1149,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 				return false;
 
             }
-			else if ( licenseSize != 28032 && !global::noWarns )
+			else if ( licenseSize != sizeof(cd::ISO_LICENSE) && !global::noWarns )
 			{
             	if ( !global::QuietMode )
 				{

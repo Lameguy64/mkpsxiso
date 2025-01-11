@@ -354,16 +354,7 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 		else
 		{
 			// Increment LBA by the size of file
-			if ( entry.type == EntryType::EntryFile || entry.type == EntryType::EntryXA_DO || entry.type == EntryType::EntryDummy )
-			{	
-				if (entry.flba > maxFlba) {
-					maxFlba = entry.flba;
-					sizeMax = GetSizeInSectors(entry.length, F1_DATA_SIZE);
-				}
-
-				lba += GetSizeInSectors(entry.length, F1_DATA_SIZE);
-			}
-			else if ( entry.type == EntryType::EntryXA )
+			if ( entry.type == EntryType::EntryXA )
 			{
 				if (entry.flba > maxFlba) {
 					maxFlba = entry.flba;
@@ -376,6 +367,15 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 			{
 				// DA files don't take up any space in the ISO filesystem, they are just links to CD tracks
 				entry.lba = iso::DA_FILE_PLACEHOLDER_LBA; // we will write the lba into the filesystem when writing the CDDA track
+			}
+			else
+			{	
+				if (entry.flba > maxFlba) {
+					maxFlba = entry.flba;
+					sizeMax = GetSizeInSectors(entry.length, F1_DATA_SIZE);
+				}
+
+				lba += GetSizeInSectors(entry.length, F1_DATA_SIZE);
 			}
 		}
 	}
@@ -440,18 +440,27 @@ void iso::DirTreeClass::SortDirectoryEntries(const bool byOrder, const bool byLB
 		}
 	}
 
-	std::stable_sort(entriesInDir.begin(), entriesInDir.end(), [&](const auto& left, const auto& right)
-		{
-			if (byOrder)
+	if (byOrder)
+	{
+		std::stable_sort(entriesInDir.begin(), entriesInDir.end(), [](const auto& left, const auto& right)
 			{
 				return left.get().order < right.get().order;
-			}
-			if (byLBA)
+			});
+	}
+	else if (byLBA)
+	{
+		std::sort(entriesInDir.begin(), entriesInDir.end(), [](const auto& left, const auto& right)
 			{
 				return left.get().lba < right.get().lba;
-			}
-			return CleanIdentifier(left.get().id) < CleanIdentifier(right.get().id);
-		});
+			});
+	}
+	else
+	{
+		std::sort(entriesInDir.begin(), entriesInDir.end(), [&](const auto& left, const auto& right)
+			{
+				return CleanIdentifier(left.get().id) < CleanIdentifier(right.get().id);
+			});
+	}
 }
 
 bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, const int totalDirs) const
@@ -487,10 +496,6 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 		if ( entry.type == EntryType::EntryXA )
 		{
 			length = F1_DATA_SIZE * GetSizeInSectors(entry.length, XA_DATA_SIZE);
-		}
-		else if ( entry.type == EntryType::EntryXA_DO )
-		{
-			length = F1_DATA_SIZE * GetSizeInSectors(entry.length, F1_DATA_SIZE);
 		}
 		else if ( entry.type == EntryType::EntryDA )
 		{
@@ -538,13 +543,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 			xa->id[1] = 'A';
 
 			unsigned short attributes = entry.perms;
-			if ( (entry.type == EntryType::EntryFile) ||
-				(entry.type == EntryType::EntryXA_DO) ||
-				(entry.type == EntryType::EntryDummy) )
-			{
-				attributes |= 0x800;
-			}
-			else if (entry.type == EntryType::EntryDA)
+			if (entry.type == EntryType::EntryDA)
 			{
 				attributes |= 0x4000;
 			}
@@ -556,6 +555,10 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 			else if (entry.type == EntryType::EntryDir)
 			{
 				attributes |= 0x8800;
+			}
+			else
+			{
+				attributes |= 0x800;
 			}
 
 			xa->attributes = SwapBytes16(attributes);
@@ -697,11 +700,6 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 				}
 
 			}
-		// Write DA files as audio tracks
-		}
-		else if ( entry.type == EntryType::EntryDA )
-		{
-			continue;
 		}
 		// Write dummies as gaps without data
 		else if ( entry.type == EntryType::EntryDummy )
@@ -713,6 +711,11 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			auto sectorView = writer->GetSectorViewM2F1(entry.lba, sizeInSectors, isForm2 ? cd::IsoWriter::EdcEccForm::Form2 : cd::IsoWriter::EdcEccForm::Form1);
 
 			sectorView->WriteBlankSectors(sizeInSectors, entry.attribs, entry.HF);
+		}
+		// Write DA files as audio tracks
+		else
+		{
+			continue;
 		}
 	}
 
