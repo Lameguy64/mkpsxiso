@@ -1229,7 +1229,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	bool found_da = false;
 	const EntryAttributes defaultAttributes = ReadEntryAttributes(EntryAttributes{}, trackElement->FirstChildElement(xml::elem::DEFAULT_ATTRIBUTES));
 
-	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate, ReadEntryAttributes(EntryAttributes{}, directoryTree));
+	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate, ReadEntryAttributes(defaultAttributes, directoryTree));
 	iso::DirTreeClass* dirTree = root.subdir.get();
 
 	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, defaultAttributes, found_da) )
