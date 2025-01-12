@@ -13,7 +13,8 @@
 			"binaryDir":   "${sourceDir}/build",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG": "Debug"
+				"CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG": "Debug",
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "1"
 			}
 		},
 		{

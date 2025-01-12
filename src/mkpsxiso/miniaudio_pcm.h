@@ -1,4 +1,6 @@
 #pragma once
+#include "common.h"
+#include "miniaudio.h"
 
 typedef struct {
     uint8_t header[44];
@@ -131,7 +133,7 @@ static ma_result stdio_file_size(FILE *file, uint64_t *pSizeInBytes)
     return MA_SUCCESS;
 }
 
-MA_API ma_result ma_decoder_init_FILE_pcm(FILE *file, ma_decoder_config* pConfig, ma_decoder* pDecoder, VirtualWav *pUserData)
+inline MA_API ma_result ma_decoder_init_FILE_pcm(FILE *file, ma_decoder_config* pConfig, ma_decoder* pDecoder, VirtualWav *pUserData)
 {
     uint64_t pcmSize;
     if(stdio_file_size(file, &pcmSize) != MA_SUCCESS)
@@ -144,7 +146,7 @@ MA_API ma_result ma_decoder_init_FILE_pcm(FILE *file, ma_decoder_config* pConfig
         return MA_ERROR;
 	}
 	// 2 channels of 16 bit samples
-	else if((pcmSize % (2 * sizeof(int16_t))) != 0)
+    else if((pcmSize % (2 * sizeof(int16_t))) != 0)
 	{
 		printf("    ERROR: (PCM) byte count indicates non-integer sample count\n");
         return MA_ERROR;
@@ -206,7 +208,7 @@ MA_API ma_result ma_decoder_init_FILE_pcm(FILE *file, ma_decoder_config* pConfig
 }
 #ifdef __cplusplus
 // feed to pcm file to miniaudio as a wav file
-MA_API ma_result ma_decoder_init_path_pcm(const fs::path& pFilePath, ma_decoder_config* pConfig, ma_decoder* pDecoder, VirtualWavEx *pUserData)
+inline MA_API ma_result ma_decoder_init_path_pcm(const fs::path& pFilePath, ma_decoder_config* pConfig, ma_decoder* pDecoder, VirtualWavEx *pUserData)
 {
     unique_file file(OpenFile(pFilePath, "rb"));
     if(!file)

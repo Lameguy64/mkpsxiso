@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Fetch repo contents
-      uses: actions/checkout@v4
+      uses: actions/checkout@main
       with:
         submodules: recursive
 
@@ -20,7 +20,7 @@ jobs:
         cmake --workflow ci
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@main
       with:
         name: mkpsxiso-windows
         path: |
@@ -33,16 +33,18 @@ jobs:
 
     steps:
     - name: Fetch repo contents
-      uses: actions/checkout@v4
+      uses: actions/checkout@main
       with:
         submodules: recursive
 
     - name: Build and package mkpsxiso
       run: |
+        export CC=clang
+        export CXX=clang++
         cmake --workflow ci
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@main
       with:
         name: mkpsxiso-linux
         path: |
@@ -55,7 +57,7 @@ jobs:
 
     steps:
     - name: Fetch repo contents
-      uses: actions/checkout@v4
+      uses: actions/checkout@main
       with:
         submodules: recursive
 
@@ -64,7 +66,7 @@ jobs:
         cmake --workflow ci
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@main
       with:
         name: mkpsxiso-macos
         path: |
@@ -81,11 +83,11 @@ jobs:
     steps:
     - name: Fetch build artifacts
       if:   ${{ github.ref_type == 'tag' }}
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@main
 
     - name: Publish release
       if:   ${{ github.ref_type == 'tag' }}
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@master
       with:
         fail_on_unmatched_files: true
         #generate_release_notes:  true

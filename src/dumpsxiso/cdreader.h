@@ -1,6 +1,7 @@
 #ifndef _CDREADER_H
 #define _CDREADER_H
 
+#include "common.h"
 #include "xa.h"
 #include "listview.h"
 

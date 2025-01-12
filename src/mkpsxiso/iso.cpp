@@ -2,8 +2,6 @@
 #include "iso.h"
 #include "xa.h"
 #include "miniaudio_helpers.h"
-#include <algorithm>
-#include <cstring>
 #include <fstream>
 
 static const int MinimumOne(const int val)
@@ -941,7 +939,7 @@ int iso::DirTreeClass::GetFileCountTotal() const
     for ( const auto& e : entriesInDir )
 	{
 		const DIRENTRY& entry = e.get();
-        if ( entry.type != EntryType::EntryDir )
+		if ( entry.type != EntryType::EntryDir )
 		{
 			if ( !entry.id.empty() )
 			{

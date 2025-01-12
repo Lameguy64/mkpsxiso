@@ -1,7 +1,5 @@
-#include "common.h"
 #include "cdreader.h"
 #include "platform.h"
-#include <cstring>
 
 cd::IsoReader::IsoReader()
 {

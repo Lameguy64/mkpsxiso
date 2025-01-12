@@ -1,5 +1,4 @@
 #include "platform.h"
-#include "common.h"
 #include "xml.h"
 #include "cue.h"
 #include <map>
@@ -191,11 +190,13 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
 
 	FILE* outFile = OpenFile(param::outPath / "license_data.dat", "wb");
 
-    if (outFile == NULL) {
+	if (outFile == NULL)
+	{
 		printf("\nERROR: Cannot create license file.\n");
         exit(EXIT_FAILURE);
     }
-	else if (!param::QuietMode) {
+	else if (!param::QuietMode)
+	{
 		printf(" Ok.\n");
 	}
 
@@ -215,7 +216,7 @@ void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, c
     	if (bytesToRead > bufferSize)
     		bytesToRead = bufferSize;
 
-    	if (!isInvalid)
+		if (!isInvalid)
     		reader.ReadBytesDA(copyBuff, bytesToRead);
 		else
 			memset(copyBuff, 0, bytesToRead);

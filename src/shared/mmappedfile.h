@@ -2,7 +2,6 @@
 
 // Cross-platform memory mapped file wrapper
 
-#include <cstdint>
 #include "ghc/fs_std.hpp"
 
 class MMappedFile

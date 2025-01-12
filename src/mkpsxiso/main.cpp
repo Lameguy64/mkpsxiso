@@ -1136,7 +1136,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 
 			int64_t licenseSize = GetSize( license_file );
 
-            if ( licenseSize < 0 )
+			if ( licenseSize < 0 )
 			{
 				if ( !global::QuietMode )
 				{
@@ -1535,7 +1535,7 @@ bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* pare
 	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
 		
-        if ( CompareICase( "file", dirElement->Name() ))
+		if ( CompareICase( "file", dirElement->Name() ))
 		{
 			if (!ParseFileEntry(dirTree, dirElement, xmlPath, defaultAttributes, found_da))
 			{

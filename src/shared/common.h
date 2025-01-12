@@ -3,7 +3,7 @@
 #include "cd.h"
 #include "ghc/fs_std.hpp"
 #include <optional>
-#include <string>
+#include <cstring>
 
 enum class EntryType
 {
