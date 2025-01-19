@@ -584,19 +584,19 @@ std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, Lis
   	return dirEntries;
 }
 
-std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> ParseDAfiles(cd::IsoReader &reader, std::list<cd::IsoDirEntries::Entry>& entries)
+std::list<cd::IsoDirEntries::Entry*> ParseDAfiles(cd::IsoReader& reader, std::list<cd::IsoDirEntries::Entry>& entries)
 {
-	std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> DAfiles;
+	std::list<cd::IsoDirEntries::Entry*> DAfiles;
 	unsigned tracknum = 2;
 
 	// Get referenced DA files and assign them an ID number
-	for(auto it = entries.begin(); it != entries.end(); it++)
+	for(auto& entry : entries)
 	{
-		if(it->type == EntryType::EntryDA)
+		if(entry.type == EntryType::EntryDA)
 		{
-			it->trackid = std::format("{:02}", tracknum);
+			entry.trackid = std::format("{:02}", tracknum);
 			tracknum++;
-			DAfiles.push_back(it);
+			DAfiles.push_back(&entry);
 		}
 	}
 
@@ -651,11 +651,11 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> ParseDAfiles(cd::IsoR
 		for (auto& entry : unrefDAbuff)
 		{
 			entries.emplace_back(std::move(entry));
-			DAfiles.push_back(std::prev(entries.end()));
+			DAfiles.push_back(&entries.back());
 		}
 
 		// Sort DA files by LBA
-		std::sort(DAfiles.begin(), DAfiles.end(),[](const auto& left, const auto& right)
+		DAfiles.sort([](const auto& left, const auto& right)
 			{
 				return left->entry.entryOffs.lsb < right->entry.entryOffs.lsb;
 			});
@@ -1175,10 +1175,12 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 		}
 
-		for(size_t i = 0; i < DAfiles.size(); i++)
+		int tracknum = 2;
+		for(const auto& entry : DAfiles)
 		{
-			printf("\n  Track #%zu audio:\n", i + 2);
-			printf("    DA File \"%s\"\n", CleanIdentifier(DAfiles[i]->identifier).c_str());
+			printf("\n  Track #%d audio:\n", tracknum);
+			printf("    DA File \"%s\"\n", CleanIdentifier(entry->identifier).c_str());
+			tracknum++;
 		}
 		printf( "\nExtracting ISO...\n"
 				"  Creating files...\n" );
@@ -1280,7 +1282,7 @@ void ParseISO(cd::IsoReader& reader) {
 					printf("WARNING: Size of DATA track postgap is of %u sectors instead of 150.\n", postGap);
 				}
 			}
-			else if (!DAfiles.empty() && DAfiles[0]->entry.entryOffs.lsb - postGap == currentLBA)
+			else if (!DAfiles.empty() && DAfiles.front()->entry.entryOffs.lsb - postGap == currentLBA)
 			{
 				postGap = 0;
 			}
