@@ -31,7 +31,7 @@ namespace global
 };
 
 
-bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const fs::path& xmlPath, const EntryAttributes& parentAttribs, bool& found_da);
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const fs::path& xmlPath, const EntryAttributes& parentAttribs);
 int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path& xmlPath, iso::EntryList& entries, iso::IDENTIFIERS& isoIdentifiers, int& totalLen);
 
 bool PackFileAsCDDA(void* buffer, const fs::path& audioFile);
@@ -1226,13 +1226,12 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		return false;
 	}
 
-	bool found_da = false;
 	const EntryAttributes defaultAttributes = ReadEntryAttributes(EntryAttributes{}, trackElement->FirstChildElement(xml::elem::DEFAULT_ATTRIBUTES));
 
 	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate, ReadEntryAttributes(defaultAttributes, directoryTree));
 	iso::DirTreeClass* dirTree = root.subdir.get();
 
-	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, defaultAttributes, found_da) )
+	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, defaultAttributes) )
 	{
 		return false;
 	}
@@ -1257,7 +1256,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	return true;
 }
 
-static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
+static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes)
 {
 	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
 	const char* sourceElement = dirElement->Attribute(xml::attrib::ENTRY_SOURCE);
@@ -1409,7 +1408,6 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 				return false;
 			}
 			srcFile = sourceElement;
-			found_da = true;
 		}
 		else
 		{
@@ -1424,40 +1422,13 @@ static bool ParseFileEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElemen
 
 			return false;
 		}
-
-		//if ( found_da && entry != EntryType::EntryDA )
-		//{
-		//	if ( !global::QuietMode )
-		//	{
-		//		printf( "      " );
-		//	}
-//
-		//	printf( "ERROR: Cannot place file past a DA audio file on line %d.\n",
-		//		dirElement->GetLineNum() );
-//
-		//	return false;
-		//}
-
 	}
 
 	return dirTree->AddFileEntry(name.c_str(), entry, xmlPath / srcFile, ReadEntryAttributes(defaultAttributes, dirElement), trackid);
 }
 
-static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const bool found_da)
+static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement)
 {
-	//if ( found_da )
-	//{
-	//	if ( !global::QuietMode )
-	//	{
-	//		printf( "      " );
-	//	}
-//
-	//	printf( "ERROR: Cannot place dummy past a DA audio file on line %d.\n",
-	//		dirElement->GetLineNum() );
-//
-	//	return false;
-	//}
-//
 	// TODO: For now this is a hack, unify this code again with the file type in the future
 	// so it isn't as awkward
 
@@ -1468,7 +1439,7 @@ static bool ParseDummyEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLEleme
 	return true;
 }
 
-static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
+static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* dirElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes)
 {
 	const char* nameElement = dirElement->Attribute(xml::attrib::ENTRY_NAME);
 	if ( strlen( nameElement ) > 12 )
@@ -1514,44 +1485,31 @@ static bool ParseDirEntry(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement
 		return false;
 	}
 
-	//if ( found_da && !alreadyExists )
-	//{
-	//	if ( !global::QuietMode )
-	//	{
-	//		printf( "      " );
-	//	}
-//
-	//	printf( "ERROR: Cannot place directory past a DA audio file on line %d\n",
-	//		dirElement->GetLineNum() );
-//
-	//	return false;
-	//}
-
-	return ParseDirectory(subdir, dirElement, xmlPath, defaultAttributes, found_da);
+	return ParseDirectory(subdir, dirElement, xmlPath, defaultAttributes);
 }
 
-bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes, bool& found_da)
+bool ParseDirectory(iso::DirTreeClass* dirTree, const tinyxml2::XMLElement* parentElement, const fs::path& xmlPath, const EntryAttributes& defaultAttributes)
 {
 	for ( const tinyxml2::XMLElement* dirElement = parentElement->FirstChildElement(); dirElement != nullptr; dirElement = dirElement->NextSiblingElement() )
 	{
 		
 		if ( CompareICase( "file", dirElement->Name() ))
 		{
-			if (!ParseFileEntry(dirTree, dirElement, xmlPath, defaultAttributes, found_da))
+			if (!ParseFileEntry(dirTree, dirElement, xmlPath, defaultAttributes))
 			{
 				return false;
 			}
 		}
 		else if ( CompareICase( "dummy", dirElement->Name() ))
 		{
-			if (!ParseDummyEntry(dirTree, dirElement, found_da))
+			if (!ParseDummyEntry(dirTree, dirElement))
 			{
 				return false;
 			}
         }
 		else if ( CompareICase( "dir", dirElement->Name() ))
 		{
-			if (!ParseDirEntry(dirTree, dirElement, xmlPath, defaultAttributes, found_da))
+			if (!ParseDirEntry(dirTree, dirElement, xmlPath, defaultAttributes))
 			{
 				return false;
 			}
