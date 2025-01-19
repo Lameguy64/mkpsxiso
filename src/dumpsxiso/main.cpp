@@ -756,12 +756,12 @@ void BruteForce(cd::IsoReader& reader, std::list<cd::IsoDirEntries::Entry>& entr
 
 void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entry>& files, const fs::path& rootPath)
 {
-	bool firstDA = true;
+	bool printedDA = false;
     for (const auto& entry : files)
 	{
-		const fs::path outputPath = rootPath / entry.virtualPath / CleanIdentifier(entry.identifier);
         if (entry.subdir == nullptr) // Do not extract directories, they're already prepared
 		{
+			const fs::path outputPath = rootPath / entry.virtualPath / CleanIdentifier(entry.identifier);
 			if (entry.type == EntryType::EntryXA)
 			{
 				// Extract XA or STR file.
@@ -812,10 +812,10 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 			else if (entry.type == EntryType::EntryDA)
 			{
 				// Extract CDDA file
-				if (firstDA && !param::QuietMode)
+				if (!printedDA && !param::QuietMode)
 				{
 					printf("\n  Creating CDDA files...\n");
-					firstDA = false;
+					printedDA = true;
 				}
 				bool isInvalid = !global::cueFile.multiBIN
 					? !reader.SeekToSector(entry.entry.entryOffs.lsb)
@@ -994,7 +994,7 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	if (numSectors < 1) {
 		return;
 	}
-	cd::SECTOR_M2F2 sector;
+	cd::SECTOR_M2F1 sector;
 	reader.SeekToSector(startSector);
 	reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
 	tinyxml2::XMLElement* newelement = dirElement->InsertNewChildElement("dummy");
@@ -1006,11 +1006,34 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	}
 }
 
+void WriteXMLPostGap(const int postGap, tinyxml2::XMLElement* dirTree, unsigned int& currentLBA, cd::IsoReader& reader)
+{
+	if (!postGap)
+		return;
+
+	// There are some CD-DA games that have a non-zero adrress ECC calculation in the last postgap sector. So, we are checking it.
+	// Idk if this behavior could happen in other sectors, but apparently it's only related to CD-DA games postgaps (maybe a bug).
+	cd::SECTOR_M2F1 sector;
+	reader.SeekToSector(currentLBA + postGap - 1);
+	reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
+	if (memcmp(sector.ecc, "\0\0\0\0", sizeof(sector.edc)))
+	{
+		WriteXMLGap(postGap - 1, dirTree, currentLBA, reader);
+		WriteXMLGap(1, dirTree, currentLBA + postGap - 1, reader);
+		dirTree->LastChildElement()->SetAttribute(xml::attrib::ECC_ADDRES, true);
+	}
+	else
+	{
+		WriteXMLGap(postGap, dirTree, currentLBA, reader);
+	}
+	currentLBA += postGap;
+}
+
 void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
-	EntryAttributeCounters& attributeCounters, cd::IsoReader &reader)
+	EntryAttributeCounters& attributeCounters, cd::IsoReader& reader, const int postGap)
 {
 	fs::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
-
+	bool writedPostGap = false;
 	for (const auto& entry : files)
 	{
 		// if this is a DA file we are at the end of filesystem
@@ -1026,6 +1049,11 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 		else if (entry.trackid.empty())
 		{
 			continue; // Skip if it's an unreferenced DA file
+		}
+		else if (!writedPostGap)
+		{
+			WriteXMLPostGap(postGap, dirElement, expectedLBA, reader);
+			writedPostGap = true;
 		}
 
 		// Work out the relative position between the current directory and the element to create
@@ -1053,6 +1081,11 @@ void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::X
 		}
 
 		dirElement = WriteXMLEntry(entry, dirElement, &currentVirtualPath, sourcePath, attributeCounters);
+	}
+
+	if (!writedPostGap)
+	{
+		WriteXMLPostGap(postGap, dirElement, expectedLBA, reader);
 	}
 }
 
@@ -1160,20 +1193,38 @@ void ParseISO(cd::IsoReader& reader) {
 		BruteForce(reader, entries, descriptor.rootDirRecord.entryOffs.lsb, totalLenLBA);
 	}
 
+	// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, postgap should be always >= 150 sectors for CD-DA discs and optionally for non CD-DA.
+	int endFS, postGap = 150;
+	for (auto it = entries.rbegin(); it != entries.rend(); it++)
+	{
+		if (it->type != EntryType::EntryDA)
+	 	{
+	 		endFS = it->entry.entryOffs.lsb + GetSizeInSectors(it->entry.entrySize.lsb);
+			if (!global::cueFile.tracks.empty() && global::cueFile.tracks[0].endSector <= totalLenLBA)
+			{
+				endFS += postGap = global::cueFile.tracks[0].endSector - endFS;
+			}
+			else if (!DAfiles.empty())
+			{
+				endFS += postGap = (DAfiles.front()->entry.entryOffs.lsb - endFS) / 2;
+			}
+			else if (totalLenLBA - endFS < postGap)
+			{
+				endFS += postGap = totalLenLBA - endFS;
+				if (postGap && !param::noWarns)
+				{
+					printf("    WARNING: Size of DATA track postgap is of %d sectors instead of 150.\n", postGap);
+				}
+			}
+			break;
+		}
+	}
+
 	if (!param::QuietMode)
 	{
 		printf("      Files Total: %zu\n", entries.size() - numEntries);
 		printf("      Directories: %zu\n", numEntries - 1);
-		for (auto it = entries.rbegin(); it != entries.rend(); it++)
-		{
-			if (it->type != EntryType::EntryDA)
-			{
-				unsigned endFS = it->entry.entryOffs.lsb + GetSizeInSectors(it->entry.entrySize.lsb);
-				endFS += totalLenLBA - endFS < 150 ? totalLenLBA - endFS : 150;
-				printf("      Total file system size: %u bytes (%u sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
-				break;
-			}
-		}
+		printf("      Total file system size: %d bytes (%d sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
 
 		int tracknum = 2;
 		for(const auto& entry : DAfiles)
@@ -1258,53 +1309,15 @@ void ParseISO(cd::IsoReader& reader) {
 			if (param::outputSortedByDir)
 			{
 				WriteXMLByDirectories(rootDir.get(), trackElement, sourcePath, currentLBA, attributeCounters);		
+				WriteXMLPostGap(postGap, trackElement->LastChildElement(), currentLBA, reader);
 			}
 			else
 			{
-				WriteXMLByLBA(entries, trackElement, sourcePath, currentLBA, attributeCounters, reader);
+				WriteXMLByLBA(entries, trackElement, sourcePath, currentLBA, attributeCounters, reader, postGap);
 			}
 
 			tinyxml2::XMLElement *dirtree = trackElement->FirstChildElement(xml::elem::DIRECTORY_TREE);
 			SimplifyDefaultXMLAttributes(dirtree, EstablishXMLAttributeDefaults(defaultAttributesElement, attributeCounters));
-
-			// Write the DATA track postgap
-			// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, postgap should be always >= 150 sectors for CD-DA discs and optionally for non CD-DA.
-			unsigned postGap = 150;
-			if (!global::cueFile.tracks.empty() && global::cueFile.tracks[0].endSector <= totalLenLBA)
-			{
-				postGap = global::cueFile.tracks[0].endSector - currentLBA;
-			}
-			else if (totalLenLBA - currentLBA < postGap)
-			{
-				postGap = totalLenLBA - currentLBA;
-				if (postGap && !param::noWarns)
-				{
-					printf("WARNING: Size of DATA track postgap is of %u sectors instead of 150.\n", postGap);
-				}
-			}
-			else if (!DAfiles.empty() && DAfiles.front()->entry.entryOffs.lsb - postGap == currentLBA)
-			{
-				postGap = 0;
-			}
-			// There are some CD-DA games that have a non-zero adrress ECC calculation in the last postgap sector. So, we are checking it.
-			// Idk if this behavior could happen in other sectors, but apparently it's only related to CD-DA games postgaps (maybe a bug).
-			if (postGap)
-			{
-				cd::SECTOR_M2F1 sector;
-				reader.SeekToSector(currentLBA + postGap - 1);
-				reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
-				if (memcmp(sector.ecc, "\0\0\0\0", sizeof(sector.edc)))
-				{
-					WriteXMLGap(postGap - 1, dirtree, currentLBA, reader);
-					WriteXMLGap(1, dirtree, currentLBA + postGap - 1, reader);
-					dirtree->LastChildElement("dummy")->SetAttribute(xml::attrib::ECC_ADDRES, true);
-				}
-				else
-				{
-					WriteXMLGap(postGap, dirtree, currentLBA, reader);
-				}
-			}
-			currentLBA += postGap;
 
 			// Write CD-DA tracks
 			tinyxml2::XMLNode *modifyProject = trackElement->Parent();
@@ -1339,17 +1352,17 @@ void ParseISO(cd::IsoReader& reader) {
 			}
 
 			// Check if there is still an EoF gap
-			if (currentLBA < totalLenLBA && !param::noWarns)
+			if (!param::noWarns && (postGap > 150 || currentLBA < totalLenLBA))
 			{
-				printf( "WARNING: There is still a gap of %u sectors at the end.\n"
-						"\t This could mean that there are missing files or tracks.\n", totalLenLBA - currentLBA);
+				printf( "WARNING: There is still a gap of %u sectors at the end of file system.\n"
+						"\t This could mean that there are missing files or tracks.\n", postGap > 150 ? postGap : totalLenLBA - currentLBA);
 				if (global::cueFile.tracks.empty())
 				{
 					printf("\t Try using a .cue file instead of an ISO image.\n");
 				}
 				else
 				{
-					printf("\t Try using the -pt command, it could help if the game has an obfuscated file system.\n");
+					printf("\t Try using the -pt or/and -f command, helps with obfuscated file systems.\n");
 				}
 			}
 
