@@ -101,11 +101,14 @@
 										 'xa' and 'str' can also be used as aliases for 'mixed'.
 								'da': is for CD-DA audio files. More details below.
 							  If no value for type is specified, the default is 'data'.
-					order	- Optional, custom directory record order for games with the 'new_type' string on 'true'. Values between 0-65535 only.
-							  This setting doesn't modify the LBA and is per directory, so you can repeat order values but in different directories.
-							  If order is not specified, defaults to '10'. So, files/folders with order < 10 will be before the unspecified ones
-							  and after them the ones with order > 10. To set more than 9 files before the unspecified ones, you will need to set
-							  ALL files/folders in the current directory, otherwise unexpected results will happen.
+					hidden	- Optional, flag to set files/directories as "hidden". Options are
+								'0': not hidden. (Default)
+								'1': hidden.
+								'2': obfuscated. (Doesn't add the entry to the Directory Record)
+								'3': obfuscated and hidden. (Only for directories)
+					order	- Optional, custom Directory Record order for games with the 'new_type' string on 'true'.
+							  This setting doesn't modify the LBA and is per directory. If order is not specified, defaults to '0'.
+							  So, files/folders with order < 0 will be before the unordered ones and after them the ones with order > 0.
 				
 				Note: Either name or source attribute can be omitted. If name is only specified, it uses that
 				as the name of the source file and specifying source only strips off the path name if there's
@@ -124,7 +127,8 @@
 					name	- Specifies the name of the subdirectory.
 					srcdir	- Specifies the directory path to the source files if no source attribute is
 							  specified to the <file> elements (optional, can be a relative or absolute path).
-					order	- Optional, custom directory record order (see above for description).
+					hidden	- Optional, flag to set files/directories as "hidden" (see above for description).
+					order	- Optional, custom Directory Record order (see above for description).
 						  
 			-->
 			<dir name="mydir">
@@ -169,7 +173,7 @@
 				Attributes:
 					sectors	- Size of dummy file in sector units (1024 = 2MB).
 					type	- The dummy's submode value. Values between 0-255 only.
-								 '0': for a Form 1 dummy (0x00).
+								 '0': for a Form 1 dummy (0x00). (Default)
 								'32': for a Form 2 dummy (0x20).
 					ecc_addr- Optional, calculates the ECC with the real address instead of a zeroed one. Values 'true' or 'false' only.
 							  This is only usefull for some CD-DA games last DATA postgap sector that has a non-standart ECC calculation.

@@ -84,7 +84,7 @@ iso::DIRENTRY& iso::DirTreeClass::CreateRootDirectory(EntryList& entries, const 
 		entry.date.year = volumeDate.year % 0x64; // Root overflows dates past 1999 for games built with old(<2003) mastering tool
 	}
 	entry.length	= 0; // Length is meaningless for directories
-	entry.HF		= attributes.HFLAG;
+	entry.HF		= attributes.HFLAG % 4;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -201,7 +201,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 	entry.id		= std::move(temp_name);
 	entry.type		= type;
 	entry.subdir	= nullptr;
-	entry.HF		= attributes.HFLAG;
+	entry.HF		= attributes.HFLAG % 4;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -247,6 +247,7 @@ void iso::DirTreeClass::AddDummyEntry(const unsigned int sectors, const unsigned
 	entry.type		= EntryType::EntryDummy;
 	entry.length	= F1_DATA_SIZE * sectors;
 	entry.flba		= flba;
+	entry.order		= -1;
 	entry.HF		= eccAddr;
 
 	entries.emplace_back(std::move(entry));
@@ -298,7 +299,7 @@ iso::DirTreeClass* iso::DirTreeClass::AddSubDirEntry(const char* id, const fs::p
 
 	entry.type		= EntryType::EntryDir;
 	entry.subdir	= std::make_unique<DirTreeClass>(entries, this);
-	entry.HF		= attributes.HFLAG;
+	entry.HF		= attributes.HFLAG % 4;
 	entry.attribs	= attributes.XAAttrib;
 	entry.perms		= attributes.XAPerm;
 	entry.GID		= attributes.GID;
@@ -395,7 +396,7 @@ int iso::DirTreeClass::CalculateDirEntryLen() const
 	for ( const auto& e : entriesInDir )
 	{
 		const DIRENTRY& entry = e.get();
-		if ( entry.id.empty() )
+		if ( entry.id.empty() || entry.HF > 1 )
 		{
 			continue;
 		}
@@ -481,11 +482,11 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 
 		if ( entry.type == EntryType::EntryDir )
 		{
-			dirEntry->flags = 0x02 | (int)entry.HF;
+			dirEntry->flags = 0x02 | entry.HF;
 		}
 		else
 		{
-			dirEntry->flags = 0x00 | (int)entry.HF;
+			dirEntry->flags = 0x00 | entry.HF;
 		}
 
 		// File length correction for certain file types
@@ -581,7 +582,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 	for ( const auto& e : entriesInDir )
 	{
 		const DIRENTRY& entry = e.get();
-		if ( !entry.id.empty() )
+		if ( !entry.id.empty() && entry.HF < 2 )
 		{
 			writeOneEntry(entry);
 		}
@@ -1078,7 +1079,7 @@ void iso::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTIFIERS& id, con
 	isoDescriptor.rootDirRecord.extLength	= 0;
 	isoDescriptor.rootDirRecord.entryOffs = cd::SetPair32( 18+(pathTableSectors*4) );
 	isoDescriptor.rootDirRecord.entrySize = cd::SetPair32( dirTree->CalculateDirEntryLen() );
-	isoDescriptor.rootDirRecord.flags = 0x02 | (int)root.HF;
+	isoDescriptor.rootDirRecord.flags = 0x02 | root.HF;
 	isoDescriptor.rootDirRecord.volSeqNum = cd::SetPair16( 1 );
 	isoDescriptor.rootDirRecord.identifierLen = 1;
 	isoDescriptor.rootDirRecord.identifier = 0x0;

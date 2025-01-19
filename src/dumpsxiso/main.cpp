@@ -2,6 +2,7 @@
 #include "xml.h"
 #include "cue.h"
 #include <map>
+#include <format>
 
 #ifndef MKPSXISO_NO_LIBFLAC
 #include "FLAC/stream_encoder.h"
@@ -43,6 +44,7 @@ namespace param {
     fs::path outPath;
     fs::path xmlFile;
 	bool lba = false;
+	bool force = false;
 	bool noxml = false;
 	bool noWarns = false;
 	bool QuietMode = false;
@@ -345,8 +347,9 @@ static void WriteOptionalXMLAttribs(tinyxml2::XMLElement* element, const cd::Iso
 	++attributeCounters.GID[entry.extData.ownergroupid];
 	++attributeCounters.UID[entry.extData.owneruserid];
 
-	element->SetAttribute(xml::attrib::HIDDEN_FLAG, entry.entry.flags & 0x01);
-	++attributeCounters.HFLAG[entry.entry.flags & 0x01];
+	const auto HFLAG = entry.entry.flags & 0x20 ? entry.entry.flags & 0x03 : entry.entry.flags & 0x01; // 5th bit simulates obfuscation
+	element->SetAttribute(xml::attrib::HIDDEN_FLAG, HFLAG);
+	++attributeCounters.HFLAG[HFLAG];
 
 	if (entry.order.has_value())
 	{
@@ -498,14 +501,11 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 	else
 	{
 		reader.SeekToSector(pathTableList[index].entry.dirOffs);
-		while (true)
-		{
-			cd::SECTOR_M2F2 sector;
+		cd::SECTOR_M2F1 sector;
+		do {
 			dirRecordSectors++;
 			reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
-			if (sector.subHead[2] == 0x89) // Directory records always ends with submode 0x89
-				break;
-		}
+		} while (!(sector.subHead[2] & 0x81)); // Directory records normally ends with submode 0x89
 	}
 
 	dirEntries->ReadDirEntries(&reader, pathTableList[index].entry.dirOffs, dirRecordSectors);
@@ -513,13 +513,14 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
 	// Only add the missing directories to the list
     for (int i = 1; i < pathTableList.size(); i++) {
         auto& e = pathTableList[i];
-        if (e.entry.parentDirIndex - 1 == index &&
+		if (e.entry.parentDirIndex - 1 == index &&
 			!std::any_of(dirEntries->dirEntryList.GetView().begin(), dirEntries->dirEntryList.GetView().end(), [&e](const auto& entry)
 				{
 					return entry.get().identifier == e.name;
 				}))
 		{
             dirEntries->ReadRootDir(&reader, e.entry.dirOffs);
+			dirEntries->dirEntryList.GetView().back().get().entry.flags |= 0x22; // We are setting the reserved 5th bit to simulate obfuscation
         }
     } 
 
@@ -583,7 +584,7 @@ std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, Lis
   	return dirEntries;
 }
 
-std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::IsoReader &reader, std::list<cd::IsoDirEntries::Entry>& entries)
+std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> ParseDAfiles(cd::IsoReader &reader, std::list<cd::IsoDirEntries::Entry>& entries)
 {
 	std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> DAfiles;
 	unsigned tracknum = 2;
@@ -593,7 +594,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 	{
 		if(it->type == EntryType::EntryDA)
 		{
-			it->trackid = (tracknum < 10 ? "0" : "") + std::to_string(tracknum);
+			it->trackid = std::format("{:02}", tracknum);
 			tracknum++;
 			DAfiles.push_back(it);
 		}
@@ -668,7 +669,7 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 			{
 				if(!entry->trackid.empty())
 				{
-					entry->trackid = (tracknum < 10 ? "0" : "") + std::to_string(tracknum);
+					entry->trackid = std::format("{:02}", tracknum);
 				}
 				tracknum++;
 			}
@@ -679,6 +680,78 @@ std::vector<std::list<cd::IsoDirEntries::Entry>::iterator> processDAfiles(cd::Is
 	}
 
 	return DAfiles;
+}
+
+void BruteForce(cd::IsoReader& reader, std::list<cd::IsoDirEntries::Entry>& entries, unsigned int currentLBA, unsigned int totalLenLBA)
+{
+	cd::SECTOR_M2F2 sector;
+	int filenum = 0;
+
+	auto processGaps = [&](unsigned int endLBA)
+	{
+		cd::IsoDirEntries::Entry* gapEntry = &entries.front(); // Get root stats
+		signed char rootGMTOff = gapEntry->entry.entryDate.GMToffs;
+		unsigned short rootGID = gapEntry->extData.ownergroupid;
+		unsigned short rootUID = gapEntry->extData.owneruserid;
+		unsigned short rootPrm = gapEntry->extData.attributes & cdxa::XA_PERMISSIONS_MASK;
+		bool processingFile = false;
+		reader.SeekToSector(currentLBA);
+		for (; currentLBA < endLBA; currentLBA++)
+		{
+			reader.ReadBytesXA(sector.subHead, XA_DATA_SIZE);
+
+			// Process only non dummy sectors
+			if (!processingFile && sector.subHead[2] != 0x20 && sector.subHead[2] != 0x00)
+			{
+				processingFile = true;
+				gapEntry = &entries.emplace_front();
+				gapEntry->entry.entryOffs.lsb 	  = currentLBA;
+				gapEntry->entry.entrySize.lsb 	  = F1_DATA_SIZE;
+				gapEntry->entry.entryDate.GMToffs = rootGMTOff;
+				gapEntry->entry.flags 			  = 0x22; // We are setting the reserved 5th bit to simulate obfuscation
+				gapEntry->extData.ownergroupid 	  = rootGID;
+				gapEntry->extData.owneruserid 	  = rootUID;
+				gapEntry->extData.attributes 	  = rootPrm;
+				if ((sector.subHead[2] & 0x7E) == 0x08)
+				{
+					gapEntry->identifier = std::format("UNKN{:04}.{};1", filenum++, "DAT");
+					gapEntry->type = EntryType::EntryFile;
+				}
+				else
+				{
+					gapEntry->identifier = std::format("UNKN{:04}.{};1", filenum++, "STR");
+					gapEntry->type = EntryType::EntryXA;
+				}
+			}
+			else if (processingFile)
+			{
+				gapEntry->entry.entrySize.lsb += F1_DATA_SIZE;
+			}
+
+			// Process file until EoF or EoR is set
+			if (sector.subHead[2] & 0x81)
+				processingFile = false;
+		}
+	};
+
+	for (const auto& entry : entries)
+	{
+		if (currentLBA < entry.entry.entryOffs.lsb)
+		{
+			processGaps(entry.entry.entryOffs.lsb);
+		}
+		currentLBA += GetSizeInSectors(entry.entry.entrySize.lsb);
+	}
+
+	if (currentLBA < totalLenLBA)
+	{
+		processGaps(totalLenLBA);
+	}
+
+	entries.sort([](const auto& left, const auto& right)
+		{
+			return left.entry.entryOffs.lsb < right.entry.entryOffs.lsb;
+		});
 }
 
 void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entry>& files, const fs::path& rootPath)
@@ -859,12 +932,12 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 	// else directories will have their timestamps discarded when files are being unpacked into them!
 	for (const auto& entry : files)
 	{
+		if(entry.trackid.empty())
+			continue; // Skip unreferenced entries
+
 		fs::path toChange(rootPath / entry.virtualPath / CleanIdentifier(entry.identifier));
 		if(entry.type == EntryType::EntryDA)
 		{
-			if (entry.trackid.empty())
-				continue; // Skip if it's an unreferenced DA file
-
 			toChange = GetRealDAFilePath(toChange);
 		}
 		UpdateTimestamps(toChange, entry.entry.entryDate);
@@ -1078,7 +1151,15 @@ void ParseISO(cd::IsoReader& reader) {
 			return left.entry.entryOffs.lsb < right.entry.entryOffs.lsb;
 		});
 
+	// Process DA tracks and add them to the entries list
+	auto DAfiles = ParseDAfiles(reader, entries);
+
 	unsigned totalLenLBA = descriptor.volumeSize.lsb;
+	if (param::force)
+	{
+		BruteForce(reader, entries, descriptor.rootDirRecord.entryOffs.lsb, totalLenLBA);
+	}
+
 	if (!param::QuietMode)
 	{
 		printf("      Files Total: %zu\n", entries.size() - numEntries);
@@ -1093,13 +1174,7 @@ void ParseISO(cd::IsoReader& reader) {
 				break;
 			}
 		}
-	}
 
-	// Process DA tracks and add them to the entries list
-	auto DAfiles = processDAfiles(reader, entries);
-
-	if (!param::QuietMode)
-	{
 		for(size_t i = 0; i < DAfiles.size(); i++)
 		{
 			printf("\n  Track #%zu audio:\n", i + 2);
@@ -1303,7 +1378,8 @@ int Main(int argc, char *argv[])
 		"  -w|--warns\t\tSuppress all warnings (can be used along with -q)\n"
 		"  -x <path>\t\tOptional destination directory for extracted files (defaults to working dir)\n"
 		"  -s <file>\t\tOptional XML name/destination for MKPSXISO script (defaults to working dir)\n"
-		"  -pt|--path-table\tGo through every known directory in order; helps to deobfuscate some games (like DMW3)\n"
+		"  -pt|--path-table\tGo through every known directory in order; helps on soft obfuscated games (like DMW3)\n"
+		"  -f|--force\t\tScans all unknown sectors for files; helps on heavy obfuscated games (like Xenogears)\n"
 		"  -e|--encode <codec>\tCodec to encode CDDA/DA audio; supports " SUPPORTED_CODEC_TEXT " (defaults to wave)\n"
 		"  -l|--lba\t\tWrites all lba offsets in the xml to force them at build time\n"
 		"  -n|--noxml\t\tDo not generate an XML file and license file\n"
@@ -1334,6 +1410,11 @@ int Main(int argc, char *argv[])
 				printf(VERSION_TEXT);
 				printf(HELP_TEXT);
 				return EXIT_SUCCESS;
+			}
+			if (ParseArgument(args, "f", "force"))
+			{
+				param::force = true;
+				continue;
 			}
 			if (ParseArgument(args, "l", "lba"))
 			{

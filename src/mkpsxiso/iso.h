@@ -29,7 +29,7 @@ namespace iso
 
 		fs::path 		srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		EntryType		type;		/// File type (0 - file, 1 - directory)
-		bool			HF;			/// Hidden Flag
+		unsigned char	HF;			/// Hidden Flag
 		unsigned char	attribs;	/// XA attributes, 0xFF is not set
 		unsigned short	perms;		/// XA permissions
 		unsigned short	GID;		/// Owner group ID
@@ -38,7 +38,7 @@ namespace iso
 
 		cd::ISO_DATESTAMP date;
 		std::string		trackid;	/// only used for DA files
-		unsigned short	order;
+		signed short	order;
 
 	};
 

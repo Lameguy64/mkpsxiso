@@ -33,7 +33,7 @@
 
 1. Set up Git, CMake and a compiler toolchain. Install the `git`, `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
    * MSVC [Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (do not install CMake through its installer, download it from [here](https://cmake.org/download) instead) and [Git](https://git-scm.com/downloads/win)
-   * [MSYS2](https://www.msys2.org/) (use the "UCRT64" shell) with the following packages: `git`, `mingw-w64-ucrt-x86_64-make`, `mingw-w64-ucrt-x86_64-cmake`, `mingw-w64-ucrt-x86_64-gcc`
+   * [MSYS2](https://www.msys2.org/) (use the "UCRT64" shell) with the following packages: `mingw-w64-ucrt-x86_64-toolchain`, `mingw-w64-ucrt-x86_64-cmake`, `git`
 
 2. Git clone the repository and then cd into the mkpsxiso directory:
 

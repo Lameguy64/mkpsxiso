@@ -93,7 +93,7 @@ namespace cd {
             fs::path virtualPath;
             EntryType type;
             std::string trackid;
-            std::optional<unsigned short> order;
+            std::optional<short> order;
 
             std::unique_ptr<IsoDirEntries> subdir;
         };

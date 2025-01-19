@@ -305,8 +305,8 @@ cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
 
 void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors)
 {
+	short order = 0;
 	size_t numEntries = 0; // Used to skip the first two entries, . and ..
-	unsigned short order = 0;
     for (int sec = 0; sec < sectors; sec++)
     {
         reader->SeekToSector(lba + sec);
@@ -399,8 +399,9 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 		return std::nullopt;
 
 	// Add the EntryType here so as to not keep calculating it everytime later
-	// Check for file number first to determine if it's a STR/XA file, because some games (Mega Man X3) have flagged them as DATA but currently they are not
+	// Check for file number first to determine if it's a STR/XA file, because some games (Mega Man X3) has flagged them as DATA but currently they are not
 	entry.type = entry.extData.filenum ? EntryType::EntryXA : GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
+	entry.trackid = "01"; // This helps detect unreferenced entries more easily
 
 	return entry;
 }
