@@ -11,7 +11,7 @@ namespace cdxa {
 		unsigned short	owneruserid;	// Usually 0x0000
 		unsigned short	attributes;
 		char			id[2];
-		unsigned char	filenum;		// For XA files is the same as its 1st subheader byte or at least 0x01, 0x00 otherwise
+		unsigned char	filenum;		// 0x00 standard file. 0x01-0xFF interleaved file (must match the file subheader filenum byte unless it's 0x00)
 		unsigned char	reserved[5];
 	};
 
