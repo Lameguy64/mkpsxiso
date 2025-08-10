@@ -1252,6 +1252,10 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		printf( "      Total file system size: %d bytes (%d sectors)\n\n",
 			CD_SECTOR_SIZE*totalLen, totalLen);
 	}
+	if ( !global::noWarns && totalLen > (71 * 60 * 75) )
+	{
+		printf( "WARNING: System duration > 71 minutes\n\n" );
+	}
 
 	return true;
 }
