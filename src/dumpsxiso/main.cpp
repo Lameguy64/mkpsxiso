@@ -44,6 +44,7 @@ namespace param {
     fs::path outPath;
     fs::path xmlFile;
 	bool lba = false;
+	bool raw = false;
 	bool force = false;
 	bool noxml = false;
 	bool noWarns = false;
@@ -209,7 +210,7 @@ void SaveLicense(const cd::ISO_LICENSE& license) {
 void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, const bool isInvalid)
 {
 	constexpr size_t bufferSize = 64 * 1024; // Use a 64KiB buffer for better I/O performance
-	unsigned char copyBuff[bufferSize];
+	unsigned char copyBuff[bufferSize]{};
 	size_t bytesLeft = cddaSize;
 	while (bytesLeft > 0) {
 
@@ -220,8 +221,6 @@ void writePCMFile(FILE *outFile, cd::IsoReader& reader, const size_t cddaSize, c
 
 		if (!isInvalid)
     		reader.ReadBytesDA(copyBuff, bytesToRead);
-		else
-			memset(copyBuff, 0, bytesToRead);
 
     	fwrite(copyBuff, 1, bytesToRead, outFile);
 
@@ -790,7 +789,8 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				{
 				constexpr size_t bufferSize = 64 * 1024; // Use a 64KiB buffer for better I/O performance
 				unsigned char copyBuff[bufferSize];
-				size_t bytesLeft = XA_DATA_SIZE * sectorsToRead;
+				auto ptrReadFunc = !param::raw ? &cd::IsoReader::ReadBytesXA : &cd::IsoReader::ReadBytesDA;
+				size_t bytesLeft = (!param::raw ? XA_DATA_SIZE : CD_SECTOR_SIZE) * sectorsToRead;
 				while(bytesLeft > 0) {
 
 					size_t bytesToRead = bytesLeft;
@@ -798,7 +798,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					if (bytesToRead > bufferSize)
 						bytesToRead = bufferSize;
 
-					reader.ReadBytesXA(copyBuff, bytesToRead);
+					(reader.*ptrReadFunc)(copyBuff, bytesToRead, false);
 
 					fwrite(copyBuff, 1, bytesToRead, outFile);
 
@@ -895,7 +895,8 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				{
 				constexpr size_t bufferSize = 64 * 1024; // Use a 64KiB buffer for better I/O performance
 				unsigned char copyBuff[bufferSize];
-				size_t bytesLeft = entry.entry.entrySize.lsb;
+				auto ptrReadFunc = !param::raw ? &cd::IsoReader::ReadBytes : &cd::IsoReader::ReadBytesDA;
+				size_t bytesLeft = !param::raw ? entry.entry.entrySize.lsb : CD_SECTOR_SIZE * GetSizeInSectors(entry.entry.entrySize.lsb);
 				while(bytesLeft > 0) {
 
 					size_t bytesToRead = bytesLeft;
@@ -903,7 +904,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 					if (bytesToRead > bufferSize)
 						bytesToRead = bufferSize;
 
-					reader.ReadBytes(copyBuff, bytesToRead);
+					(reader.*ptrReadFunc)(copyBuff, bytesToRead, false);
 					fwrite(copyBuff, 1, bytesToRead, outFile);
 
 					bytesLeft -= bytesToRead;
@@ -1398,6 +1399,7 @@ int Main(int argc, char *argv[])
 		"  -e|--encode <codec>\tCodec to encode CDDA/DA audio; supports " SUPPORTED_CODEC_TEXT " (defaults to wave)\n"
 		"  -l|--lba\t\tWrites all lba offsets in the xml to force them at build time\n"
 		"  -n|--noxml\t\tDo not generate an XML file and license file\n"
+		"  -r|--raw\t\tDumps all files in raw format (forces --noxml option)\n"
 		"  -S|--sort-by-dir\tOutputs a \"pretty\" XML script where entries are grouped in directories\n"
 		"\t\t\t(instead of strictly following their original order on the disc)\n";
 
@@ -1449,6 +1451,13 @@ int Main(int argc, char *argv[])
 			if (ParseArgument(args, "q", "quiet"))
 			{
 				param::QuietMode = true;
+				continue;
+			}
+			if (ParseArgument(args, "r", "raw"))
+			{
+				param::raw = true;
+				param::noxml = true;
+				param::encodingFormat = EAF_PCM;
 				continue;
 			}
 			if (ParseArgument(args, "w", "warns"))
