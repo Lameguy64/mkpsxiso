@@ -67,7 +67,7 @@ CueFile parseCueFile(fs::path& inputFile)
 		}
 		else if (line.find("TRACK") != std::string::npos)
 		{
-			TrackInfo track;
+			TrackInfo track{};
 			size_t trackNumStart = line.find("TRACK") + 6;
 			track.number = line.substr(trackNumStart, 2);
 			track.filePath = filePath;

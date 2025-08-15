@@ -87,18 +87,18 @@ static ma_result virtual_wav_seek(ma_decoder *pDecoder, ma_int64 byteOffset, ma_
     }
 
 #if defined(_WIN32)
-    #if defined(_MSC_VER) && _MSC_VER > 1200
+    #if (defined(_MSC_VER) && _MSC_VER > 1200) || defined(__MINGW64__)
         result = _fseeki64(vw->file, byteOffset, whence);
     #else
         /* No _fseeki64() so restrict to 31 bits. */
-        if (origin > 0x7FFFFFFF) {
+        if (byteOffset > 0x7FFFFFFF) {
             return MA_ERROR;
         }
 
         result = fseek(vw->file, (int)byteOffset, whence);
     #endif
 #else
-    result = fseek(vw->file, (long int)byteOffset, whence);
+    result = fseek(vw->file, (long)byteOffset, whence);
 #endif
     if (result != 0) {
         return MA_ERROR;
@@ -107,7 +107,7 @@ static ma_result virtual_wav_seek(ma_decoder *pDecoder, ma_int64 byteOffset, ma_
     return MA_SUCCESS;
 }
 
-#if !defined(_MSC_VER) && !((defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_POSIX_SOURCE)) && !defined(MA_BSD)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !((defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_POSIX_SOURCE)) && !defined(MA_BSD)
 int fileno(FILE *stream);
 #endif
 
@@ -118,7 +118,7 @@ static ma_result stdio_file_size(FILE *file, uint64_t *pSizeInBytes)
 
     MA_ASSERT(file  != NULL);
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__)
     fd = _fileno(file);
 #else
     fd =  fileno(file);

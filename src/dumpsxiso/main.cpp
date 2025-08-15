@@ -1007,7 +1007,7 @@ void WriteXMLGap(const unsigned int numSectors, tinyxml2::XMLElement* dirElement
 	}
 }
 
-void WriteXMLPostGap(const int postGap, tinyxml2::XMLElement* dirTree, unsigned int& currentLBA, cd::IsoReader& reader)
+void WriteXMLPostGap(const unsigned int& postGap, tinyxml2::XMLElement* dirTree, unsigned int& currentLBA, cd::IsoReader& reader)
 {
 	if (!postGap)
 		return;
@@ -1031,7 +1031,7 @@ void WriteXMLPostGap(const int postGap, tinyxml2::XMLElement* dirTree, unsigned 
 }
 
 void WriteXMLByLBA(const std::list<cd::IsoDirEntries::Entry>& files, tinyxml2::XMLElement* dirElement, const fs::path& sourcePath, unsigned int& expectedLBA,
-	EntryAttributeCounters& attributeCounters, cd::IsoReader& reader, const int postGap)
+	EntryAttributeCounters& attributeCounters, cd::IsoReader& reader, const unsigned int& postGap)
 {
 	fs::path currentVirtualPath; // Used to find out whether to traverse 'dir' up or down the chain
 	bool writedPostGap = false;
@@ -1195,7 +1195,7 @@ void ParseISO(cd::IsoReader& reader) {
 	}
 
 	// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, postgap should be always >= 150 sectors for CD-DA discs and optionally for non CD-DA.
-	int endFS, postGap = 150;
+	unsigned endFS, postGap = 150;
 	for (auto it = entries.rbegin(); it != entries.rend(); it++)
 	{
 		if (it->type != EntryType::EntryDA)
@@ -1214,7 +1214,7 @@ void ParseISO(cd::IsoReader& reader) {
 				endFS += postGap = totalLenLBA - endFS;
 				if (postGap && !param::noWarns)
 				{
-					printf("    WARNING: Size of DATA track postgap is of %d sectors instead of 150.\n", postGap);
+					printf("    WARNING: Size of DATA track postgap is of %u sectors instead of 150.\n", postGap);
 				}
 			}
 			break;
@@ -1225,7 +1225,7 @@ void ParseISO(cd::IsoReader& reader) {
 	{
 		printf("      Files Total: %zu\n", entries.size() - numEntries);
 		printf("      Directories: %zu\n", numEntries - 1);
-		printf("      Total file system size: %d bytes (%d sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
+		printf("      Total file system size: %u bytes (%u sectors)\n", endFS * CD_SECTOR_SIZE, endFS);
 
 		int tracknum = 2;
 		for(const auto& entry : DAfiles)

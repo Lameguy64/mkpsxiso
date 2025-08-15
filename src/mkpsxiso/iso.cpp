@@ -332,7 +332,6 @@ int iso::DirTreeClass::CalculateTreeLBA(int lba)
 	int maxFlba = 0;
 	int sizeMax = 0;
 
-	bool firstDAWritten = false;
 	for ( DIRENTRY& entry : entries )
 	{
 		// Set current LBA to directory record entry

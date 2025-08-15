@@ -98,11 +98,11 @@ uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize)
 	return size ? static_cast<uint32_t>((size + (sectorSize - 1)) / sectorSize) : 1;
 }
 
-int32_t TimecodeToSectors(const std::string timecode)
+int32_t TimecodeToSectors(const std::string_view timecode)
 {
 	int minutes;
 	unsigned int seconds, frames;
-	if (sscanf(timecode.c_str(), "%u:%u:%u", &minutes, &seconds, &frames) != 3 || (minutes < 0) || (seconds > 59) || (frames > 74))
+	if (sscanf(timecode.data(), "%d:%u:%u", &minutes, &seconds, &frames) != 3 || (minutes < 0) || (seconds > 59) || (frames > 74))
 	{
 		return -1;
 	}
