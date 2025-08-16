@@ -107,7 +107,7 @@ static ma_result virtual_wav_seek(ma_decoder *pDecoder, ma_int64 byteOffset, ma_
     return MA_SUCCESS;
 }
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__) && !((defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_POSIX_SOURCE)) && !defined(MA_BSD)
+#if !defined(_WIN32) && !((defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_POSIX_SOURCE)) && !defined(MA_BSD)
 int fileno(FILE *stream);
 #endif
 
@@ -118,7 +118,7 @@ static ma_result stdio_file_size(FILE *file, uint64_t *pSizeInBytes)
 
     MA_ASSERT(file  != NULL);
 
-#if defined(_MSC_VER) || defined(__MINGW32__)
+#if defined(_WIN32)
     fd = _fileno(file);
 #else
     fd =  fileno(file);
