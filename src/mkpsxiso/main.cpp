@@ -852,7 +852,7 @@ int Main(int argc, char* argv[])
 			}
 
 			// Write directory entries
-			dirTree->WriteDirectoryRecords( &writer, root, root, *global::new_type ? dirTree->GetDirCountTotal() : 0 );
+			dirTree->WriteDirectoryRecords( &writer, root, root, global::new_type.value_or(false) ? dirTree->GetDirCountTotal() : 0 );
 
 			// Write file system descriptors to finish the image
 	        iso::WriteDescriptor( &writer, isoIdentifiers, root, totalLenLBA );
@@ -1205,7 +1205,7 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 	const int rootLBA = 18+(GetSizeInSectors(pathTableLen)*4);
 
 	// Sort directory entries, calculate tree LBAs and retrieve size of image
-	if (!*global::new_type) {
+	if (!global::new_type.value_or(false)) {
 		dirTree->SortDirectoryEntries();
 	}
 	totalLen = dirTree->CalculateTreeLBA(rootLBA);
