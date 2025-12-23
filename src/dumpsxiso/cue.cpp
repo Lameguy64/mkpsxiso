@@ -4,7 +4,12 @@
 
 bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &entry, cd::IsoReader &reader, const CueFile &cueFile)
 {
-	unsigned trackIndex = (entry.trackid.empty() ? std::stoi(entry.identifier.substr(6, 2)) : std::stoi(entry.trackid)) - 1;
+	int trackIndex = (entry.trackid.empty() ? std::stoi(entry.identifier.substr(6, 2)) : std::stoi(entry.trackid)) - 1;
+	if (trackIndex < 1 || trackIndex >= static_cast<int>(cueFile.tracks.size()))
+	{
+		printf("Error: Invalid cue TRACK index \"%02d\" for AUDIO file.\n", trackIndex + 1);
+		exit(EXIT_FAILURE);
+	}
 	reader.Open(cueFile.tracks[trackIndex].filePath);
 	return reader.SeekToSector(sector - cueFile.tracks[trackIndex - 1].endSector);
 }
@@ -60,6 +65,7 @@ CueFile parseCueFile(fs::path& inputFile)
 				fileType = "UNKNOWN";
 			}
 
+			// We set inputFile to the first track entry in the cue because that's the main DATA file
 			if (cueFile.tracks.empty())
 			{
 				inputFile = filePath;
