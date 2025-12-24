@@ -101,6 +101,45 @@ This can be avoided by minimizing identically named directories but its best to 
 
 ## Changelog
 
+**Version 2.20 (24/12/2025)**
+* Added support for calculating the real address instead of a zeroed one for the last postgap sector of some CD-DA games DATA tracks via the xml `ecc_addr` string.
+* Added support for regenerating correct submode for PS2 CD-ROM games via the xml `ps2` string.
+* Added `--warns` argument to suppress all warnings.
+* Changed the sort logic for 2003 games directory records to a custom one via the xml `order` string.
+* Fixed 0 byte files not having a whole sector allocated for them.
+* Fixed a regression introduced in previous version with timestamps prior to 1970 on `Linux`.
+* Renamed xml string `h_flag` to `hidden` for better understanding and added obfusctation flags to it.
+* Refactored date handling functions to use `Windows` APIs.
+* Updated credits.
+* Updated help texts.
+* Updated readme compile instructions and added info about filesystem issues.
+* Added `macOS` CI build.
+* cmake: Updated build presets and changed the install path for `Windows`.
+* dumpsxiso: Restructured the logic on how DA files are processed.
+* dumpsxiso: Changed the way on how DATA track postgap sector is calculated.
+* dumpsxiso: Fixed some games `STR/XA` files being extracted as DATA when they are not.
+* dumpsxiso: Stripped `--lba` argument from `--path-table`.
+* dumpsxiso: Added a hack to detect problematic isos with attributes in little endian.
+* dumpsxiso: Improved logic of `--path-table` command.
+* dumpsxiso: Fix crash on images with corrupted directory records or with SUSP.
+* dumpsxiso: Added `--force` argument to dump very obfuscated games like Chrono Cross, Xenogears.
+* dumpsxiso: Added `--quiet` argument to suppress all but warnings and errors.
+* dumpsxiso: Added `--noxml` argument which prevents creation of an xml and license file.
+* dumpsxiso: Added `--raw` argument to dump all files in raw format.
+* dumpsxiso: Added a descriptive error if a directory can't be created.
+* dumpsxiso: Added a descriptive error if a xml file can't be created.
+* dumpsxiso: Changed print statements to match mkpsxiso layout and updated some error messages.
+* dumpsxiso: Fixed reading of pathtable in cases where its size was exactly 2048.
+* dumpsxiso: Use 64KiB buffer size for better I/O.
+* mkpsxiso: Fixed file name sorting, so as to not take in account the `;1` chars.
+* mkpsxiso: Fixed a regression introduced in previous version with MSVC debugging.
+* mkpsxiso: Unreferenced tracks are now listed in `-lba's` args.
+* mkpsxiso: Better formated `-lba` log, refactor and sort it by lba instead of name.
+* mkpsxiso: Increased character limit from `12` to `31` for homebrew development.
+* mkpsxiso: Allow lower case in iso descriptor for homebrew development.
+* mkpsxiso: Allow non-standard root attributes.
+* mkpsxiso: Limited length and depth of paths to follow ISO 9660 standards.
+
 **Version 2.10 (10/01/2024)**
 * Added support to read/update timestamps prior to 1970 on Windows.
 * Files are now extracted/built with the original timestamps instead of being offsetted previously and then re-calculated at build time. This is for better compatibily with the other CD authoring tools.
