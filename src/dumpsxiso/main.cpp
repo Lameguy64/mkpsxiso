@@ -769,7 +769,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				// The source file will anyway be stored on our hard drive in raw form.
 				if (!param::QuietMode)
 				{
-					printf("    Extracting XA \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
+					printf("    Extracting XA \"%s\"... ", outputPath.lexically_normal().string().c_str());
 				}
 				fflush(stdout);
 
@@ -777,7 +777,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				if (outFile == NULL || !reader.SeekToSector(entry.entry.entryOffs.lsb))
 				{
-					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"\n", outputPath.filename().c_str());
+					printf("\nERROR: Cannot create file \"%s\"\n", outputPath.filename().string().c_str());
 					exit(EXIT_FAILURE);
 				}
 
@@ -825,8 +825,8 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 
 				if (isInvalid && !param::noWarns)
 				{
-					printf( "\nWARNING: The CDDA file \"%" PRFILESYSTEM_PATH "\" is out of the iso file bounds.\n"
-							"\t This usually means that the game has audio tracks, and they are on separate files.\n", daOutPath.filename().c_str() );
+					printf( "\nWARNING: The CDDA file \"%s\" is out of the iso file bounds.\n"
+							"\t This usually means that the game has audio tracks, and they are on separate files.\n", daOutPath.filename().string().c_str() );
 					if (global::cueFile.tracks.empty())
 					{
 						printf("\t Try using a .cue file, instead of an ISO image, to be able to access those files.\n");
@@ -841,12 +841,12 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				}
 				else if (!param::QuietMode)
 				{
-					printf("    Extracting audio \"%" PRFILESYSTEM_PATH "\"... ", daOutPath.lexically_normal().c_str());
+					printf("    Extracting audio \"%s\"... ", daOutPath.lexically_normal().string().c_str());
 				}
 				fflush(stdout);
 
 				if (!outFile) {
-					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"\n", daOutPath.filename().c_str());
+					printf("\nERROR: Cannot create file \"%s\"\n", daOutPath.filename().string().c_str());
 					exit(EXIT_FAILURE);
 				}
 
@@ -879,7 +879,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				// Extract regular file
 				if (!param::QuietMode)
 				{
-					printf("    Extracting \"%" PRFILESYSTEM_PATH "\"... ", outputPath.lexically_normal().c_str());
+					printf("    Extracting \"%s\"... ", outputPath.lexically_normal().string().c_str());
 					fflush(stdout);
 				}
 
@@ -888,7 +888,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				FILE* outFile = OpenFile(outputPath, "wb");
 
 				if (outFile == NULL) {
-					printf("\nERROR: Cannot create file \"%" PRFILESYSTEM_PATH "\"\n", outputPath.filename().c_str());
+					printf("\nERROR: Cannot create file \"%s\"\n", outputPath.filename().string().c_str());
 					exit(EXIT_FAILURE);
 				}
 
@@ -1160,7 +1160,7 @@ void ParseISO(cd::IsoReader& reader) {
 		fs::create_directories(dirPath, ec);
 		if (ec)
 		{
-			printf("\nERROR: Cannot create directory \"%" PRFILESYSTEM_PATH "\". %s\n", dirPath.parent_path().lexically_normal().c_str(), ec.message().c_str());
+			printf("\nERROR: Cannot create directory \"%s\". %s\n", dirPath.parent_path().lexically_normal().string().c_str(), ec.message().c_str());
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -1169,7 +1169,7 @@ void ParseISO(cd::IsoReader& reader) {
 	{
 		if (!param::noxml)
 		{
-			printf("\n    License file: \"%" PRFILESYSTEM_PATH "\"\n", (param::outPath.lexically_normal() / "license_data.dat").c_str());
+			printf("\n    License file: \"%s\"\n", (param::outPath.lexically_normal() / "license_data.dat").string().c_str());
 		}
 		printf("\n    Parsing directory tree...\n");
 	}
@@ -1372,7 +1372,7 @@ void ParseISO(cd::IsoReader& reader) {
 		}
 		else
 		{
-			printf("\nERROR: Cannot create xml file \"%" PRFILESYSTEM_PATH "\". %s\n", param::xmlFile.lexically_normal().c_str(), strerror(errno));
+			printf("\nERROR: Cannot create xml file \"%s\". %s\n", param::xmlFile.lexically_normal().string().c_str(), strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -1551,7 +1551,7 @@ int Main(int argc, char *argv[])
 
 	if (!reader.Open(param::isoFile)) {
 
-		printf("ERROR: Cannot open file \"%" PRFILESYSTEM_PATH "\"\n", param::isoFile.lexically_normal().c_str());
+		printf("ERROR: Cannot open file \"%s\"\n", param::isoFile.lexically_normal().string().c_str());
 		return EXIT_FAILURE;
 
 	}
@@ -1568,7 +1568,7 @@ int Main(int argc, char *argv[])
 
 	if (!param::QuietMode)
 	{
-		printf("Output directory : \"%" PRFILESYSTEM_PATH "\"\n\n", param::outPath.lexically_normal().c_str());
+		printf("Output directory : \"%s\"\n\n", param::outPath.lexically_normal().string().c_str());
 	}
 
 	tzset(); // Initializes the time-related environment variables

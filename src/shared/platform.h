@@ -4,15 +4,12 @@
 #include "ghc/fs_std.hpp"
 #include "cd.h"
 
-// PRFILESYSTEM_PATH printf format for fs::path::c_str()
 #ifdef _WIN32
 #define stat64 _stat64
 #define SYSTEM_TIMEZONE _timezone
-#define PRFILESYSTEM_PATH "ls"
 #else
 #include <sys/stat.h>
 #define SYSTEM_TIMEZONE timezone
-#define PRFILESYSTEM_PATH "s"
 #if (defined(__APPLE__) && defined(__arm64__)) || (defined(__linux__) && defined(__aarch64__))
 // __DARWIN_ONLY_64_BIT_INO_T is set on ARM-based Macs (which then sets __DARWIN_64_BIT_INO_T).
 // This sets the following in Apple SDK's stat.h: struct stat __DARWIN_STRUCT_STAT64;

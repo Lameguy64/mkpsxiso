@@ -107,7 +107,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 			printf("      ");
 		}
 
-		printf("ERROR: File not found: %" PRFILESYSTEM_PATH "\n", srcfile.lexically_normal().c_str());
+		printf("ERROR: File not found: %s\n", srcfile.lexically_normal().string().c_str());
 		return false;
     }
 
@@ -135,7 +135,7 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 				printf("      ");
 			}
 
-			printf("ERROR: %" PRFILESYSTEM_PATH " is a WAV or is not properly ripped.\n", srcfile.lexically_normal().c_str());
+			printf("ERROR: %s is a WAV or is not properly ripped.\n", srcfile.lexically_normal().string().c_str());
 
 			return false;
 		}
@@ -154,8 +154,8 @@ bool iso::DirTreeClass::AddFileEntry(const char* id, EntryType type, const fs::p
 					printf("      ");
 				}
 
-				printf("ERROR: %" PRFILESYSTEM_PATH " is not a multiple of 2336 or 2048 bytes.\n",
-					srcfile.lexically_normal().c_str());
+				printf("ERROR: %s is not a multiple of 2336 or 2048 bytes.\n",
+					srcfile.lexically_normal().string().c_str());
 
 				return false;
 			}
@@ -625,7 +625,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "    Packing \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+					printf( "    Packing \"%s\"... ", entry.srcfile.lexically_normal().string().c_str() );
 					fflush(stdout);
 				}
 
@@ -652,7 +652,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 		{
 			if ( !global::QuietMode )
 			{
-				printf( "    Packing XA \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+				printf( "    Packing XA \"%s\"... ", entry.srcfile.lexically_normal().string().c_str() );
 				fflush(stdout);
 			}
 
@@ -678,7 +678,7 @@ bool iso::DirTreeClass::WriteFiles(cd::IsoWriter* writer) const
 			{
 				if ( !global::QuietMode )
 				{
-					printf( "    Packing XA-DO \"%" PRFILESYSTEM_PATH "\"... ", entry.srcfile.lexically_normal().c_str() );
+					printf( "    Packing XA-DO \"%s\"... ", entry.srcfile.lexically_normal().string().c_str() );
 					fflush(stdout);
 				}
 
@@ -786,7 +786,7 @@ void iso::DirTreeClass::OutputLBAlisting(FILE* fp, int level) const
 		// Write size in byte units
 		fprintf(fp, "%-11s|", entry.type != EntryType::EntryDir ? std::to_string(entry.length).c_str() : "");
 		// Write source file path
-		fprintf(fp, "%" PRFILESYSTEM_PATH "\n", entry.srcfile.lexically_normal().c_str());
+		fprintf(fp, "%s\n", entry.srcfile.lexically_normal().string().c_str());
 	};
 
 	int maxlba = 0;
