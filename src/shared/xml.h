@@ -27,6 +27,7 @@ namespace attrib
 	constexpr const char* TRACK_TYPE = "type";
 	constexpr const char* XA_EDC = "xa_edc";
 	constexpr const char* NEW_TYPE = "new_type";
+	constexpr const char* PS2 = "ps2";
 	constexpr const char* TRACK_SOURCE = "source";
 	constexpr const char* TRACK_ID = "trackid";
 	constexpr const char* PREGAP_DURATION = "duration";
@@ -34,12 +35,13 @@ namespace attrib
 	constexpr const char* ENTRY_NAME = "name";
 	constexpr const char* ENTRY_SOURCE = "source";
 	constexpr const char* ENTRY_TYPE = "type";
+	constexpr const char* ORDER = "order";
 	constexpr const char* OFFSET = "offs";
 
 	constexpr const char* LICENSE_FILE = "file";
 
 	constexpr const char* GMT_OFFSET = "gmt_offs";
-	constexpr const char* HIDDEN_FLAG = "h_flag";
+	constexpr const char* HIDDEN_FLAG = "hidden";
 	constexpr const char* XA_ATTRIBUTES = "xa_attrib";
 	constexpr const char* XA_PERMISSIONS = "xa_perm";
 	constexpr const char* XA_GID = "xa_gid";
@@ -57,6 +59,7 @@ namespace attrib
 	constexpr const char* MODIFICATION_DATE = "modification_date";
 
 	constexpr const char* NUM_DUMMY_SECTORS = "sectors";
+	constexpr const char* ECC_ADDRES = "ecc_addr";
 }
 
 }

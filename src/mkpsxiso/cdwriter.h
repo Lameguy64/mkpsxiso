@@ -3,12 +3,11 @@
 
 #include "cd.h"
 #include "mmappedfile.h"
-#include "fs.h"
 #include <ThreadPool.h>
 #include <forward_list>
-#include <memory>
 
 namespace cd {
+using namespace progschj;
 
 class IsoWriter
 {
@@ -36,7 +35,7 @@ public:
 
 		virtual void WriteFile(FILE* file) = 0;
 		virtual void WriteMemory(const void* memory, size_t size) = 0;
-		virtual void WriteBlankSectors(unsigned int count, const unsigned char submode = 32) = 0;
+		virtual void WriteBlankSectors(unsigned int count, const unsigned char submode = 0x20, const bool eccAddr = false) = 0;
 		virtual size_t GetSpaceInCurrentSector() const = 0;
 		virtual void NextSector() = 0;
 		virtual void SetSubheader(unsigned int subHead) = 0;
@@ -46,7 +45,7 @@ public:
 	protected:
 		void PrepareSectorHeader() const;
 
-		void CalculateForm1();
+		void CalculateForm1(const bool eccAddr = false);
 		void CalculateForm2();
 
 	protected:

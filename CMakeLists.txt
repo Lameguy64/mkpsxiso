@@ -13,7 +13,7 @@ project(
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_C_STANDARD           11)
-set(CMAKE_CXX_STANDARD         17)
+set(CMAKE_CXX_STANDARD         20)
 
 # Useful paths
 set(mkpsxiso_dir "src/mkpsxiso")
@@ -34,14 +34,13 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ghc/include/ghc/filesystem.hpp)
 	message(FATAL_ERROR "The ghc directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
-if(NOT EXISTS ${PROJECT_SOURCE_DIR}/ThreadPool/ThreadPool.h)
-	message(FATAL_ERROR "The ThreadPool directory is empty. Run 'git submodule update --init --recursive' to populate it.")
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/threadpool/ThreadPool.h)
+	message(FATAL_ERROR "The threadpool directory is empty. Run 'git submodule update --init --recursive' to populate it.")
 endif()
 
-# Build tinyxml2. I didn't bother with tinyxml2's actual CMake integration
-# because it's far easier do do this. It is a single-file library after all.
-add_library               (tinyxml2 STATIC tinyxml2/tinyxml2.cpp)
-target_include_directories(tinyxml2 PUBLIC tinyxml2)
+# Build tinyxml2
+set(tinyxml2_BUILD_TESTING OFF CACHE INTERNAL "")
+add_subdirectory(tinyxml2 EXCLUDE_FROM_ALL)
 
 # Build libFLAC, unless explicitly requested not too
 if(NOT MKPSXISO_NO_LIBFLAC)
@@ -61,6 +60,9 @@ if(NOT MKPSXISO_NO_LIBFLAC)
 	if(MINGW)
 		set(WITH_STACK_PROTECTOR, OFF CACHE INTERNAL "")
 	endif()
+	if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+		set(WITH_FORTIFY_SOURCE OFF CACHE INTERNAL "")
+	endif()
 	add_subdirectory(flac EXCLUDE_FROM_ALL)
 endif()
 
@@ -72,13 +74,12 @@ add_subdirectory(ghc EXCLUDE_FROM_ALL)
 # Populate shared files
 add_library(iso_shared OBJECT
 	${shared_dir}/common.cpp
-	${shared_dir}/fs.cpp
 	${shared_dir}/mmappedfile.cpp
 	${shared_dir}/platform.cpp
 )
 target_include_directories(iso_shared PUBLIC ${shared_dir})
 target_compile_definitions(iso_shared PUBLIC VERSION="${PROJECT_VERSION}")
-target_link_libraries(iso_shared ghc_filesystem)
+target_link_libraries(iso_shared ghc_filesystem tinyxml2)
 
 find_package(Threads REQUIRED)
 
@@ -90,17 +91,18 @@ add_executable(mkpsxiso
 	${mkpsxiso_dir}/iso.cpp
 	${mkpsxiso_dir}/main.cpp
 )
-target_include_directories(mkpsxiso PUBLIC "miniaudio" "ThreadPool")
-target_link_libraries(mkpsxiso tinyxml2 iso_shared Threads::Threads)
+target_include_directories(mkpsxiso PUBLIC "miniaudio" "threadpool")
+target_link_libraries(mkpsxiso iso_shared Threads::Threads)
 if(MINGW)
 	target_link_libraries(mkpsxiso "-municode")
 endif()
 
 add_executable(dumpsxiso
 	${dumpsxiso_dir}/cdreader.cpp
+	${dumpsxiso_dir}/cue.cpp
 	${dumpsxiso_dir}/main.cpp
 )
-target_link_libraries(dumpsxiso tinyxml2 iso_shared)
+target_link_libraries(dumpsxiso iso_shared)
 if(NOT MKPSXISO_NO_LIBFLAC)
 	target_link_libraries(dumpsxiso FLAC)
 else()
@@ -113,8 +115,14 @@ endif()
 ## Installation
 
 include(GNUInstallDirs)
-install(TARGETS mkpsxiso dumpsxiso)
-install(FILES ${PROJECT_SOURCE_DIR}/README.md ${PROJECT_SOURCE_DIR}/LICENSE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/psn00bsdk/doc/mkpsxiso)
+if (WIN32 AND CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+	set(CMAKE_INSTALL_BINDIR $<IF:$<CONFIG:Release>,.,${CMAKE_INSTALL_BINDIR}>)
+	set(CMAKE_INSTALL_DATADIR $<IF:$<CONFIG:Release>,doc,${CMAKE_INSTALL_DOCDIR}>)
+else()
+	set(CMAKE_INSTALL_DATADIR ${CMAKE_INSTALL_DOCDIR})
+endif()
+install(TARGETS dumpsxiso mkpsxiso RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES ${PROJECT_SOURCE_DIR}/examples/example.xml ${PROJECT_SOURCE_DIR}/LICENSE.md ${PROJECT_SOURCE_DIR}/README.md DESTINATION ${CMAKE_INSTALL_DATADIR})
 
 ## CPack (used by GitHub Actions to package releases)
 

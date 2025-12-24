@@ -1,14 +1,9 @@
 #ifndef _CDREADER_H
 #define _CDREADER_H
 
-#include "cd.h"
+#include "common.h"
 #include "xa.h"
 #include "listview.h"
-#include "fs.h"
-#include <memory>
-#include <optional>
-#include <vector>
-#include <string>
 
 namespace cd {
 
@@ -50,10 +45,10 @@ namespace cd {
         size_t ReadBytesDA(void* ptr, size_t bytes, bool singleSector = false);
 
         // Skip bytes in data sectors (supports sequential skipping)
-        void SkipBytes(size_t bytes, bool singleSector = false);
+        size_t SkipBytes(size_t bytes, bool singleSector = false);
 
-        // Seek to a sector in the ISO image in sector units
-        int SeekToSector(int sector);
+        // Seek to a sector in the ISO image in sector units (returns true if success)
+        bool SeekToSector(int sector);
 
         // Seek to a data offset in the ISO image in byte units
         size_t SeekToByte(size_t offs);
@@ -81,7 +76,7 @@ namespace cd {
         std::vector<Entry> pathTableList;
 
         void FreePathTable();
-        size_t ReadPathTable(cd::IsoReader* reader, int lba);
+        size_t ReadPathTable(cd::IsoReader* reader, int lba, unsigned int size);
 
         fs::path GetFullDirPath(int dirEntry) const;
     };
@@ -96,13 +91,16 @@ namespace cd {
             cdxa::ISO_XA_ATTRIB extData;
             std::string identifier;
             fs::path virtualPath;
+            EntryType type;
+            std::string trackid;
+            std::optional<short> order;
 
             std::unique_ptr<IsoDirEntries> subdir;
         };
         ListView<Entry> dirEntryList;
 
         IsoDirEntries(ListView<Entry> view);
-        void ReadDirEntries(cd::IsoReader* reader, int lba, int sectors, bool skipFolders);
+        void ReadDirEntries(cd::IsoReader* reader, int lba, int sectors);
         void ReadRootDir(cd::IsoReader* reader, int lba);
 
     private:
@@ -110,5 +108,5 @@ namespace cd {
     };
 
 }
-
+extern EntryType GetXAEntryType(unsigned short xa_attr);
 #endif // _CDREADER_H

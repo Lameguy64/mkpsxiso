@@ -1,11 +1,13 @@
 #include "mmappedfile.h"
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #else
 #include <unistd.h>
 #include <sys/mman.h>
-#include <sys/types.h>
 #include <fcntl.h>
 #endif
 

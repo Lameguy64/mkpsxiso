@@ -30,9 +30,8 @@
 						  If xa_edc is not specified, defaults to 'true'.
 			new_type	- For data track only, specifies if the image was created with the old(<2003) Sony's mastering tool.
 						  If new_type is not specified, defaults to 'false'.
-			source		- For audio tracks only, specifies the file name of a wav audio
-						  file as source data for the audio track.
-			
+			ps2			- Optional, for data track only, specifies if the image is a Playstation 2 one. Defaults to 'false'.
+			source		- For audio tracks only, specifies the file name of a wav audio file as source data for the audio track.
 	-->
 	<track type="data" xa_edc="true" new_type="false">
 	
@@ -102,6 +101,14 @@
 										 'xa' and 'str' can also be used as aliases for 'mixed'.
 								'da': is for CD-DA audio files. More details below.
 							  If no value for type is specified, the default is 'data'.
+					hidden	- Optional, flag to set files/directories as "hidden". Options are
+								'0': not hidden. (Default)
+								'1': hidden.
+								'2': obfuscated. (Doesn't add the entry to the Directory Record)
+								'3': obfuscated and hidden. (Only for directories)
+					order	- Optional, custom Directory Record order for games with the 'new_type' string on 'true'.
+							  This setting doesn't modify the LBA and is per directory. If order is not specified, defaults to '0'.
+							  So, files/folders with order < 0 will be before the unordered ones and after them the ones with order > 0.
 				
 				Note: Either name or source attribute can be omitted. If name is only specified, it uses that
 				as the name of the source file and specifying source only strips off the path name if there's
@@ -120,6 +127,8 @@
 					name	- Specifies the name of the subdirectory.
 					srcdir	- Specifies the directory path to the source files if no source attribute is
 							  specified to the <file> elements (optional, can be a relative or absolute path).
+					hidden	- Optional, flag to set files/directories as "hidden" (see above for description).
+					order	- Optional, custom Directory Record order (see above for description).
 						  
 			-->
 			<dir name="mydir">
@@ -163,9 +172,11 @@
 				
 				Attributes:
 					sectors	- Size of dummy file in sector units (1024 = 2MB).
-					type	- The dummy's submode value. Values between 0-255 only
-								 '0': for a Form 1 dummy (0x00).
+					type	- The dummy's submode value. Values between 0-255 only.
+								 '0': for a Form 1 dummy (0x00). (Default)
 								'32': for a Form 2 dummy (0x20).
+					ecc_addr- Optional, calculates the ECC with the real address instead of a zeroed one. Values 'true' or 'false' only.
+							  This is only usefull for some CD-DA games last DATA postgap sector that has a non-standart ECC calculation.
 			-->
 			<dummy sectors="1024" type="0"/>
 			
@@ -176,7 +187,7 @@
 				A DA file must have a trackid that matches with with a <track>. The trackid is just a
 				string.
 				
-				You can still use <track> elements after this, if you want to add further audio tracks
+				You can still use <dummy> or <track> elements after this, if you want to add further audio tracks
 				that are not referenced by any DA file in the data track.
 			-->
 			<file name="audio1.da" trackid="02" type="da"/>

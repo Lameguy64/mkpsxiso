@@ -1,17 +1,9 @@
 #ifndef _ISO_H
 #define _ISO_H
 
-#include <ctime>
-#include <stdlib.h>
-#include <list>
-#include <memory>
-#include <optional>
-#include <string>
-#include <utility>
-#include <vector>
-#include "fs.h"
 #include "cdwriter.h"
 #include "common.h"
+#include <list>
 
 namespace iso
 {
@@ -37,15 +29,16 @@ namespace iso
 
 		fs::path 		srcfile;	/// Filename with path to source file (empty if directory or dummy)
 		EntryType		type;		/// File type (0 - file, 1 - directory)
-		unsigned char 	HF;			/// Hidden Flag
-		unsigned char 	attribs;	/// XA attributes, 0xFF is not set
-		unsigned short 	perms;		/// XA permissions
-		unsigned short 	GID;		/// Owner group ID
-		unsigned short 	UID;		/// Owner user ID
+		unsigned char	HF;			/// Hidden Flag
+		unsigned char	attribs;	/// XA attributes, 0xFF is not set
+		unsigned short	perms;		/// XA permissions
+		unsigned short	GID;		/// Owner group ID
+		unsigned short	UID;		/// Owner user ID
 		std::unique_ptr<class DirTreeClass> subdir;
 
 		cd::ISO_DATESTAMP date;
-		std::string 	trackid;	/// only used for DA files
+		std::string		trackid;	/// only used for DA files
+		signed short	order;
 
 	};
 
@@ -78,10 +71,10 @@ namespace iso
 
 		DIRENTRY* entry = nullptr;
 
-		DirTreeClass* parent = nullptr; // Non-owning
+		DirTreeClass* parent; // Non-owning
 		
 		/// Internal function for generating and writing directory records
-		bool WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, const unsigned short totalDirs) const;
+		bool WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, const int totalDirs) const;
 
 		/// Internal function for recursive path table generation
 		std::unique_ptr<PathTableClass> GenPathTableSub(unsigned short& index, unsigned short parentIndex) const;
@@ -91,10 +84,10 @@ namespace iso
 		EntryList& entries; // List of all entries on the disc
 		std::vector<std::reference_wrapper<iso::DIRENTRY>> entriesInDir; // References to entries in this directory
 
-		DirTreeClass(EntryList& entries, DirTreeClass* parent = nullptr);
+		DirTreeClass(EntryList& entries, DirTreeClass* parent = nullptr, std::string name = "<root>");
 		~DirTreeClass();
 
-		static DIRENTRY& CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate);
+		static DIRENTRY& CreateRootDirectory(EntryList& entries, const cd::ISO_DATESTAMP& volumeDate, const EntryAttributes& attributes);
 
 		void PrintRecordPath();
 
@@ -130,8 +123,9 @@ namespace iso
 		 *	sectors		- The size of the dummy file in sector units (1 = 2048 bytes, 1024 = 2MB).
 		 *	submode		- Submode value 0x00(0) for form1 (data) dummy, 0x20(32) for form2 (XA) dummy.
 		 *	flba		- Forced LBA offset.
+		 *	eccAddr		- Switch to use the real address instead of a zeroed one for ecc calculation.
 		 */
-		void AddDummyEntry(const unsigned int sectors, const unsigned char submode, const unsigned int flba);
+		void AddDummyEntry(const unsigned int sectors, const unsigned char submode, const unsigned int flba, const bool eccAddr);
 
 		/** Generates a path table of all directories and subdirectories within this class' directory record.
 		 *
@@ -164,24 +158,23 @@ namespace iso
 		 *	have been written to the CD image.
 		 *
 		 *	*writer		   - Pointer to a cd::IsoWriter class that is ready for writing.
-		 *	LBA			   - Current directory LBA
-		 *  parentLBA	   - Parent directory LBA
-		 *  currentDirDate - Timestamp to use for . and .. directories.
+		 *	root		   - Root directory
 		 *  totalDirs	   - Total number of directories. Only usefull for games built with the latest sony mastering tool
 		 */
-		bool WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& dir, const DIRENTRY& parentDir, unsigned short totalDirs);
+		bool WriteDirectoryRecords(cd::IsoWriter* writer, const DIRENTRY& root, int totalDirs);
 
-		void SortDirectoryEntries();
+		void SortDirectoryEntries(const bool byOrder, const bool byLBA = false);
 
 		int CalculatePathTableLen(const DIRENTRY& dirEntry) const;
 
 		int GetFileCountTotal() const;
 		int GetDirCountTotal() const;
+		int GetPathDepth(size_t* pathLength = nullptr) const;
 
 		void OutputLBAlisting(FILE* fp, int level) const;
 	};
 
-	void WriteLicenseData(cd::IsoWriter* writer, void* data);
+	void WriteLicenseData(cd::IsoWriter* writer, void* data, const bool& ps2);
 
 	void WriteDescriptor(cd::IsoWriter* writer, const IDENTIFIERS& id, const DIRENTRY& root, int imageLen);
 

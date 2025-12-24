@@ -1,17 +1,5 @@
-#ifdef _WIN32
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
-#include "cd.h"
-#include "xa.h"
-#include "common.h"
 #include "cdreader.h"
 #include "platform.h"
-#include <string.h>
-#include <stdlib.h>
 
 cd::IsoReader::IsoReader()
 {
@@ -61,11 +49,10 @@ size_t cd::IsoReader::ReadBytes(void* ptr, size_t bytes, bool singleSector)
 
 	size_t bytesRead = 0;
     char* const dataPtr = (char*)ptr;
-	constexpr size_t DATA_SIZE = sizeof(sectorM2F1->data);
 
     while(bytes > 0)
 	{
-		const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
+		const size_t toRead = std::min(F1_DATA_SIZE - currentByte, bytes);
 
         memcpy(dataPtr+bytesRead, &sectorM2F1->data[currentByte], toRead);
 
@@ -73,7 +60,7 @@ size_t cd::IsoReader::ReadBytes(void* ptr, size_t bytes, bool singleSector)
 		bytesRead += toRead;
 		bytes -= toRead;
 
-		if (currentByte >= DATA_SIZE)
+		if (currentByte >= F1_DATA_SIZE)
 		{
 			if (singleSector || !PrepareNextSector())
 			{
@@ -94,19 +81,18 @@ size_t cd::IsoReader::ReadBytesXA(void* ptr, size_t bytes, bool singleSector)
 
 	size_t bytesRead = 0;
     char* const dataPtr = (char*)ptr;
-	constexpr size_t DATA_SIZE = sizeof(sectorM2F2->data);
 
     while(bytes > 0)
 	{
-		const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
+		const size_t toRead = std::min(XA_DATA_SIZE - currentByte, bytes);
 
-        memcpy(dataPtr+bytesRead, &sectorM2F2->data[currentByte], toRead);
+        memcpy(dataPtr+bytesRead, &sectorM2F2->subHead[currentByte], toRead);
 
 		currentByte += toRead;
 		bytesRead += toRead;
 		bytes -= toRead;
 
-		if (currentByte >= DATA_SIZE)
+		if (currentByte >= XA_DATA_SIZE)
 		{
 			if (singleSector || !PrepareNextSector())
 			{
@@ -127,11 +113,10 @@ size_t cd::IsoReader::ReadBytesDA(void* ptr, size_t bytes, bool singleSector)
 
 	size_t bytesRead = 0;
     char* const dataPtr = (char*)ptr;
-	constexpr size_t DATA_SIZE = sizeof(sectorBuff);
 
     while(bytes > 0)
 	{
-		const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
+		const size_t toRead = std::min(CD_SECTOR_SIZE - currentByte, bytes);
 
         memcpy(dataPtr+bytesRead, &sectorBuff[currentByte], toRead);
 
@@ -139,7 +124,7 @@ size_t cd::IsoReader::ReadBytesDA(void* ptr, size_t bytes, bool singleSector)
 		bytesRead += toRead;
 		bytes -= toRead;
 
-		if (currentByte >= DATA_SIZE)
+		if (currentByte >= CD_SECTOR_SIZE)
 		{
 			if (singleSector || !PrepareNextSector())
 			{
@@ -152,39 +137,41 @@ size_t cd::IsoReader::ReadBytesDA(void* ptr, size_t bytes, bool singleSector)
 
 }
 
-void cd::IsoReader::SkipBytes(size_t bytes, bool singleSector) {
+size_t cd::IsoReader::SkipBytes(size_t bytes, bool singleSector) {
 
 	if (currentSector >= totalSectors) {
-		return;
+		return 0;
 	}
 
-	constexpr size_t DATA_SIZE = sizeof(sectorM2F1->data);
-
+	size_t bytesRead = 0;
     while(bytes > 0) {
 
-        const size_t toRead = std::min(DATA_SIZE - currentByte, bytes);
+        const size_t toRead = std::min(F1_DATA_SIZE - currentByte, bytes);
 
 		currentByte += toRead;
+		bytesRead += toRead;
 		bytes -= toRead;
 
-		if (currentByte >= DATA_SIZE) {
+		if (currentByte >= F1_DATA_SIZE) {
 
             if (singleSector || !PrepareNextSector())
 			{
-				return;
+				return bytesRead;
 			}
 		}
     }
+
+	return bytesRead;
 }
 
-int cd::IsoReader::SeekToSector(int sector) {
+bool cd::IsoReader::SeekToSector(int sector) {
 
-	if (sector >= totalSectors)
-		return -1;
+	if (sector >= totalSectors || filePtr == nullptr)
+		return false;
 
     fseek(filePtr, CD_SECTOR_SIZE*sector, SEEK_SET);
 	if (fread(sectorBuff, CD_SECTOR_SIZE, 1, filePtr) != 1) {
-		return -1;
+		return false;
 	}
 
 	currentSector = sector;
@@ -193,7 +180,7 @@ int cd::IsoReader::SeekToSector(int sector) {
 	sectorM2F1 = (cd::SECTOR_M2F1*)sectorBuff;
     sectorM2F2 = (cd::SECTOR_M2F2*)sectorBuff;
 
-	return ferror(filePtr);
+	return !ferror(filePtr);
 
 }
 
@@ -251,33 +238,35 @@ void cd::IsoPathTable::FreePathTable()
 	pathTableList.clear();
 }
 
-size_t cd::IsoPathTable::ReadPathTable(cd::IsoReader* reader, int lba)
+size_t cd::IsoPathTable::ReadPathTable(cd::IsoReader* reader, int lba, unsigned int size)
 {
-	if (lba >= 0)
-		reader->SeekToSector(lba);
+	if (lba < 0 || !reader->SeekToSector(lba) || size < sizeof(ISO_PATHTABLE_ENTRY) + sizeof(""))
+		return 0;
 
 	FreePathTable();
 
-	while (true)
+	size_t bytesRead = 0;
+	while (bytesRead < size)
 	{
 		Entry pathTableEntry;
-		reader->ReadBytes(&pathTableEntry.entry, sizeof(pathTableEntry.entry));
+		bytesRead += reader->ReadBytes(&pathTableEntry.entry, sizeof(pathTableEntry.entry));
 
 		// Its the end of the path table when its nothing but zeros
-		if (pathTableEntry.entry.nameLength == 0)
+		// ECMA-119 7.6.3 - The length of a Directory Identifier shall not exceed 31
+		if (pathTableEntry.entry.identifierLen == 0 || pathTableEntry.entry.identifierLen > 31)
 			break;
 
 
 		// Read entry name
 		{
-			const size_t length = pathTableEntry.entry.nameLength;
+			const size_t length = pathTableEntry.entry.identifierLen;
 			pathTableEntry.name.resize(length);
-			reader->ReadBytes(pathTableEntry.name.data(), length);
+			bytesRead += reader->ReadBytes(pathTableEntry.name.data(), length);
 
 			// ECMA-119 9.4.6 - 00 field present only if entry length is an odd number
 			if ((length % 2) != 0)
 			{
-				reader->SkipBytes(1);
+				bytesRead += reader->SkipBytes(1);
 			}
 
 			// Strip trailing zeroes, if any
@@ -314,8 +303,9 @@ cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
 {
 }
 
-void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors, bool skipFolders)
+void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors)
 {
+	short order = 0;
 	size_t numEntries = 0; // Used to skip the first two entries, . and ..
     for (int sec = 0; sec < sectors; sec++)
     {
@@ -329,8 +319,12 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 				break;
 			}
 
-			if (numEntries++ >= 2 && !(skipFolders && entry.value().entry.flags & 0x2))
+			if (numEntries++ >= 2)
 			{
+				if (*global::new_type)
+				{
+					entry->order = order++;
+				}
 				dirEntryList.emplace(std::move(entry.value()));
 			}
 		}
@@ -341,6 +335,21 @@ void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int secto
 		{
 			return left.get().entry.entryOffs.lsb < right.get().entry.entryOffs.lsb;
 		});
+
+	// Delete orders if all are correct to avoid populate the xml with unnecessary strings
+	if (*global::new_type)
+	{
+		auto& entriesInDir = dirEntryList.GetView();
+		for (int index = 0; index < entriesInDir.size(); index++)
+		{
+			if (*entriesInDir[index].get().order != index)
+				return;
+		}
+		for (auto& entry : entriesInDir)
+		{
+			entry.get().order.reset();
+		}
+	}
 }
 
 std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoReader* reader) const
@@ -351,12 +360,13 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	size_t bytesRead = reader->ReadBytes(&entry.entry, sizeof(entry.entry), true);
 
 	// The file entry table usually ends with null bytes so break if we reached that area
-	if (bytesRead != sizeof(entry.entry) || entry.entry.entryLength == 0)
+	// ECMA-119 7.5.1 - The length of a File Identifier shall not exceed 31 + ';1'
+	if (bytesRead != sizeof(entry.entry) || entry.entry.entryLength == 0 || entry.entry.identifierLen > 33)
 		return std::nullopt;
 
 	// Read identifier string
 	entry.identifier.resize(entry.entry.identifierLen);
-	reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen, true);
+	bytesRead += reader->ReadBytes(entry.identifier.data(), entry.entry.identifierLen, true);
 
 	// Strip trailing zeroes, if any
 	entry.identifier.resize(strlen(entry.identifier.c_str()));
@@ -364,16 +374,34 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	// ECMA-119 9.1.12 - 00 field present only if file identifier length is an even number
 	if ((entry.entry.identifierLen % 2) == 0)
     {
-        reader->SkipBytes(1);
+		bytesRead += reader->SkipBytes(1);
     }
 
 	// Read XA attribute data
-	reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);
+	bytesRead += reader->ReadBytes(&entry.extData, sizeof(entry.extData), true);
 
 	// XA attributes are big endian, swap them
-	entry.extData.attributes = SwapBytes16(entry.extData.attributes);
 	entry.extData.ownergroupid = SwapBytes16(entry.extData.ownergroupid);
 	entry.extData.owneruserid = SwapBytes16(entry.extData.owneruserid);
+	if ((entry.extData.attributes & 0x0FFF) != 0x0800) // HACK for conflictive images that has the attributes written as little endian
+	{
+		entry.extData.attributes = SwapBytes16(entry.extData.attributes);
+	}
+
+	// Skip unsupported System Use extensions
+	if (bytesRead < entry.entry.entryLength)
+	{
+		bytesRead += reader->SkipBytes(entry.entry.entryLength - bytesRead, true);
+	}
+
+	// If there is still a difference, then it's either an invalid entry or a corrupted sector
+	if (bytesRead != entry.entry.entryLength)
+		return std::nullopt;
+
+	// Add the EntryType here so as to not keep calculating it everytime later
+	// Check for file number first to determine if it's a STR/XA file, because some games (Mega Man X3) has flagged them as DATA but currently they are not
+	entry.type = entry.extData.filenum ? EntryType::EntryXA : GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
+	entry.trackid = "01"; // This helps detect unreferenced entries more easily
 
 	return entry;
 }

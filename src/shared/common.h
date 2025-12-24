@@ -1,10 +1,9 @@
 #pragma once
 
 #include "cd.h"
-#include "fs.h"
-#include <memory>
+#include "ghc/fs_std.hpp"
 #include <optional>
-#include <string>
+#include <cstring>
 
 enum class EntryType
 {
@@ -36,6 +35,7 @@ private:
 	static constexpr unsigned char DEFAULT_XAATRIB = 0xFF;
 	static constexpr unsigned short DEFAULT_XAPERM = 0x555; // rx
 	static constexpr unsigned short	DEFAULT_OWNER_ID = 0;
+	static constexpr signed short	DEFAULT_ORDER = 0;
 	static constexpr unsigned short	DEFAULT_FORCE_LBA = 0;
 
 public:
@@ -45,18 +45,25 @@ public:
 	unsigned short XAPerm = DEFAULT_XAPERM;
 	unsigned short GID = DEFAULT_OWNER_ID;
 	unsigned short UID = DEFAULT_OWNER_ID;
+	signed short ORDER = DEFAULT_ORDER;
 	unsigned int FLBA = DEFAULT_FORCE_LBA;
 };
 
+// Shared by mkpsxiso and dumpsxiso
+namespace global
+{
+	extern std::optional<bool> new_type;
+}
+
 // Helper functions for datestamp manipulation
 cd::ISO_DATESTAMP GetDateFromString(const char* str, bool* success = nullptr);
-cd::ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success = false);
-//cd::ISO_LONG_DATESTAMP GetLongDateFromDate(const cd::ISO_DATESTAMP& src);
+cd::ISO_LONG_DATESTAMP GetLongDateFromString(const char* str);
 cd::ISO_LONG_DATESTAMP GetUnspecifiedLongDate();
 std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src);
 
-uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize = 2048);
-
+// Helper functions for sector conversion
+uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize = F1_DATA_SIZE);
+int32_t TimecodeToSectors(const std::string_view timecode);
 std::string SectorsToTimecode(const unsigned sectors);
 
 // Endianness swap
@@ -77,6 +84,8 @@ struct file_deleter
 using unique_file = std::unique_ptr<FILE, file_deleter>;
 unique_file OpenScopedFile(const fs::path& path, const char* mode);
 
+// Helper functions for string manipulation
+std::string CleanIdentifier(std::string_view id);
 bool CompareICase(std::string_view strLeft, std::string_view strRight);
 
 // Argument parsing

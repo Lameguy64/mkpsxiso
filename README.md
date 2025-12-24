@@ -16,49 +16,55 @@
 * Injects license data into ISO image correctly.
 * File LBA controlled by order of files allowing for file seek optimization (just like BUILDCD).
 * Supports mixed-mode CD-XA stream files such as XA audio and STR video.
-* Supports CDDA audio tracks from wav, flac, pcm, and mp3 files, both as DA files and just as audio tracks
+* Supports CDDA audio tracks from wav, flac, pcm, and mp3 files, both as DA files and just as audio tracks.
 * Can output log of all files packed with details such as LBA, size and timecode offset.
 * Extract CDDA tracks from ISO as wav, flac, and pcm.
-* Many images can be rebuilt 1:1 now.
+* Almost all images can be rebuilt 1:1 now.
     * XML generation: by default in strict LBA order, but can instead sort by dir for pretty output.
     * Timestamps and XA attributes are preserved.
 
 ## Binary Download
 
-[Releases](../../releases/latest) for Win32 and `ubuntu-latest`, both are built by github CI starting at v2.0
+[Releases](../../releases/latest) for Windows, Linux and macOS (built by github CI)
 
 [Ancient releases](https://github.com/Lameguy64/mkpsxiso/tree/gh-pages) (NOT RECOMMENDED)
 
 ## Compiling
 
-1. Set up CMake and a compiler toolchain. Install the `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
-   * MSVC (do not install CMake through the Visual Studio installer, download it from [here](https://cmake.org/download) instead)
-   * MSys2 (use the "MinGW 64-bit" shell) with the following packages: `git`, `mingw-w64-x86_64-make`, `mingw-w64-x86_64-cmake`, `mingw-w64-x86_64-gcc`
-   * Cygwin64 with the following packages: `git`, `make`, `cmake`, `gcc`
+1. Set up Git, CMake and a compiler toolchain. Install the `git`, `cmake` and `build-essential` packages provided by your Linux distro, or one of the following kits on Windows:
+   * MSVC [Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools) (do not install CMake through its installer, download it from [here](https://cmake.org/download) instead) and [Git](https://git-scm.com/downloads/win)
+   * [MSYS2](https://www.msys2.org) (use the "UCRT64" shell) with the following packages: `mingw-w64-ucrt-x86_64-toolchain`, `mingw-w64-ucrt-x86_64-cmake`, `git`
 
-2. Clone/download the repo, then run the following command from the mkpsxiso directory to ensure `tinyxml2` is also downloaded and updated:
+2. Git clone the repository and then cd into the mkpsxiso directory:
 
    ```bash
-   git submodule update --init --recursive
+   git clone --recurse-submodules https://github.com/Lameguy64/mkpsxiso.git
+   cd mkpsxiso
    ```
+   Note: submodules folders will be empty if you downloaded the repository .zip instead of cloning it.
 
-3. Run the following commands:
+3. Run the following commands to configure and build the project:
 
    ```bash
-   cmake -S . --preset release
-   cmake --build ./build --config Release
-   cmake --install ./build
+   cmake --preset release
+   cmake --build --preset release
    ```
 
    If you wish to build dumpsxiso without libFLAC support (libFLAC is required for encoding CDDA/DA audio as FLAC), add `-DMKPSXISO_NO_LIBFLAC=1` to the end of the first command.
 
-   Add `sudo` to the install command if necessary.
+   Optionally you can install the build files with the following command:
+   ```bash
+   cmake --install ./build
+   ```
+   Note: installation to default paths needs administrative privileges.
 
-The default installation path is `C:\Program Files\mkpsxiso\bin` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
+   Default installation path is `C:\Program Files (x86)\mkpsxiso` on Windows or `/usr/local/bin` on Linux. You can change it to any directory by passing `--install-prefix` to the first command.
 
 ## Issues
 
-The only known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
+On `ext4` and `xfs` filesystems, the minimum timestamp you can set is 1901/12/13, which makes games that has files/folders with dates older than that (like Crash Bash, Spyro3, Vagrant Story, etc) impossible to be rebuilt 1:1. A workaround to this is to work on a fs that has better date support, like `f2fs` `ntfs` `btrfs`.
+
+The other known major issue that hasn't (or cannot) be resolved is that if you create a disc image with the following directory structure:
 
 ```xml
 <dir name="dira">

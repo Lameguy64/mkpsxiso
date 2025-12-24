@@ -1,59 +1,21 @@
 #include "common.h"
 #include "platform.h"
-#include <iterator>
-#include <memory>
-#include <cstring>
-#include <cstdarg>
 
 using namespace cd;
-/*
-static void snprintfZeroPad(char* s, size_t n, const char* format, ...)
-{
-	// We need a temporary buffer that is 1 byte bigger than the specified one,
-	// then memcpy without the null terminator/pad with zeroes
-	auto buf = std::make_unique<char[]>(n + 1);
 
-	va_list args;
-	va_start(args, format);
-
-	const int bytesWritten = vsnprintf(buf.get(), n + 1, format, args);
-	memcpy(s, buf.get(), bytesWritten);
-	if (bytesWritten < n) {
-		std::fill(s + bytesWritten, s + n, '\0');
-	}
-
-	va_end(args);
-}
-
-ISO_LONG_DATESTAMP GetLongDateFromDate(const ISO_DATESTAMP& src)
-{
-	ISO_LONG_DATESTAMP result;
-
-	snprintfZeroPad(result.year, std::size(result.year), "%04d", src.year != 0 ? 1900 + src.year : 0);
-	snprintfZeroPad(result.month, std::size(result.month), "%02d", src.month);
-	snprintfZeroPad(result.day, std::size(result.day), "%02d", src.day);
-	snprintfZeroPad(result.hour, std::size(result.hour), "%02d", src.hour);
-	snprintfZeroPad(result.minute, std::size(result.minute), "%02d", src.minute);
-	snprintfZeroPad(result.second, std::size(result.second), "%02d", src.second);
-	strncpy(result.hsecond, "00", std::size(result.hsecond));
-	result.GMToffs = src.GMToffs;
-
-	return result;
-}
-*/
 ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 {
 	bool succeeded = false;
 
 	ISO_DATESTAMP result {};
 
-	short int year;
-	const int argsRead = sscanf( str, "%04hd%02hhu%02hhu%02hhu%02hhu%02hhu%*02u%hhd",
+	unsigned int year;
+	const int argsRead = sscanf( str, "%4u%2hhu%2hhu%2hhu%2hhu%2hhu%*2u%hhd",
 		&year, &result.month, &result.day,
 		&result.hour, &result.minute, &result.second, &result.GMToffs );
 	if (argsRead >= 6)
 	{
-		result.year = year != 0 ? year - 1900 : 0;
+		result.year = year >= 1900 ? year - 1900 : 0;
 		if (argsRead < 7)
 		{
 			// Consider GMToffs optional
@@ -69,15 +31,14 @@ ISO_DATESTAMP GetDateFromString(const char* str, bool* success)
 	return result;
 }
 
-ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success)
+ISO_LONG_DATESTAMP GetLongDateFromString(const char* str)
 {
 	ISO_LONG_DATESTAMP result {};
 
 	if (str) {
-		unsigned short year;
-		unsigned char month, day, hour, minute, second, hsecond;
+		unsigned int year, month, day, hour, minute, second, hsecond {};
 
-		const unsigned char argsRead = sscanf( str, "%04hu%02hhu%02hhu%02hhu%02hhu%02hhu%02hhu%hhd",
+		const int argsRead = sscanf( str, "%4u%2u%2u%2u%2u%2u%2u%hhd",
 			&year, &month, &day, &hour, &minute, &second, &hsecond, &result.GMToffs );
 
 		if (argsRead >= 6) {
@@ -86,9 +47,9 @@ ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success)
 				result.GMToffs = 36;
 			}
 
-			auto intToChars = [](unsigned short value, char* buf, unsigned char size) {
-				for (signed char i = size - 1; i >= 0; --i) {
-					buf[i] = '0' + (value % 10);
+			auto intToChars = [](unsigned int value, char* dest, unsigned int size) {
+				for (int i = size - 1; i >= 0; --i) {
+					dest[i] = '0' + (value % 10);
 					value /= 10;
 				}
 			};
@@ -101,7 +62,6 @@ ISO_LONG_DATESTAMP GetLongDateFromString(const char* str, bool success)
 			intToChars(second, result.second, 2);
 			intToChars(hsecond, result.hsecond, 2);
 
-			success = true;
 			return result;
 		}
 	}
@@ -113,13 +73,7 @@ ISO_LONG_DATESTAMP GetUnspecifiedLongDate()
 {
 	ISO_LONG_DATESTAMP result;
 
-	strncpy(result.year, "0000", std::size(result.year));
-	strncpy(result.month, "00", std::size(result.month));
-	strncpy(result.day, "00", std::size(result.day));
-	strncpy(result.hour, "00", std::size(result.hour));
-	strncpy(result.minute, "00", std::size(result.minute));
-	strncpy(result.second, "00", std::size(result.second));
-	strncpy(result.hsecond, "00", std::size(result.hsecond));
+	memset(&result, '0', sizeof(result));
 	result.GMToffs = 0;
 
 	return result;
@@ -132,8 +86,8 @@ std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src)
 
 	std::string result(srcStr, srcStr+16);
 
-	char GMTbuf[8];
-	sprintf(GMTbuf, "%+hhd", src.GMToffs);
+	char GMTbuf[4];
+	snprintf(GMTbuf, sizeof(GMTbuf), "%+hhd", src.GMToffs);
 	result.append(GMTbuf);
 
 	return result;
@@ -141,7 +95,18 @@ std::string LongDateToString(const cd::ISO_LONG_DATESTAMP& src)
 
 uint32_t GetSizeInSectors(uint64_t size, uint32_t sectorSize)
 {
-	return static_cast<uint32_t>((size + (sectorSize - 1)) / sectorSize);
+	return size ? static_cast<uint32_t>((size + (sectorSize - 1)) / sectorSize) : 1;
+}
+
+int32_t TimecodeToSectors(const std::string_view timecode)
+{
+	int minutes;
+	unsigned int seconds, frames;
+	if (sscanf(timecode.data(), "%d:%u:%u", &minutes, &seconds, &frames) != 3 || (minutes < 0) || (seconds > 59) || (frames > 74))
+	{
+		return -1;
+	}
+	return (minutes * 60 + seconds) * 75 + frames;
 }
 
 std::string SectorsToTimecode(const unsigned sectors)
@@ -149,7 +114,7 @@ std::string SectorsToTimecode(const unsigned sectors)
 	char timecode[16];
 	snprintf( timecode, sizeof(timecode), "%02u:%02u:%02u", (sectors/75)/60, (sectors/75)%60, sectors%75);
 	return std::string(timecode);
-}	                
+}
 
 unsigned short SwapBytes16(unsigned short val)
 {
@@ -168,6 +133,12 @@ unsigned int SwapBytes32(unsigned int val)
 unique_file OpenScopedFile(const fs::path& path, const char* mode)
 {
 	return unique_file { OpenFile(path, mode) };
+}
+
+std::string CleanIdentifier(std::string_view id)
+{
+	std::string result(id.substr(0, id.find_last_of(';')));
+	return result;
 }
 
 bool CompareICase(std::string_view strLeft, std::string_view strRight)
@@ -203,7 +174,7 @@ std::optional<fs::path> ParsePathArgument(char**& argv, std::string_view command
 		{
 			argv++;
 		}
-		return fs::u8path(*argv);
+		return *argv;
 	}
 	return std::nullopt;
 }
