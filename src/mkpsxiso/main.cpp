@@ -224,7 +224,6 @@ int Main(int argc, char* argv[])
 		tinyxml2::XMLError error;
 		if (FILE* file = OpenFile(global::XMLscript, "rb"); file != nullptr)
 		{
-			global::XMLscript = fs::relative(global::XMLscript);
 			error = xmlFile.LoadFile(file);
 			fclose(file);
 		}
