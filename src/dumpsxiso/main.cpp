@@ -769,7 +769,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				// The source file will anyway be stored on our hard drive in raw form.
 				if (!param::QuietMode)
 				{
-					printf("    Extracting XA \"%s\"... ", outputPath.lexically_normal().string().c_str());
+					printf("    Extracting XA \"%s\"... ", outputPath.string().c_str());
 				}
 				fflush(stdout);
 
@@ -841,7 +841,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				}
 				else if (!param::QuietMode)
 				{
-					printf("    Extracting audio \"%s\"... ", daOutPath.lexically_normal().string().c_str());
+					printf("    Extracting audio \"%s\"... ", daOutPath.string().c_str());
 				}
 				fflush(stdout);
 
@@ -879,7 +879,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				// Extract regular file
 				if (!param::QuietMode)
 				{
-					printf("    Extracting \"%s\"... ", outputPath.lexically_normal().string().c_str());
+					printf("    Extracting \"%s\"... ", outputPath.string().c_str());
 					fflush(stdout);
 				}
 
@@ -957,7 +957,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 		{
 			newelement = dirElement->InsertNewChildElement("dir");
 			newelement->SetAttribute(xml::attrib::ENTRY_NAME, entry.identifier.c_str());
-			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_string().c_str());
+			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.generic_string().c_str());
 		}
 		else
 		{
@@ -977,7 +977,7 @@ tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry, tinyx
 		newelement->SetAttribute(xml::attrib::ENTRY_NAME, CleanIdentifier(entry.identifier).c_str());
 		if(entry.type != EntryType::EntryDA)
 		{
-			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.lexically_normal().generic_string().c_str());
+			newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, outputPath.generic_string().c_str());
 			newelement->SetAttribute(xml::attrib::ENTRY_TYPE, entry.type == EntryType::EntryFile ? "data" : "mixed");	
 		}
 		else
@@ -1160,7 +1160,7 @@ void ParseISO(cd::IsoReader& reader) {
 		fs::create_directories(dirPath, ec);
 		if (ec)
 		{
-			printf("\nERROR: Cannot create directory \"%s\". %s\n", dirPath.parent_path().lexically_normal().string().c_str(), ec.message().c_str());
+			printf("\nERROR: Cannot create directory \"%s\". %s\n", dirPath.parent_path().string().c_str(), ec.message().c_str());
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -1169,7 +1169,7 @@ void ParseISO(cd::IsoReader& reader) {
 	{
 		if (!param::noxml)
 		{
-			printf("\n    License file: \"%s\"\n", (param::outPath.lexically_normal() / "license_data.dat").string().c_str());
+			printf("\n    License file: \"%s\"\n", (param::outPath / "license_data.dat").string().c_str());
 		}
 		printf("\n    Parsing directory tree...\n");
 	}
@@ -1327,7 +1327,7 @@ void ParseISO(cd::IsoReader& reader) {
 			{
 				// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, pause should be always >= 150 sectors.
 				unsigned pregap_sectors = 150;
-				dafile->virtualPath = GetRealDAFilePath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier)).lexically_normal();
+				dafile->virtualPath = GetRealDAFilePath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier));
 				if(dafile->entry.entryOffs.lsb != currentLBA)
 				{
 					pregap_sectors = dafile->entry.entryOffs.lsb - currentLBA;
@@ -1372,7 +1372,7 @@ void ParseISO(cd::IsoReader& reader) {
 		}
 		else
 		{
-			printf("\nERROR: Cannot create xml file \"%s\". %s\n", param::xmlFile.lexically_normal().string().c_str(), strerror(errno));
+			printf("\nERROR: Cannot create xml file \"%s\". %s\n", param::xmlFile.string().c_str(), strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -1477,7 +1477,7 @@ int Main(int argc, char *argv[])
 			}
 			if (auto xmlPath = ParsePathArgument(args, "s"); xmlPath.has_value())
 			{
-				param::xmlFile = *xmlPath;
+				param::xmlFile = xmlPath->lexically_normal();
 				continue;
 			}
 			if(auto encodingStr = ParseStringArgument(args, "e", "encode"); encodingStr.has_value())
@@ -1512,7 +1512,7 @@ int Main(int argc, char *argv[])
 
 		if (param::isoFile.empty())
 		{
-			param::isoFile = *args;
+			param::isoFile = fs::path(*args).lexically_normal();
 		}
 		else
 		{
@@ -1551,7 +1551,7 @@ int Main(int argc, char *argv[])
 
 	if (!reader.Open(param::isoFile)) {
 
-		printf("ERROR: Cannot open file \"%s\"\n", param::isoFile.lexically_normal().string().c_str());
+		printf("ERROR: Cannot open file \"%s\"\n", param::isoFile.string().c_str());
 		return EXIT_FAILURE;
 
 	}
@@ -1568,7 +1568,7 @@ int Main(int argc, char *argv[])
 
 	if (!param::QuietMode)
 	{
-		printf("Output directory : \"%s\"\n\n", param::outPath.lexically_normal().string().c_str());
+		printf("Output directory : \"%s\"\n\n", param::outPath.string().c_str());
 	}
 
 	tzset(); // Initializes the time-related environment variables
