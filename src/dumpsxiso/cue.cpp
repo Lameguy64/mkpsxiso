@@ -1,6 +1,5 @@
 #include "cue.h"
 #include "platform.h"
-#include <fstream>
 
 bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &entry, cd::IsoReader &reader, const CueFile &cueFile)
 {
@@ -17,15 +16,17 @@ bool multiBinSeeker(const unsigned int sector, const cd::IsoDirEntries::Entry &e
 CueFile parseCueFile(fs::path& inputFile)
 {
 	CueFile cueFile;
-	std::string line, fileType;
-	fs::ifstream file(inputFile);
+	std::string fileType;
+	unique_file file = OpenScopedFile(inputFile, "r");
 	fs::path filePath = inputFile;
 	int lineNumber = 1;
 	int pauseStartSector = 1;
 	int previousStartSector = 0;
 
-	while (std::getline(file, line))
+	char buffer[1024];
+	while (std::fgets(buffer, sizeof(buffer), file.get()) != nullptr)
 	{
+		std::string_view line(buffer);
 		if (line.find("FILE") != std::string::npos)
 		{
 
@@ -37,9 +38,9 @@ CueFile parseCueFile(fs::path& inputFile)
 				cueFile.multiBIN = true;
 			}
 
-			size_t firstQuote = line.find("\"");
-			size_t lastQuote = line.rfind("\"");
-			std::string fileName = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+			size_t firstQuote = line.find('"');
+			size_t lastQuote = line.rfind('"');
+			std::string fileName(line.substr(firstQuote + 1, lastQuote - firstQuote - 1));
 			filePath.replace_filename(fileName);
 			if (int64_t fileSize = GetSize(filePath); fileSize < 0)
 			{
@@ -97,7 +98,7 @@ CueFile parseCueFile(fs::path& inputFile)
 		else if (line.find("INDEX 00") != std::string::npos)
 		{
 			size_t timeStart = line.find("INDEX 00") + 9;
-			std::string startTime = line.substr(timeStart, line.find("\r") - timeStart);
+			std::string startTime(line.substr(timeStart, line.find_first_of("\r\n") - timeStart));
 			pauseStartSector = TimecodeToSectors(startTime);
 			if (pauseStartSector < 0)
 			{
@@ -114,7 +115,7 @@ CueFile parseCueFile(fs::path& inputFile)
 		else if (line.find("INDEX 01") != std::string::npos)
 		{
 			size_t timeStart = line.find("INDEX 01") + 9;
-			std::string startTime = line.substr(timeStart, line.find("\r") - timeStart);
+			std::string startTime(line.substr(timeStart, line.find_first_of("\r\n") - timeStart));
 			int startSector = TimecodeToSectors(startTime);
 			if (startSector < 0)
 			{

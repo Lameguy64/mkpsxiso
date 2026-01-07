@@ -2,7 +2,6 @@
 #include "xa.h"
 #include "miniaudio_helpers.h"
 #include <ctime>
-#include <fstream>
 
 namespace global
 {
@@ -557,7 +556,7 @@ bool iso::DirTreeClass::WriteDirEntries(cd::IsoWriter* writer, const DIRENTRY& d
 			else if (entry.type == EntryType::EntryXA)
 			{
 				attributes |= entry.attribs != 0xFFu ? (entry.attribs << 8) : 0x3800;
-				xa->filenum = MinimumOne(fs::ifstream(entry.srcfile, std::ios::binary).get());
+				xa->filenum = MinimumOne(fgetc(OpenScopedFile(entry.srcfile, "rb").get()));
 			}
 			else if (entry.type == EntryType::EntryDir)
 			{
