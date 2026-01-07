@@ -550,10 +550,10 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
     return dirEntries;  
 }
 
-std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, int offs)
+std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, int offs, std::vector<cd::IsoPathTable::Entry>& pathTableList)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
-    dirEntries->ReadRootDir(&reader, offs);
+	dirEntries->ReadRootDir(&reader, !param::pathTable ? offs : pathTableList[0].entry.dirOffs);
 
 	if (dirEntries->dirEntryList.GetView().empty())
 	{
@@ -561,26 +561,11 @@ std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd:
 		exit(EXIT_FAILURE);
 	}
 	auto& entry = dirEntries->dirEntryList.GetView().front().get();
-    entry.subdir = ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb),
-		CleanIdentifier(entry.identifier));
+	entry.subdir = !param::pathTable
+		? ParseSubdirectory(reader, dirEntries->dirEntryList.NewView(), entry.entry.entryOffs.lsb, GetSizeInSectors(entry.entry.entrySize.lsb), entry.identifier)
+		: ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, 0, entry.identifier);
 
 	return dirEntries;
-}
-
-std::unique_ptr<cd::IsoDirEntries> ParseRootPathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList)
-{ 
-    auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
-    dirEntries->ReadRootDir(&reader, pathTableList[0].entry.dirOffs);
-
-	if (dirEntries->dirEntryList.GetView().empty())
-	{
-		printf("\nERROR: Root directory is empty or invalid.\n");
-		exit(EXIT_FAILURE);
-	}
-  	auto& entry = dirEntries->dirEntryList.GetView().front().get();
-	entry.subdir = ParsePathTable(reader, dirEntries->dirEntryList.NewView(), pathTableList, 0, CleanIdentifier(entry.identifier));
-
-  	return dirEntries;
 }
 
 std::list<cd::IsoDirEntries::Entry*> ParseDAfiles(cd::IsoReader& reader, std::list<cd::IsoDirEntries::Entry>& entries)
@@ -1175,9 +1160,7 @@ void ParseISO(cd::IsoReader& reader) {
 	}
 
 	std::list<cd::IsoDirEntries::Entry> entries;
-	std::unique_ptr<cd::IsoDirEntries> rootDir = (param::pathTable
-		? ParseRootPathTable(reader, ListView(entries), pathTable.pathTableList)
-		: ParseRoot(reader,	ListView(entries), descriptor.rootDirRecord.entryOffs.lsb));
+	std::unique_ptr<cd::IsoDirEntries> rootDir = ParseRoot(reader, ListView(entries), descriptor.rootDirRecord.entryOffs.lsb, pathTable.pathTableList);
 
 	// Sort files by LBA for "strict" output
 	entries.sort([](const auto& left, const auto& right)
