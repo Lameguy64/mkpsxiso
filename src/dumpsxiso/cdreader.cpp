@@ -240,7 +240,7 @@ void cd::IsoPathTable::FreePathTable()
 
 size_t cd::IsoPathTable::ReadPathTable(cd::IsoReader* reader, int lba, unsigned int size)
 {
-	if (lba < 0 || !reader->SeekToSector(lba) || size < sizeof(ISO_PATHTABLE_ENTRY) + sizeof(""))
+	if (lba < 0 || !reader->SeekToSector(lba) || size <= sizeof(ISO_PATHTABLE_ENTRY))
 		return 0;
 
 	FreePathTable();

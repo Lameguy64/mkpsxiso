@@ -73,7 +73,7 @@ namespace cd {
 		unsigned char	type;		/// Volume descriptor type (1 is descriptor, 255 is descriptor terminator)
 		char			id[5];		/// Volume descriptor ID (always CD001)
 		unsigned char	version;	/// Volume descriptor version (always 0x01)
-		unsigned char	flags;		/// Volume descriptor flags (always 0x00)
+		unsigned char	pad;		/// Unused null byte
 	} ISO_DESCRIPTOR_HEADER;
 
 	/// Structure of a date stamp for ISO_DIR_ENTRY structure
@@ -140,7 +140,7 @@ namespace cd {
 		unsigned char	identifier;			// 0x00
 	} ISO_ROOTDIR_HEADER;
 
-	// ISO descriptor structure
+	// ISO Primary Volume Descriptor structure
 	typedef struct {
 
 		// ISO descriptor header
@@ -154,7 +154,7 @@ namespace cd {
 		// Size of volume in sector units
 		ISO_UINT_PAIR volumeSize;
 		// Unused null bytes
-		unsigned char escapeSequences[32];
+		unsigned char pad2[32];
 		// Number of discs in this volume set (always 1 for single volume)
 		ISO_USHORT_PAIR volumeSetSize;
 		// Number of this disc in volume set (always 1 for single volume)
@@ -198,11 +198,11 @@ namespace cd {
 		// File structure version (always 1)
 		unsigned char	fileStructVersion;
 		// Padding
-		unsigned char	pad2;
+		unsigned char	pad3;
 		// Application specific data (says CD-XA001 at [141], the rest are null bytes)
 		unsigned char	appData[512];
 		// Padding
-		unsigned char	pad3[653];
+		unsigned char	pad4[653];
 
 	} ISO_DESCRIPTOR;
 

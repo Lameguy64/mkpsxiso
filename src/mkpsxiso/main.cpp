@@ -49,8 +49,7 @@ bool UpdateDAFilesWithLBA(iso::EntryList& entries, const char *trackid, const un
 		entry.lba = lba;
 		if ( !global::QuietMode )
 		{
-			std::string_view id(entry.id);
-			printf("    DA File \"%s\"\n", std::string(id.substr(0, id.find_last_of(';'))).c_str());
+			printf("    DA File \"%s\"\n", CleanIdentifier(entry.id).c_str());
 		}
 		return true;
 	}
@@ -383,7 +382,7 @@ int Main(int argc, char* argv[])
 			{
 				// Use file name of XML project as the image file name
 				global::ImageName = global::XMLscript.stem();
-				global::ImageName += ".iso";
+				global::ImageName += ".bin";
 			}
 		}
 

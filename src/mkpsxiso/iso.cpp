@@ -14,7 +14,7 @@ namespace global
 
 static const int MinimumOne(const int val)
 {
-	return val ? val : 1;
+	return val > 1 ? val : 1;
 }
 
 static const int RoundToEven(const int val)
@@ -747,8 +747,6 @@ void iso::DirTreeClass::OutputHeaderListing(FILE* fp, int level) const
 
 			for ( char& ch : temp_name )
 			{
-				ch = std::toupper( ch );
-
 				if ( ch == '.' || ch == ' ' || ch == '-' )
 				{
 					ch = '_';

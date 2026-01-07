@@ -145,7 +145,7 @@ bool CompareICase(std::string_view strLeft, std::string_view strRight)
 {
 	return std::equal(strLeft.begin(), strLeft.end(), strRight.begin(), strRight.end(), [](char left, char right)
 		{
-			return left == right || std::tolower(left) == std::tolower(right);
+			return left == right || std::tolower((unsigned char)left) == std::tolower((unsigned char)right);
 		});
 }
 
