@@ -60,7 +60,7 @@ namespace global
 	std::optional<bool> new_type;
 }
 
-fs::path GetRealDAFilePath(const fs::path& inputPath)
+fs::path GetEncodedDAPath(const fs::path& inputPath)
 {
 	fs::path outputPath(inputPath); 
 	if(param::encodingFormat == EAF_WAV)
@@ -606,7 +606,7 @@ std::list<cd::IsoDirEntries::Entry*> ParseDAfiles(cd::IsoReader& reader, std::li
 			auto& entry = unrefDAbuff.emplace_back();
 			entry.entry.entryOffs.lsb = track.startSector;
 			entry.entry.entrySize.lsb = track.sizeInSectors * F1_DATA_SIZE;
-			entry.identifier = GetRealDAFilePath("TRACK-" + track.number).string() + ";1";
+			entry.identifier = GetEncodedDAPath("TRACK-" + track.number).string() + ";1";
 			entry.type = EntryType::EntryDA;
 
 			// Additional safety check in case the .cue file had a wrong pause size
@@ -805,7 +805,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 				bool isInvalid = !global::cueFile.multiBIN
 					? !reader.SeekToSector(entry.entry.entryOffs.lsb)
 					: !multiBinSeeker(entry.entry.entryOffs.lsb, entry, reader, global::cueFile);
-                auto daOutPath = GetRealDAFilePath(outputPath);
+                auto daOutPath = GetEncodedDAPath(outputPath);
 				auto outFile = OpenScopedFile(daOutPath, "wb");
 
 				if (isInvalid && !param::noWarns)
@@ -924,7 +924,7 @@ void ExtractFiles(cd::IsoReader& reader, const std::list<cd::IsoDirEntries::Entr
 		fs::path toChange(rootPath / entry.virtualPath / CleanIdentifier(entry.identifier));
 		if(entry.type == EntryType::EntryDA)
 		{
-			toChange = GetRealDAFilePath(toChange);
+			toChange = GetEncodedDAPath(toChange);
 		}
 		UpdateTimestamps(toChange, entry.entry.entryDate);
 	}
@@ -1310,7 +1310,7 @@ void ParseISO(cd::IsoReader& reader) {
 			{
 				// SYSTEM DESCRIPTION CD-ROM XA Ch.II 2.3, pause should be always >= 150 sectors.
 				unsigned pregap_sectors = 150;
-				dafile->virtualPath = GetRealDAFilePath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier));
+				dafile->virtualPath = GetEncodedDAPath(sourcePath / dafile->virtualPath / CleanIdentifier(dafile->identifier));
 				if(dafile->entry.entryOffs.lsb != currentLBA)
 				{
 					pregap_sectors = dafile->entry.entryOffs.lsb - currentLBA;
