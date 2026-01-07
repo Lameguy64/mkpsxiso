@@ -48,8 +48,7 @@
 				volume			- Optional, specifies the volume identifier.
 				volume_set		- Optional, specifies the volume set identifier.
 				publisher		- Optional, specifies the publisher identifier.
-				data_preparer	- Optional, specifies the data preparer identifier (defaults to a
-								  message stating that the image file was generated using MKPSXISO).
+				data_preparer	- Optional, specifies the data preparer identifier.
 				copyright       - Optional, specifies the copyright descriptor.
 		-->
 		<identifiers
@@ -77,11 +76,6 @@
 		
 		<!-- <directory_tree>
 			Specifies and contains the directory structure for the data track.
-			
-			Attributes:
-				srcdir	- Optional, specifies the directory path to the source files if no source attribute is
-						  specified to the <file> elements (optional, take note that it does not behave
-						  like cd or chdir and must be a complete path, can be a relative or absolute path).
 		-->
 		<directory_tree>
 		
@@ -110,9 +104,9 @@
 							  This setting doesn't modify the LBA and is per directory. If order is not specified, defaults to '0'.
 							  So, files/folders with order < 0 will be before the unordered ones and after them the ones with order > 0.
 				
-				Note: Either name or source attribute can be omitted. If name is only specified, it uses that
-				as the name of the source file and specifying source only strips off the path name if there's
-				any and uses that as the name of the file. Omitting both will cause an error obviously.
+				Note: Either name or source attribute can be omitted. If only name is specified, it uses that as the
+				name of the source file (must be in the root directory), and specifying only source strips off the
+				path name and uses that as the name of the file. Omitting both will cause an error obviously.
 			-->
 			<!-- Stores system.txt as system.cnf -->
 			<file name="system.cnf"	type="data"	source="system.txt"/>
