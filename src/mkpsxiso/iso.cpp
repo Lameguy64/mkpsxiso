@@ -1,8 +1,17 @@
-#include "global.h"
 #include "iso.h"
 #include "xa.h"
 #include "miniaudio_helpers.h"
+#include <ctime>
 #include <fstream>
+
+namespace global
+{
+	extern time_t	BuildTime;
+	extern bool		noWarns;
+	extern bool		QuietMode;
+	extern bool		noXA;
+	extern int		trackNum;
+};
 
 static const int MinimumOne(const int val)
 {

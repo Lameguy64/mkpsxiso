@@ -1,11 +1,15 @@
 #include "cdwriter.h"
 #include "common.h"
 #include "edcecc.h"
-#include "global.h"
 
 using namespace cd;
 
 static const EDCECC EDC_ECC_GEN;
+
+namespace global
+{
+	extern bool xa_edc;
+}
 
 ISO_USHORT_PAIR cd::SetPair16(unsigned short val) {
     return { val, SwapBytes16(val) };
