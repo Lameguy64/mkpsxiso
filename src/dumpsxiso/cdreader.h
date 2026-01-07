@@ -108,5 +108,5 @@ namespace cd {
     };
 
 }
-extern EntryType GetXAEntryType(unsigned short xa_attr);
+
 #endif // _CDREADER_H

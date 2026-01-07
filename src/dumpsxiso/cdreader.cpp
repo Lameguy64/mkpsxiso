@@ -303,6 +303,45 @@ cd::IsoDirEntries::IsoDirEntries(ListView<Entry> view)
 {
 }
 
+static EntryType GetXAEntryType(unsigned short xa_attr)
+{
+	// we try to guess the file type. Usually, the xa_attr should tell this, but there are many games
+	// that do not follow the standard, and sometime leave some or all the attributes unset.
+	if (xa_attr & 0x40)
+	{
+		// if the cddata flag is set, we assume this is the case
+		return EntryType::EntryDA;
+	}
+	if (xa_attr & 0x80)
+	{
+		// if the directory flag is set, we assume this is the case
+		return EntryType::EntryDir;
+	}
+	if ( (xa_attr & 0x08) && !(xa_attr & 0x10) )
+	{
+		// if the mode 2 form 1 flag is set, and form 2 is not, we assume this is a regular file.
+		return EntryType::EntryFile;
+	}
+	if ( (xa_attr & 0x10) && !(xa_attr & 0x08) )
+	{
+		// if the mode 2 form 2 flag is set, and form 1 is not, we assume this is a pure audio xa file.
+		return EntryType::EntryXA;
+	}
+
+	// here all flags are set to the same value. From what I could see until now, when both flags are the same,
+	// this is interpreted in the following two ways, which both lead us to choose str/xa type.
+	// 1. Both values are 1, which means there is an indication by the mode 2 form 2 flag that the data is not
+	//    regular mode 2 form 1 data (i.e., it is either mixed or just xa).
+	// 2. Both values are 0. The fact that the mode 2 form 2 flag is 0 simply means that the data might not
+	//    be *pure* mode 2 form 2 data (i.e., xa), so, we do not conclude it is regular mode 2 form 1 data.
+	//    We thus give priority to the mode 2 form 1 flag, which is also zero,
+	//	  and conclude that the data is not regular mode 2 form 1 data, and thus can be either mode 2 form 2 or mixed.
+
+	// Remark: Some games (Legend of Mana), use a very strange STR+XA format that is stored in plain mode 2 form 1.
+	// This is properly marked in the xa_attr, and there is nothing wrong in extracting them as data.
+	return EntryType::EntryXA;
+}
+
 void cd::IsoDirEntries::ReadDirEntries(cd::IsoReader* reader, int lba, int sectors)
 {
 	short order = 0;
