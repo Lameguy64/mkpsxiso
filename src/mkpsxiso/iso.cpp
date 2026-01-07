@@ -1009,11 +1009,9 @@ static void CopyStringPadWithSpaces(char (&dest)[N], const char* src)
 
 	if ( src != nullptr )
 	{
-		size_t i = 0;
-		const size_t len = strlen(src);
-		for (; begin != end && i < len; ++begin, ++i)
+		for (; begin != end && *src != 0; ++begin, ++src)
 		{
-			*begin = std::toupper( src[i] );
+			*begin = std::toupper( (unsigned char)*src );
 		}
 	}
 
