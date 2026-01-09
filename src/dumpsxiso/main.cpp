@@ -1457,7 +1457,7 @@ int Main(int argc, char *argv[])
 
 		if (param::isoFile.empty())
 		{
-			param::isoFile = fs::path(*args).lexically_normal();
+			param::isoFile = fs::path(*args).lexically_normal().lexically_proximate(fs::current_path());
 		}
 		else
 		{

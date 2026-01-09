@@ -182,7 +182,7 @@ int Main(int argc, char* argv[])
 
 		if ( global::XMLscript.empty() )
 		{
-			global::XMLscript = fs::path(*args).lexically_normal();
+			global::XMLscript = fs::path(*args).lexically_normal().lexically_proximate(fs::current_path());
 		}
 		else
 		{
