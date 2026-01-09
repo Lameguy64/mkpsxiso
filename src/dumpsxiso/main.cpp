@@ -448,8 +448,9 @@ std::unique_ptr<cd::IsoDirEntries> ParseSubdirectory(cd::IsoReader& reader, List
 	return dirEntries;
 }
 
-std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, std::vector<cd::IsoPathTable::Entry>& pathTableList, int index,
-   const fs::path& path) {
+std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, const std::vector<cd::IsoPathTable::Entry>& pathTableList,
+	int index, const fs::path& path)
+{
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
 
 	// Calculate Directory Record sector size
@@ -511,10 +512,10 @@ std::unique_ptr<cd::IsoDirEntries> ParsePathTable(cd::IsoReader& reader, ListVie
     return dirEntries;  
 }
 
-std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, int offs, std::vector<cd::IsoPathTable::Entry>& pathTableList)
+std::unique_ptr<cd::IsoDirEntries> ParseRoot(cd::IsoReader& reader, ListView<cd::IsoDirEntries::Entry> view, const std::vector<cd::IsoPathTable::Entry>& pathTableList)
 {
     auto dirEntries = std::make_unique<cd::IsoDirEntries>(std::move(view));
-	dirEntries->ReadRootDir(&reader, !param::pathTable ? offs : pathTableList[0].entry.dirOffs);
+	dirEntries->ReadRootDir(&reader, pathTableList[0].entry.dirOffs);
 
 	if (dirEntries->dirEntryList.GetView().empty())
 	{
@@ -1121,7 +1122,7 @@ void ParseISO(cd::IsoReader& reader) {
 	}
 
 	std::list<cd::IsoDirEntries::Entry> entries;
-	std::unique_ptr<cd::IsoDirEntries> rootDir = ParseRoot(reader, ListView(entries), descriptor.rootDirRecord.entryOffs.lsb, pathTable.pathTableList);
+	std::unique_ptr<cd::IsoDirEntries> rootDir = ParseRoot(reader, ListView(entries), pathTable.pathTableList);
 
 	// Sort files by LBA for "strict" output
 	entries.sort([](const auto& left, const auto& right)
