@@ -125,7 +125,7 @@
 					order	- Optional, custom Directory Record order (see above for description).
 						  
 			-->
-			<dir name="mydir">
+			<dir name="mydir" source="../mkpsxiso/mydir">
 			
 				<!-- All <file> and <dir> elements here will be inside mydir -->
 				
