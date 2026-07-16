@@ -351,12 +351,6 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	// Strip trailing zeroes, if any
 	entry.identifier.resize(strlen(entry.identifier.c_str()));
 
-	// We don't need a dirty ID, clean it!
-	if ((entry.entry.flags & 0x02) == 0)
-	{
-		entry.identifier = CleanIdentifier(entry.identifier);
-	}
-
 	// ECMA-119 9.1.12 - 00 field present only if file identifier length is an even number
 	if ((entry.entry.identifierLen % 2) == 0)
     {
@@ -384,9 +378,18 @@ std::optional<cd::IsoDirEntries::Entry> cd::IsoDirEntries::ReadEntry(cd::IsoRead
 	if (bytesRead != entry.entry.entryLength)
 		return std::nullopt;
 
-	// Add the EntryType here so as to not keep calculating it everytime later
-	// Check for file number first to determine if it's a STR/XA file, because some games (Mega Man X3) has flagged them as DATA but currently they are not
-	entry.type = entry.extData.filenum ? EntryType::EntryXA : GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
+	// Set the EntryType here so as to not keep calculating it everytime later
+	if ((entry.entry.flags & 0x02) != 0)
+	{
+		entry.type = EntryType::EntryDir;
+	}
+	else
+	{
+		// We don't need a dirty ID, clean it!
+		entry.identifier = CleanIdentifier(entry.identifier);
+		// Check for file number first to determine if it's a STR/XA file, because some games (Mega Man X3) has flagged them as DATA but currently they are not
+		entry.type = entry.extData.filenum ? EntryType::EntryXA : GetXAEntryType((entry.extData.attributes & cdxa::XA_ATTRIBUTES_MASK) >> 8);
+	}
 	entry.trackid = "01"; // This helps detect unreferenced entries more easily
 
 	return entry;
