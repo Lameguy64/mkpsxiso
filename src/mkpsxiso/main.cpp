@@ -1022,6 +1022,8 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		isoIdentifiers.Copyright	= identifierElement->Attribute(xml::attrib::COPYRIGHT);
 		isoIdentifiers.CreationDate	= identifierElement->Attribute(xml::attrib::CREATION_DATE);
 		isoIdentifiers.ModificationDate = identifierElement->Attribute(xml::attrib::MODIFICATION_DATE);
+		isoIdentifiers.AbstractFile = identifierElement->Attribute(xml::attrib::ABSTRACT_FILE);
+		isoIdentifiers.BibliographicFile = identifierElement->Attribute(xml::attrib::BIBLIOGRAPHIC_FILE);
 
 		// Is an ID file specified?
 		if( const char* identifierFile = identifierElement->Attribute(xml::attrib::ID_FILE) )
@@ -1085,6 +1087,10 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 					isoIdentifiers.CreationDate		= str;
 				if( (str = identifierElement->Attribute(xml::attrib::MODIFICATION_DATE)) )
 					isoIdentifiers.ModificationDate = str;
+				if( (str = identifierElement->Attribute(xml::attrib::ABSTRACT_FILE)) )
+					isoIdentifiers.AbstractFile = str;
+				if( (str = identifierElement->Attribute(xml::attrib::BIBLIOGRAPHIC_FILE)) )
+					isoIdentifiers.BibliographicFile = str;
 			}
 		}
 	}
@@ -1261,7 +1267,12 @@ int ParseISOfileSystem(const tinyxml2::XMLElement* trackElement, const fs::path&
 		? (xmlPath / reinterpret_cast<const char8_t*>(dirTreePath)).lexically_normal()
 		: xmlPath;
 
-	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, volumeDate, ReadEntryAttributes(defaultAttributes, directoryTree));
+	cd::ISO_DATESTAMP rootDate = volumeDate;
+	if (const char* rootDateStr = directoryTree->Attribute(xml::attrib::ENTRY_DATE))
+	{
+		ParseDateFromString(rootDate, rootDateStr, volumeDate.GMToffs);
+	}
+	iso::DIRENTRY& root = iso::DirTreeClass::CreateRootDirectory(entries, rootDate, ReadEntryAttributes(defaultAttributes, directoryTree));
 	iso::DirTreeClass* dirTree = root.subdir.get();
 
 	if ( !ParseDirectory(dirTree, directoryTree, xmlPath, defaultAttributes, currentPath) )

@@ -915,8 +915,8 @@ void iso::DirTreeClass::WriteDescriptor(cd::IsoWriter* writer, const iso::IDENTI
 	CopyStringPadWithSpaces( isoDescriptor.copyrightFileIdentifier, id.Copyright );
 
 	// Unneeded identifiers
-	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, nullptr );
-	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, nullptr );
+	CopyStringPadWithSpaces( isoDescriptor.abstractFileIdentifier, id.AbstractFile );
+	CopyStringPadWithSpaces( isoDescriptor.bibliographicFilelIdentifier, id.BibliographicFile );
 
 	ParseLongDateFromString( isoDescriptor.volumeCreateDate, id.CreationDate );
 	ParseLongDateFromString( isoDescriptor.volumeModifyDate, id.ModificationDate );

@@ -180,6 +180,10 @@ static tinyxml2::XMLElement* WriteXMLEntry(const cd::IsoDirEntries::Entry& entry
 			{
 				newelement->SetAttribute(xml::attrib::ENTRY_SOURCE, reinterpret_cast<const char*>(sourcePath.generic_u8string().c_str()));
 			}
+			if (!param::dir)
+			{
+				newelement->SetAttribute(xml::attrib::ENTRY_DATE, DateToString(entry.entry.entryDate, false).c_str());
+			}
 		}
 
 		dirElement = newelement;
@@ -389,6 +393,8 @@ unsigned xml::WriteXML(const cd::ISO_DESCRIPTOR& descriptor, const std::unique_p
 		setAttributeIfNotEmpty(xml::attrib::PUBLISHER, CleanDescElement(descriptor.publisherIdentifier));
 		setAttributeIfNotEmpty(xml::attrib::DATA_PREPARER, CleanDescElement(descriptor.dataPreparerIdentifier));
 		setAttributeIfNotEmpty(xml::attrib::COPYRIGHT, CleanDescElement(descriptor.copyrightFileIdentifier));
+		setAttributeIfNotEmpty(xml::attrib::ABSTRACT_FILE, CleanDescElement(descriptor.abstractFileIdentifier));
+		setAttributeIfNotEmpty(xml::attrib::BIBLIOGRAPHIC_FILE, CleanDescElement(descriptor.bibliographicFilelIdentifier));
 		setAttributeIfNotEmpty(xml::attrib::CREATION_DATE, LongDateToString(descriptor.volumeCreateDate).c_str());
 		if (auto ZERO_DATE = GetUnspecifiedLongDate(); memcmp(&descriptor.volumeModifyDate, &ZERO_DATE, sizeof(descriptor.volumeModifyDate)) != 0)
 		{

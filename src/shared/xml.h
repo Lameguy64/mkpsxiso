@@ -58,6 +58,8 @@ namespace attrib
 	constexpr const char* COPYRIGHT = "copyright";
 	constexpr const char* CREATION_DATE = "creation_date";
 	constexpr const char* MODIFICATION_DATE = "modification_date";
+	constexpr const char* ABSTRACT_FILE = "abstract_file";
+	constexpr const char* BIBLIOGRAPHIC_FILE = "bibliographic_file";
 
 	constexpr const char* NUM_DUMMY_SECTORS = "sectors";
 	constexpr const char* ECC_ADDRESS = "ecc_addr"; // Simulates the real address ECC calculation bug, used for 1:1 rebuilds.

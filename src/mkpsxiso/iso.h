@@ -18,6 +18,8 @@ namespace iso
 		const char* Copyright;
 		const char* CreationDate;
 		const char* ModificationDate;
+		const char* AbstractFile;
+		const char* BibliographicFile;
 	} IDENTIFIERS;
 
 	struct DIRENTRY
